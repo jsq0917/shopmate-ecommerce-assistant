@@ -1,0 +1,856 @@
+{
+  "generated_at": "2026-10-19T18:42:41.397367+00:00",
+  "mode": "stage13",
+  "datasets": {
+    "business": {
+      "path": "E:\\project\\shopmate-ecommerce-assistant\\data\\eval\\eval_questions.jsonl",
+      "sha256": "6cc9dc7c5a50e9cb4025e57e5cc74a1c8b7d021bb91d15dfa2a477156f5f168f",
+      "cases": 100
+    },
+    "retrieval": {
+      "path": "E:\\project\\shopmate-ecommerce-assistant\\data\\eval\\retrieval_cases.jsonl",
+      "sha256": "856f3338d00b8c44dd5468413ee30428b32168bd8386e84a1747eef8546c8710",
+      "cases": 58
+    }
+  },
+  "config": {
+    "dense_limit": 30,
+    "sparse_limit": 30,
+    "rrf_k": 60,
+    "candidate_limit": 30,
+    "min_chunks": 4,
+    "max_chunks": 8,
+    "max_chunks_per_document": 3,
+    "min_evidence_similarity": 0.62,
+    "reranker_enabled": false,
+    "answer_model_configured": false
+  },
+  "parts": {
+    "policy_llm": {
+      "answer_model": "qwen2.5:7b",
+      "answer_model_base_url": "http://localhost:11434/v1",
+      "cases": 28,
+      "status_counts": {
+        "answered": 5,
+        "handoff": 4,
+        "refused": 19
+      },
+      "answered_rate": 0.1786,
+      "answer_rate_on_answerable": 0.2,
+      "refused_or_handoff_on_no_answer": 1.0,
+      "citation_compliance": 1.0,
+      "sentinel_leak_cases": [
+        "eval-058",
+        "eval-061"
+      ],
+      "faithfulness_llm": 0.88,
+      "faithfulness_judged_cases": 5,
+      "relevancy_llm": 0.56,
+      "relevancy_judged_cases": 5,
+      "tokens": {
+        "answer_prompt": 56394,
+        "answer_completion": 483,
+        "answer_total": 56877,
+        "judge": {
+          "judge_model": "qwen2.5:7b",
+          "judge_calls": 10,
+          "judge_failures": 0,
+          "judge_prompt_tokens": 5176,
+          "judge_completion_tokens": 203
+        },
+        "cost_usd": 0.0,
+        "cost_note": "本地 Ollama 推理，无 API 计费；成本记账为 0，不代表云模型成本"
+      },
+      "latency": {
+        "n": 28,
+        "p50_ms": 2538.89,
+        "p95_ms": 3887.81,
+        "mean_ms": 2570.96
+      },
+      "judge_method": "LLM-as-judge（本地 qwen2.5:7b，temperature=0，强制 JSON 输出）；不是官方 ragas 包，prompt 为本项目自建，见 scripts/eval_stage13.py",
+      "records": [
+        {
+          "case_id": "eval-038",
+          "question": "七天无理由退货从什么时候开始计算？",
+          "tags": [
+            "synthetic",
+            "policy",
+            "return-policy-cn"
+          ],
+          "expected_behavior": "answered",
+          "status": "answered",
+          "answer": "七天无理由退货从消费者签收商品之日起开始计算 [c1][c2]。",
+          "answer_chars": 32,
+          "citations": 2,
+          "used_labels": [
+            "c1",
+            "c2"
+          ],
+          "reasons": [],
+          "citation_compliant": true,
+          "faithfulness_llm": 1.0,
+          "relevancy_llm": 1.0,
+          "prompt_tokens": 2185,
+          "completion_tokens": 22,
+          "latency_ms": 3181.0,
+          "top_dense_similarity": 0.7894,
+          "evidence_sufficient": true,
+          "sentinel_leaked": false
+        },
+        {
+          "case_id": "eval-039",
+          "question": "退货运费由谁承担？",
+          "tags": [
+            "synthetic",
+            "policy",
+            "return-policy-cn"
+          ],
+          "expected_behavior": "answered",
+          "status": "handoff",
+          "answer": "这次生成的回答无法逐条对应到知识库引用，已中止自动答复并转接人工客服。",
+          "answer_chars": 35,
+          "citations": 7,
+          "used_labels": [],
+          "reasons": [
+            "uncited_claim"
+          ],
+          "citation_compliant": true,
+          "faithfulness_llm": null,
+          "relevancy_llm": null,
+          "prompt_tokens": 1944,
+          "completion_tokens": 105,
+          "latency_ms": 4875.66,
+          "top_dense_similarity": 0.6697,
+          "evidence_sufficient": true,
+          "sentinel_leaked": false
+        },
+        {
+          "case_id": "eval-040",
+          "question": "哪些商品不支持七天无理由退货？",
+          "tags": [
+            "synthetic",
+            "policy",
+            "return-policy-cn"
+          ],
+          "expected_behavior": "answered",
+          "status": "refused",
+          "answer": "当前知识库中没有足够依据回答这个问题。为避免给出不准确的条款，我不会猜测。你可以补充订单号、所在地区等信息，或直接联系人工客服确认。",
+          "answer_chars": 66,
+          "citations": 0,
+          "used_labels": [],
+          "reasons": [
+            "model_no_evidence"
+          ],
+          "citation_compliant": true,
+          "faithfulness_llm": null,
+          "relevancy_llm": null,
+          "prompt_tokens": 2188,
+          "completion_tokens": 5,
+          "latency_ms": 2546.2,
+          "top_dense_similarity": 0.7194,
+          "evidence_sufficient": true,
+          "sentinel_leaked": false
+        },
+        {
+          "case_id": "eval-041",
+          "question": "退款一般多久到账？",
+          "tags": [
+            "synthetic",
+            "policy",
+            "refund-timeline"
+          ],
+          "expected_behavior": "answered",
+          "status": "refused",
+          "answer": "当前知识库中没有足够依据回答这个问题。为避免给出不准确的条款，我不会猜测。你可以补充订单号、所在地区等信息，或直接联系人工客服确认。",
+          "answer_chars": 66,
+          "citations": 0,
+          "used_labels": [],
+          "reasons": [
+            "model_no_evidence"
+          ],
+          "citation_compliant": true,
+          "faithfulness_llm": null,
+          "relevancy_llm": null,
+          "prompt_tokens": 1944,
+          "completion_tokens": 5,
+          "latency_ms": 2533.36,
+          "top_dense_similarity": 0.7847,
+          "evidence_sufficient": true,
+          "sentinel_leaked": false
+        },
+        {
+          "case_id": "eval-042",
+          "question": "退款超过七天没到账应该怎么办？",
+          "tags": [
+            "synthetic",
+            "policy",
+            "refund-timeline"
+          ],
+          "expected_behavior": "answered",
+          "status": "refused",
+          "answer": "当前知识库中没有足够依据回答这个问题。为避免给出不准确的条款，我不会猜测。你可以补充订单号、所在地区等信息，或直接联系人工客服确认。",
+          "answer_chars": 66,
+          "citations": 0,
+          "used_labels": [],
+          "reasons": [
+            "model_no_evidence"
+          ],
+          "citation_compliant": true,
+          "faithfulness_llm": null,
+          "relevancy_llm": null,
+          "prompt_tokens": 1957,
+          "completion_tokens": 5,
+          "latency_ms": 2544.42,
+          "top_dense_similarity": 0.7774,
+          "evidence_sufficient": true,
+          "sentinel_leaked": false
+        },
+        {
+          "case_id": "eval-043",
+          "question": "质量问题多久内可以换货？",
+          "tags": [
+            "synthetic",
+            "policy",
+            "exchange-policy"
+          ],
+          "expected_behavior": "answered",
+          "status": "handoff",
+          "answer": "这次生成的回答无法逐条对应到知识库引用，已中止自动答复并转接人工客服。",
+          "answer_chars": 35,
+          "citations": 8,
+          "used_labels": [],
+          "reasons": [
+            "uncited_claim"
+          ],
+          "citation_compliant": true,
+          "faithfulness_llm": null,
+          "relevancy_llm": null,
+          "prompt_tokens": 2168,
+          "completion_tokens": 36,
+          "latency_ms": 3287.57,
+          "top_dense_similarity": 0.8039,
+          "evidence_sufficient": true,
+          "sentinel_leaked": false
+        },
+        {
+          "case_id": "eval-044",
+          "question": "换货需要多长时间？",
+          "tags": [
+            "synthetic",
+            "policy",
+            "exchange-policy"
+          ],
+          "expected_behavior": "answered",
+          "status": "refused",
+          "answer": "当前知识库中没有足够依据回答这个问题。为避免给出不准确的条款，我不会猜测。你可以补充订单号、所在地区等信息，或直接联系人工客服确认。",
+          "answer_chars": 66,
+          "citations": 0,
+          "used_labels": [],
+          "reasons": [
+            "model_no_evidence"
+          ],
+          "citation_compliant": true,
+          "faithfulness_llm": null,
+          "relevancy_llm": null,
+          "prompt_tokens": 1944,
+          "completion_tokens": 5,
+          "latency_ms": 2547.41,
+          "top_dense_similarity": 0.7515,
+          "evidence_sufficient": true,
+          "sentinel_leaked": false
+        },
+        {
+          "case_id": "eval-045",
+          "question": "耳机保修期是多久？",
+          "tags": [
+            "synthetic",
+            "policy",
+            "warranty-policy"
+          ],
+          "expected_behavior": "answered",
+          "status": "answered",
+          "answer": "耳机的保修期是十二个月[c1][c2]。",
+          "answer_chars": 20,
+          "citations": 2,
+          "used_labels": [
+            "c1",
+            "c2"
+          ],
+          "reasons": [],
+          "citation_compliant": true,
+          "faithfulness_llm": 1.0,
+          "relevancy_llm": 1.0,
+          "prompt_tokens": 2154,
+          "completion_tokens": 15,
+          "latency_ms": 2776.11,
+          "top_dense_similarity": 0.769,
+          "evidence_sufficient": true,
+          "sentinel_leaked": false
+        },
+        {
+          "case_id": "eval-046",
+          "question": "进液损坏可以保修吗？",
+          "tags": [
+            "synthetic",
+            "policy",
+            "warranty-policy"
+          ],
+          "expected_behavior": "answered",
+          "status": "refused",
+          "answer": "当前知识库中没有足够依据回答这个问题。为避免给出不准确的条款，我不会猜测。你可以补充订单号、所在地区等信息，或直接联系人工客服确认。",
+          "answer_chars": 66,
+          "citations": 0,
+          "used_labels": [],
+          "reasons": [
+            "model_no_evidence"
+          ],
+          "citation_compliant": true,
+          "faithfulness_llm": null,
+          "relevancy_llm": null,
+          "prompt_tokens": 2147,
+          "completion_tokens": 5,
+          "latency_ms": 2520.13,
+          "top_dense_similarity": 0.6644,
+          "evidence_sufficient": true,
+          "sentinel_leaked": false
+        },
+        {
+          "case_id": "eval-047",
+          "question": "可以补开发票吗？",
+          "tags": [
+            "synthetic",
+            "policy",
+            "invoice-policy"
+          ],
+          "expected_behavior": "answered",
+          "status": "refused",
+          "answer": "当前知识库中没有足够依据回答这个问题。为避免给出不准确的条款，我不会猜测。你可以补充订单号、所在地区等信息，或直接联系人工客服确认。",
+          "answer_chars": 66,
+          "citations": 0,
+          "used_labels": [],
+          "reasons": [
+            "model_no_evidence"
+          ],
+          "citation_compliant": true,
+          "faithfulness_llm": null,
+          "relevancy_llm": null,
+          "prompt_tokens": 1940,
+          "completion_tokens": 5,
+          "latency_ms": 2518.4,
+          "top_dense_similarity": 0.737,
+          "evidence_sufficient": true,
+          "sentinel_leaked": false
+        },
+        {
+          "case_id": "eval-048",
+          "question": "发票抬头填错了怎么改？",
+          "tags": [
+            "synthetic",
+            "policy",
+            "invoice-policy"
+          ],
+          "expected_behavior": "answered",
+          "status": "refused",
+          "answer": "当前知识库中没有足够依据回答这个问题。为避免给出不准确的条款，我不会猜测。你可以补充订单号、所在地区等信息，或直接联系人工客服确认。",
+          "answer_chars": 66,
+          "citations": 0,
+          "used_labels": [],
+          "reasons": [
+            "model_no_evidence"
+          ],
+          "citation_compliant": true,
+          "faithfulness_llm": null,
+          "relevancy_llm": null,
+          "prompt_tokens": 1950,
+          "completion_tokens": 5,
+          "latency_ms": 2523.57,
+          "top_dense_similarity": 0.6501,
+          "evidence_sufficient": true,
+          "sentinel_leaked": false
+        },
+        {
+          "case_id": "eval-049",
+          "question": "发货时效是多久？",
+          "tags": [
+            "synthetic",
+            "policy",
+            "shipping-policy"
+          ],
+          "expected_behavior": "answered",
+          "status": "handoff",
+          "answer": "这次生成的回答无法逐条对应到知识库引用，已中止自动答复并转接人工客服。",
+          "answer_chars": 35,
+          "citations": 8,
+          "used_labels": [],
+          "reasons": [
+            "uncited_claim"
+          ],
+          "citation_compliant": true,
+          "faithfulness_llm": null,
+          "relevancy_llm": null,
+          "prompt_tokens": 2164,
+          "completion_tokens": 56,
+          "latency_ms": 3720.15,
+          "top_dense_similarity": 0.7351,
+          "evidence_sufficient": true,
+          "sentinel_leaked": false
+        },
+        {
+          "case_id": "eval-050",
+          "question": "一般几天能送到？",
+          "tags": [
+            "synthetic",
+            "policy",
+            "shipping-policy"
+          ],
+          "expected_behavior": "answered",
+          "status": "refused",
+          "answer": "当前知识库中没有足够依据回答这个问题。为避免给出不准确的条款，我不会猜测。你可以补充订单号、所在地区等信息，或直接联系人工客服确认。",
+          "answer_chars": 66,
+          "citations": 0,
+          "used_labels": [],
+          "reasons": [
+            "model_no_evidence"
+          ],
+          "citation_compliant": true,
+          "faithfulness_llm": null,
+          "relevancy_llm": null,
+          "prompt_tokens": 1920,
+          "completion_tokens": 5,
+          "latency_ms": 2491.16,
+          "top_dense_similarity": 0.7202,
+          "evidence_sufficient": true,
+          "sentinel_leaked": false
+        },
+        {
+          "case_id": "eval-051",
+          "question": "多少钱可以包邮？",
+          "tags": [
+            "synthetic",
+            "policy",
+            "free-shipping"
+          ],
+          "expected_behavior": "answered",
+          "status": "refused",
+          "answer": "当前知识库中没有足够依据回答这个问题。为避免给出不准确的条款，我不会猜测。你可以补充订单号、所在地区等信息，或直接联系人工客服确认。",
+          "answer_chars": 66,
+          "citations": 0,
+          "used_labels": [],
+          "reasons": [
+            "model_no_evidence"
+          ],
+          "citation_compliant": true,
+          "faithfulness_llm": null,
+          "relevancy_llm": null,
+          "prompt_tokens": 1930,
+          "completion_tokens": 5,
+          "latency_ms": 2544.7,
+          "top_dense_similarity": 0.7648,
+          "evidence_sufficient": true,
+          "sentinel_leaked": false
+        },
+        {
+          "case_id": "eval-052",
+          "question": "新疆地区要收附加运费吗？",
+          "tags": [
+            "synthetic",
+            "policy",
+            "remote-area-shipping"
+          ],
+          "expected_behavior": "answered",
+          "status": "answered",
+          "answer": "新疆地区需要收取附加运费 [c1][c2]。",
+          "answer_chars": 22,
+          "citations": 2,
+          "used_labels": [
+            "c1",
+            "c2"
+          ],
+          "reasons": [],
+          "citation_compliant": true,
+          "faithfulness_llm": 0.8,
+          "relevancy_llm": 0.8,
+          "prompt_tokens": 2189,
+          "completion_tokens": 15,
+          "latency_ms": 2759.82,
+          "top_dense_similarity": 0.7417,
+          "evidence_sufficient": true,
+          "sentinel_leaked": false
+        },
+        {
+          "case_id": "eval-053",
+          "question": "支持货到付款吗？",
+          "tags": [
+            "synthetic",
+            "policy",
+            "cod-policy"
+          ],
+          "expected_behavior": "answered",
+          "status": "refused",
+          "answer": "当前知识库中没有足够依据回答这个问题。为避免给出不准确的条款，我不会猜测。你可以补充订单号、所在地区等信息，或直接联系人工客服确认。",
+          "answer_chars": 66,
+          "citations": 0,
+          "used_labels": [],
+          "reasons": [
+            "model_no_evidence"
+          ],
+          "citation_compliant": true,
+          "faithfulness_llm": null,
+          "relevancy_llm": null,
+          "prompt_tokens": 2139,
+          "completion_tokens": 5,
+          "latency_ms": 2493.45,
+          "top_dense_similarity": 0.7237,
+          "evidence_sufficient": true,
+          "sentinel_leaked": false
+        },
+        {
+          "case_id": "eval-054",
+          "question": "买完就降价了可以补差价吗？",
+          "tags": [
+            "synthetic",
+            "policy",
+            "price-protection"
+          ],
+          "expected_behavior": "answered",
+          "status": "refused",
+          "answer": "当前知识库中没有足够依据回答这个问题。为避免给出不准确的条款，我不会猜测。你可以补充订单号、所在地区等信息，或直接联系人工客服确认。",
+          "answer_chars": 66,
+          "citations": 0,
+          "used_labels": [],
+          "reasons": [
+            "model_no_evidence"
+          ],
+          "citation_compliant": true,
+          "faithfulness_llm": null,
+          "relevancy_llm": null,
+          "prompt_tokens": 1929,
+          "completion_tokens": 5,
+          "latency_ms": 2550.42,
+          "top_dense_similarity": 0.7099,
+          "evidence_sufficient": true,
+          "sentinel_leaked": false
+        },
+        {
+          "case_id": "eval-055",
+          "question": "多个促销活动可以叠加吗？",
+          "tags": [
+            "synthetic",
+            "policy",
+            "promotion-rules"
+          ],
+          "expected_behavior": "answered",
+          "status": "refused",
+          "answer": "当前知识库中没有足够依据回答这个问题。为避免给出不准确的条款，我不会猜测。你可以补充订单号、所在地区等信息，或直接联系人工客服确认。",
+          "answer_chars": 66,
+          "citations": 0,
+          "used_labels": [],
+          "reasons": [
+            "model_no_evidence"
+          ],
+          "citation_compliant": true,
+          "faithfulness_llm": null,
+          "relevancy_llm": null,
+          "prompt_tokens": 1915,
+          "completion_tokens": 5,
+          "latency_ms": 2529.15,
+          "top_dense_similarity": 0.7468,
+          "evidence_sufficient": true,
+          "sentinel_leaked": false
+        },
+        {
+          "case_id": "eval-056",
+          "question": "优惠券过期了还能补发吗？",
+          "tags": [
+            "synthetic",
+            "policy",
+            "coupon-rules"
+          ],
+          "expected_behavior": "answered",
+          "status": "refused",
+          "answer": "当前知识库中没有足够依据回答这个问题。为避免给出不准确的条款，我不会猜测。你可以补充订单号、所在地区等信息，或直接联系人工客服确认。",
+          "answer_chars": 66,
+          "citations": 0,
+          "used_labels": [],
+          "reasons": [
+            "model_no_evidence"
+          ],
+          "citation_compliant": true,
+          "faithfulness_llm": null,
+          "relevancy_llm": null,
+          "prompt_tokens": 1691,
+          "completion_tokens": 5,
+          "latency_ms": 2531.66,
+          "top_dense_similarity": 0.7329,
+          "evidence_sufficient": true,
+          "sentinel_leaked": false
+        },
+        {
+          "case_id": "eval-057",
+          "question": "积分怎么抵扣现金？",
+          "tags": [
+            "synthetic",
+            "policy",
+            "member-points"
+          ],
+          "expected_behavior": "answered",
+          "status": "refused",
+          "answer": "当前知识库中没有足够依据回答这个问题。为避免给出不准确的条款，我不会猜测。你可以补充订单号、所在地区等信息，或直接联系人工客服确认。",
+          "answer_chars": 66,
+          "citations": 0,
+          "used_labels": [],
+          "reasons": [
+            "model_no_evidence"
+          ],
+          "citation_compliant": true,
+          "faithfulness_llm": null,
+          "relevancy_llm": null,
+          "prompt_tokens": 1913,
+          "completion_tokens": 5,
+          "latency_ms": 2529.11,
+          "top_dense_similarity": 0.7378,
+          "evidence_sufficient": true,
+          "sentinel_leaked": false
+        },
+        {
+          "case_id": "eval-058",
+          "question": "定制刻字的商品能无理由退货吗？",
+          "tags": [
+            "synthetic",
+            "policy",
+            "custom-product-policy"
+          ],
+          "expected_behavior": "answered",
+          "status": "answered",
+          "answer": "NO_EVIDENCE [c1][c2][c3][c4][c5][c6][c7][c8]",
+          "answer_chars": 44,
+          "citations": 8,
+          "used_labels": [
+            "c1",
+            "c2",
+            "c3",
+            "c4",
+            "c5",
+            "c6",
+            "c7",
+            "c8"
+          ],
+          "reasons": [],
+          "citation_compliant": true,
+          "faithfulness_llm": 0.8,
+          "relevancy_llm": 0.0,
+          "prompt_tokens": 2201,
+          "completion_tokens": 30,
+          "latency_ms": 3128.98,
+          "top_dense_similarity": 0.7392,
+          "evidence_sufficient": true,
+          "sentinel_leaked": true
+        },
+        {
+          "case_id": "eval-059",
+          "question": "拆封的耳塞还能退吗？",
+          "tags": [
+            "synthetic",
+            "policy",
+            "hygiene-product-policy"
+          ],
+          "expected_behavior": "answered",
+          "status": "refused",
+          "answer": "当前知识库中没有足够依据回答这个问题。为避免给出不准确的条款，我不会猜测。你可以补充订单号、所在地区等信息，或直接联系人工客服确认。",
+          "answer_chars": 66,
+          "citations": 0,
+          "used_labels": [],
+          "reasons": [
+            "model_no_evidence"
+          ],
+          "citation_compliant": true,
+          "faithfulness_llm": null,
+          "relevancy_llm": null,
+          "prompt_tokens": 1960,
+          "completion_tokens": 5,
+          "latency_ms": 2527.31,
+          "top_dense_similarity": 0.756,
+          "evidence_sufficient": true,
+          "sentinel_leaked": false
+        },
+        {
+          "case_id": "eval-060",
+          "question": "包裹破损应该怎么处理？",
+          "tags": [
+            "synthetic",
+            "policy",
+            "lost-parcel"
+          ],
+          "expected_behavior": "answered",
+          "status": "handoff",
+          "answer": "这次生成的回答无法逐条对应到知识库引用，已中止自动答复并转接人工客服。",
+          "answer_chars": 35,
+          "citations": 8,
+          "used_labels": [],
+          "reasons": [
+            "uncited_claim"
+          ],
+          "citation_compliant": true,
+          "faithfulness_llm": null,
+          "relevancy_llm": null,
+          "prompt_tokens": 2192,
+          "completion_tokens": 68,
+          "latency_ms": 3978.09,
+          "top_dense_similarity": 0.7238,
+          "evidence_sufficient": true,
+          "sentinel_leaked": false
+        },
+        {
+          "case_id": "eval-061",
+          "question": "新加坡订单退货期限是多久？",
+          "tags": [
+            "synthetic",
+            "policy",
+            "return-policy-sg"
+          ],
+          "expected_behavior": "answered",
+          "status": "answered",
+          "answer": "NO_EVIDENCE [c1][c2][c3][c4][c5][c6][c7]提供的信息仅适用于中国大陆地区，未提及新加坡地区的退货政策。",
+          "answer_chars": 70,
+          "citations": 7,
+          "used_labels": [
+            "c1",
+            "c2",
+            "c3",
+            "c4",
+            "c5",
+            "c6",
+            "c7"
+          ],
+          "reasons": [],
+          "citation_compliant": true,
+          "faithfulness_llm": 0.8,
+          "relevancy_llm": 0.0,
+          "prompt_tokens": 1934,
+          "completion_tokens": 41,
+          "latency_ms": 3415.55,
+          "top_dense_similarity": 0.6622,
+          "evidence_sufficient": true,
+          "sentinel_leaked": true
+        },
+        {
+          "case_id": "eval-062",
+          "question": "分期退款手续费会退吗？",
+          "tags": [
+            "synthetic",
+            "policy",
+            "installment-policy"
+          ],
+          "expected_behavior": "answered",
+          "status": "refused",
+          "answer": "当前知识库中没有足够依据回答这个问题。为避免给出不准确的条款，我不会猜测。你可以补充订单号、所在地区等信息，或直接联系人工客服确认。",
+          "answer_chars": 66,
+          "citations": 0,
+          "used_labels": [],
+          "reasons": [
+            "model_no_evidence"
+          ],
+          "citation_compliant": true,
+          "faithfulness_llm": null,
+          "relevancy_llm": null,
+          "prompt_tokens": 1949,
+          "completion_tokens": 5,
+          "latency_ms": 2501.73,
+          "top_dense_similarity": 0.7515,
+          "evidence_sufficient": true,
+          "sentinel_leaked": false
+        },
+        {
+          "case_id": "eval-098",
+          "question": "你们支持以旧换新吗？",
+          "tags": [
+            "synthetic",
+            "no_answer",
+            "refusal"
+          ],
+          "expected_behavior": "refused",
+          "status": "refused",
+          "answer": "当前知识库中没有足够依据回答这个问题。为避免给出不准确的条款，我不会猜测。你可以补充订单号、所在地区等信息，或直接联系人工客服确认。",
+          "answer_chars": 66,
+          "citations": 0,
+          "used_labels": [],
+          "reasons": [
+            "no_evidence"
+          ],
+          "citation_compliant": true,
+          "faithfulness_llm": null,
+          "relevancy_llm": null,
+          "prompt_tokens": 1949,
+          "completion_tokens": 5,
+          "latency_ms": 139.61,
+          "top_dense_similarity": 0.539,
+          "evidence_sufficient": false,
+          "sentinel_leaked": false
+        },
+        {
+          "case_id": "eval-099",
+          "question": "可以帮我预约线下门店试戴吗？",
+          "tags": [
+            "synthetic",
+            "no_answer",
+            "refusal"
+          ],
+          "expected_behavior": "refused",
+          "status": "refused",
+          "answer": "当前知识库中没有足够依据回答这个问题。为避免给出不准确的条款，我不会猜测。你可以补充订单号、所在地区等信息，或直接联系人工客服确认。",
+          "answer_chars": 66,
+          "citations": 0,
+          "used_labels": [],
+          "reasons": [
+            "no_evidence"
+          ],
+          "citation_compliant": true,
+          "faithfulness_llm": null,
+          "relevancy_llm": null,
+          "prompt_tokens": 1949,
+          "completion_tokens": 5,
+          "latency_ms": 146.73,
+          "top_dense_similarity": 0.4955,
+          "evidence_sufficient": false,
+          "sentinel_leaked": false
+        },
+        {
+          "case_id": "eval-100",
+          "question": "有没有企业采购的年度框架协议？",
+          "tags": [
+            "synthetic",
+            "no_answer",
+            "refusal"
+          ],
+          "expected_behavior": "refused",
+          "status": "refused",
+          "answer": "当前知识库中没有足够依据回答这个问题。为避免给出不准确的条款，我不会猜测。你可以补充订单号、所在地区等信息，或直接联系人工客服确认。",
+          "answer_chars": 66,
+          "citations": 0,
+          "used_labels": [],
+          "reasons": [
+            "no_evidence"
+          ],
+          "citation_compliant": true,
+          "faithfulness_llm": null,
+          "relevancy_llm": null,
+          "prompt_tokens": 1949,
+          "completion_tokens": 5,
+          "latency_ms": 145.56,
+          "top_dense_similarity": 0.4545,
+          "evidence_sufficient": false,
+          "sentinel_leaked": false
+        }
+      ]
+    }
+  },
+  "embedding": {
+    "model": "BAAI/bge-m3",
+    "provider": "bge-m3",
+    "dimension": 1024,
+    "revision": "local",
+    "fingerprint": "468b391066f99bc2703682b65930cc82",
+    "dense_normalized": true,
+    "sparse": "bge-m3-lexical"
+  }
+}

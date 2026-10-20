@@ -1,0 +1,153 @@
+{
+  "generated_at": "2026-10-19T18:38:40.290984+00:00",
+  "mode": "stage13",
+  "datasets": {
+    "business": {
+      "path": "E:\\project\\shopmate-ecommerce-assistant\\data\\eval\\eval_questions.jsonl",
+      "sha256": "6cc9dc7c5a50e9cb4025e57e5cc74a1c8b7d021bb91d15dfa2a477156f5f168f",
+      "cases": 100
+    },
+    "retrieval": {
+      "path": "E:\\project\\shopmate-ecommerce-assistant\\data\\eval\\retrieval_cases.jsonl",
+      "sha256": "856f3338d00b8c44dd5468413ee30428b32168bd8386e84a1747eef8546c8710",
+      "cases": 58
+    }
+  },
+  "config": {
+    "dense_limit": 30,
+    "sparse_limit": 30,
+    "rrf_k": 60,
+    "candidate_limit": 30,
+    "min_chunks": 4,
+    "max_chunks": 8,
+    "max_chunks_per_document": 3,
+    "min_evidence_similarity": 0.62,
+    "reranker_enabled": false,
+    "answer_model_configured": false
+  },
+  "parts": {
+    "policy_llm": {
+      "answer_model": "qwen2.5:7b",
+      "answer_model_base_url": "http://localhost:11434/v1",
+      "cases": 3,
+      "status_counts": {
+        "answered": 1,
+        "handoff": 1,
+        "refused": 1
+      },
+      "answered_rate": 0.3333,
+      "answer_rate_on_answerable": 0.3333,
+      "refused_or_handoff_on_no_answer": null,
+      "citation_compliance": 1.0,
+      "faithfulness_llm": 1.0,
+      "faithfulness_judged_cases": 1,
+      "relevancy_llm": 1.0,
+      "relevancy_judged_cases": 1,
+      "tokens": {
+        "answer_prompt": 6317,
+        "answer_completion": 94,
+        "answer_total": 6411,
+        "judge": {
+          "judge_model": "qwen2.5:7b",
+          "judge_calls": 2,
+          "judge_failures": 0,
+          "judge_prompt_tokens": 656,
+          "judge_completion_tokens": 39
+        },
+        "cost_usd": 0.0,
+        "cost_note": "本地 Ollama 推理，无 API 计费；成本记账为 0，不代表云模型成本"
+      },
+      "latency": {
+        "n": 3,
+        "p50_ms": 3377.64,
+        "p95_ms": 4700.4,
+        "mean_ms": 3759.01
+      },
+      "judge_method": "LLM-as-judge（本地 qwen2.5:7b，temperature=0，强制 JSON 输出）；不是官方 ragas 包，prompt 为本项目自建，见 scripts/eval_stage13.py",
+      "records": [
+        {
+          "case_id": "eval-038",
+          "question": "七天无理由退货从什么时候开始计算？",
+          "tags": [
+            "synthetic",
+            "policy",
+            "return-policy-cn"
+          ],
+          "expected_behavior": "answered",
+          "status": "answered",
+          "answer": "七天无理由退货从消费者签收商品之日起开始计算 [c1][c2]。",
+          "answer_chars": 32,
+          "citations": 2,
+          "used_labels": [
+            "c1",
+            "c2"
+          ],
+          "reasons": [],
+          "citation_compliant": true,
+          "faithfulness_llm": 1.0,
+          "relevancy_llm": 1.0,
+          "prompt_tokens": 2185,
+          "completion_tokens": 22,
+          "latency_ms": 3052.02
+        },
+        {
+          "case_id": "eval-039",
+          "question": "退货运费由谁承担？",
+          "tags": [
+            "synthetic",
+            "policy",
+            "return-policy-cn"
+          ],
+          "expected_behavior": "answered",
+          "status": "handoff",
+          "answer": "这次生成的回答无法逐条对应到知识库引用，已中止自动答复并转接人工客服。",
+          "answer_chars": 35,
+          "citations": 7,
+          "used_labels": [],
+          "reasons": [
+            "uncited_claim"
+          ],
+          "citation_compliant": true,
+          "faithfulness_llm": null,
+          "relevancy_llm": null,
+          "prompt_tokens": 1944,
+          "completion_tokens": 67,
+          "latency_ms": 4847.37
+        },
+        {
+          "case_id": "eval-040",
+          "question": "哪些商品不支持七天无理由退货？",
+          "tags": [
+            "synthetic",
+            "policy",
+            "return-policy-cn"
+          ],
+          "expected_behavior": "answered",
+          "status": "refused",
+          "answer": "当前知识库中没有足够依据回答这个问题。为避免给出不准确的条款，我不会猜测。你可以补充订单号、所在地区等信息，或直接联系人工客服确认。",
+          "answer_chars": 66,
+          "citations": 0,
+          "used_labels": [],
+          "reasons": [
+            "model_no_evidence"
+          ],
+          "citation_compliant": true,
+          "faithfulness_llm": null,
+          "relevancy_llm": null,
+          "prompt_tokens": 2188,
+          "completion_tokens": 5,
+          "latency_ms": 3377.64
+        }
+      ]
+    }
+  },
+  "embedding": {
+    "model": "BAAI/bge-m3",
+    "provider": "bge-m3",
+    "dimension": 1024,
+    "revision": "local",
+    "fingerprint": "468b391066f99bc2703682b65930cc82",
+    "dense_normalized": true,
+    "sparse": "bge-m3-lexical"
+  }
+}

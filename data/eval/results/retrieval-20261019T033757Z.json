@@ -1,0 +1,3287 @@
+{
+  "generated_at": "2026-10-19T03:37:57.112260+00:00",
+  "dataset": "retrieval_cases.jsonl",
+  "dataset_sha256": "1d4c6ee36381f332a2abb29d42366943fced65e376545d3691448e54ee1dabbb",
+  "cases": 17,
+  "embedding": {
+    "model": "BAAI/bge-m3",
+    "provider": "bge-m3",
+    "dimension": 1024,
+    "revision": "local",
+    "fingerprint": "468b391066f99bc2703682b65930cc82",
+    "dense_normalized": true,
+    "sparse": "bge-m3-lexical"
+  },
+  "config": {
+    "dense_limit": 30,
+    "sparse_limit": 30,
+    "rrf_k": 60,
+    "candidate_limit": 30,
+    "min_chunks": 4,
+    "max_chunks": 8,
+    "min_evidence_similarity": 0.42,
+    "reranker_enabled": false
+  },
+  "runs": {
+    "hybrid": {
+      "summary": {
+        "cases": 17,
+        "behavior_accuracy": 0.8235,
+        "retrieval_hit_rate": 0.7059,
+        "mrr": 0.7059,
+        "phrase_recall": 1.0,
+        "leak_cases": 0,
+        "false_answer_cases": 3,
+        "false_refusal_cases": 0,
+        "avg_selected": 5.88,
+        "avg_latency_ms": 312.68
+      },
+      "by_category": {
+        "conflict": {
+          "cases": 2,
+          "behavior_accuracy": 1.0,
+          "retrieval_hit_rate": 1.0,
+          "mrr": 1.0,
+          "phrase_recall": 1.0,
+          "leak_cases": 0,
+          "false_answer_cases": 0,
+          "false_refusal_cases": 0,
+          "avg_selected": 2.0,
+          "avg_latency_ms": 301.49
+        },
+        "cross_shop": {
+          "cases": 2,
+          "behavior_accuracy": 1.0,
+          "retrieval_hit_rate": 0.0,
+          "mrr": 0.0,
+          "phrase_recall": 1.0,
+          "leak_cases": 0,
+          "false_answer_cases": 0,
+          "false_refusal_cases": 0,
+          "avg_selected": 0.0,
+          "avg_latency_ms": 243.82
+        },
+        "expired": {
+          "cases": 2,
+          "behavior_accuracy": 1.0,
+          "retrieval_hit_rate": 1.0,
+          "mrr": 1.0,
+          "phrase_recall": 1.0,
+          "leak_cases": 0,
+          "false_answer_cases": 0,
+          "false_refusal_cases": 0,
+          "avg_selected": 8.0,
+          "avg_latency_ms": 348.72
+        },
+        "no_answer": {
+          "cases": 3,
+          "behavior_accuracy": 0.0,
+          "retrieval_hit_rate": 0.0,
+          "mrr": 0.0,
+          "phrase_recall": 1.0,
+          "leak_cases": 0,
+          "false_answer_cases": 3,
+          "false_refusal_cases": 0,
+          "avg_selected": 7.67,
+          "avg_latency_ms": 329.05
+        },
+        "normal": {
+          "cases": 8,
+          "behavior_accuracy": 1.0,
+          "retrieval_hit_rate": 1.0,
+          "mrr": 1.0,
+          "phrase_recall": 1.0,
+          "leak_cases": 0,
+          "false_answer_cases": 0,
+          "false_refusal_cases": 0,
+          "avg_selected": 7.12,
+          "avg_latency_ms": 317.55
+        }
+      },
+      "records": [
+        {
+          "case_id": "normal-01",
+          "category": "normal",
+          "behavior": "answered",
+          "expected_behavior": "answered",
+          "behavior_ok": true,
+          "retrieval_hit": true,
+          "mrr": 1.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": false,
+          "selected": 8,
+          "top_dense_similarity": 0.7894,
+          "citations": [
+            {
+              "citation_id": "cit_b32200dabad18830",
+              "label": "c1",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "4c20d4fc-ab49-5e65-8b3b-e5e1344e8a93",
+              "snippet": "本政策自 2026 年 10 月 1 日起生效，替代 2026.07.1 版本，适用于中国大陆地区的自营商品订单。 政策版本、生效日期与适用地区以文档元数据为准； 跨境订单适用目的地地区的单独政策。 消费者自签收之日起七日内，可对符合条件的",
+              "dense_similarity": 0.7894278764724731
+            },
+            {
+              "citation_id": "cit_fb01856581989a70",
+              "label": "c2",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "0fdd772b-5aea-59cd-b44b-3190188a932d",
+              "snippet": "大促期间（以活动公告为准）退货审核时效由二十四小时延长至四十八小时，仓库验收时效由三个工作日延长至五个工作日。 大促期间产生的订单仍适用七天无理由期限，期限不因审核排队而顺延。 企业采购订单需在合同中约定退货条款，合同未约定时按本政策执行。",
+              "dense_similarity": 0.7176938652992249
+            },
+            {
+              "citation_id": "cit_b7f40c594c87c0b1",
+              "label": "c3",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "94d9c1b8-8037-570b-93e4-6973b44f9481",
+              "snippet": "退款在仓库验收通过后发起，原路退回，具体到账时间见《退款到账时效说明》。 消费者在订单页选择退货原因并提交申请，系统即时校验订单状态、签收时间与商品类目。 审核通过后七日内将商品寄回指定仓库，超时未寄回的申请自动关闭，可重新提交。 仓库在签",
+              "dense_similarity": 0.748629629611969
+            },
+            {
+              "citation_id": "cit_d4aae14b582e3132",
+              "label": "c4",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "c7317253-6249-5dc1-8d9b-3fc650c3ad99",
+              "snippet": "同款有库存时优先换货，无库存且消费者不同意等待时，可转为退货并按实付金额退款。 换货完成后原订单不可再申请退货，新商品按换货发出日重新计算保修期。 质量问题换货的往返运费由商城承担，非质量问题换货的往返运费由消费者承担。 消费者选择保价寄回",
+              "dense_similarity": 0.6331988573074341
+            },
+            {
+              "citation_id": "cit_e5d273c04d237d65",
+              "label": "c5",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "61bae80e-1436-56fb-b563-5540cf3886fe",
+              "snippet": "本政策适用于中国大陆地区自营商品的质量换货与非质量换货申请。 商品自签收之日起十五日内出现性能故障，经检测确认为质量问题的，可申请换货。 换货优先更换同型号同规格商品； 无同款库存时，可按消费者意愿改为退货。 非质量问题换货需在签收之日起七",
+              "dense_similarity": 0.6422109603881836
+            },
+            {
+              "citation_id": "cit_202317228108b9eb",
+              "label": "c6",
+              "title": "个护与卫生类商品售后规则",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "1d5bfa88-d8f8-578c-924d-5fc62596a84d",
+              "snippet": "耳机耳塞、剃须刀、电动牙刷等直接接触皮肤或个人卫生的商品，拆封后不适用七天无理由退货。 未拆封商品可无理由退货； 拆封后出现质量问题的，按保修政策检测处理。 退回商品需保持清洁，存在使用痕迹或污渍时可能被判定为影响二次销售。 未拆封且包装完",
+              "dense_similarity": 0.6050092577934265
+            },
+            {
+              "citation_id": "cit_1e240462052651b1",
+              "label": "c7",
+              "title": "退款到账时效说明",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "60ada2fa-4db1-56c8-82d6-1fa880a2e475",
+              "snippet": "退款在退货商品验收通过后发起，或在取消未发货订单后立即发起。 退款金额以订单实付金额为准，优惠券按规则退回，积分按规则返还。 原路退回的退款通常在发起后一至七个工作日内到账，具体取决于支付渠道。 银行卡渠道一般为一至三个工作日，第三方支付渠",
+              "dense_similarity": 0.6620588898658752
+            },
+            {
+              "citation_id": "cit_8e0e1eab6fae2689",
+              "label": "c8",
+              "title": "退货手续费说明（评测冲突样本）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "d70ee9b4-1733-51a7-abbf-0ef0051b6057",
+              "snippet": "本文件仅用于检索评测中的版本冲突场景，属于合成数据，不对应任何真实业务规则。 消费者未在约定期限内寄回商品的，每笔订单收取 20 元固定逾期退货手续费，不按金额比例计算。 手续费从退款金额中直接扣除，并在退款明细中单独列示。",
+              "dense_similarity": 0.5689781308174133
+            }
+          ],
+          "audit": {
+            "fused_candidates": 26,
+            "authorized_candidates": 26,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ok",
+              "sparse": "ok"
+            },
+            "latency_ms": 398.55
+          },
+          "question": "七天无理由退货从什么时候开始计算？"
+        },
+        {
+          "case_id": "normal-02",
+          "category": "normal",
+          "behavior": "answered",
+          "expected_behavior": "answered",
+          "behavior_ok": true,
+          "retrieval_hit": true,
+          "mrr": 1.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": false,
+          "selected": 8,
+          "top_dense_similarity": 0.7841,
+          "citations": [
+            {
+              "citation_id": "cit_1e240462052651b1",
+              "label": "c1",
+              "title": "退款到账时效说明",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "60ada2fa-4db1-56c8-82d6-1fa880a2e475",
+              "snippet": "退款在退货商品验收通过后发起，或在取消未发货订单后立即发起。 退款金额以订单实付金额为准，优惠券按规则退回，积分按规则返还。 原路退回的退款通常在发起后一至七个工作日内到账，具体取决于支付渠道。 银行卡渠道一般为一至三个工作日，第三方支付渠",
+              "dense_similarity": 0.7841293215751648
+            },
+            {
+              "citation_id": "cit_b7f40c594c87c0b1",
+              "label": "c2",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "94d9c1b8-8037-570b-93e4-6973b44f9481",
+              "snippet": "退款在仓库验收通过后发起，原路退回，具体到账时间见《退款到账时效说明》。 消费者在订单页选择退货原因并提交申请，系统即时校验订单状态、签收时间与商品类目。 审核通过后七日内将商品寄回指定仓库，超时未寄回的申请自动关闭，可重新提交。 仓库在签",
+              "dense_similarity": 0.7379344701766968
+            },
+            {
+              "citation_id": "cit_fb01856581989a70",
+              "label": "c3",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "0fdd772b-5aea-59cd-b44b-3190188a932d",
+              "snippet": "大促期间（以活动公告为准）退货审核时效由二十四小时延长至四十八小时，仓库验收时效由三个工作日延长至五个工作日。 大促期间产生的订单仍适用七天无理由期限，期限不因审核排队而顺延。 企业采购订单需在合同中约定退货条款，合同未约定时按本政策执行。",
+              "dense_similarity": 0.6656635403633118
+            },
+            {
+              "citation_id": "cit_262b561352d85b77",
+              "label": "c4",
+              "title": "积分规则",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "58c24d57-937f-5226-83cc-3239ee3a19f2",
+              "snippet": "订单完成后按实付金额累计积分，每消费 1 元累计 1 分，运费不计入积分。 退货订单按退款金额扣减对应积分，扣减后积分可为负数。 100 积分可抵扣 1 元，单笔订单最多抵扣订单金额的 20%。 积分抵扣部分不参与优惠券门槛计算。 积分自获",
+              "dense_similarity": 0.637758195400238
+            },
+            {
+              "citation_id": "cit_d4aae14b582e3132",
+              "label": "c5",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "c7317253-6249-5dc1-8d9b-3fc650c3ad99",
+              "snippet": "同款有库存时优先换货，无库存且消费者不同意等待时，可转为退货并按实付金额退款。 换货完成后原订单不可再申请退货，新商品按换货发出日重新计算保修期。 质量问题换货的往返运费由商城承担，非质量问题换货的往返运费由消费者承担。 消费者选择保价寄回",
+              "dense_similarity": 0.6415055394172668
+            },
+            {
+              "citation_id": "cit_fe8b0ffe51beadc0",
+              "label": "c6",
+              "title": "退货手续费说明（评测冲突样本）",
+              "version": "2026.09.1",
+              "page_no": null,
+              "chunk_id": "6d81ffb3-4056-51c0-89ff-c0885f136bb3",
+              "snippet": "本文件仅用于检索评测中的版本冲突场景，属于合成数据，不对应任何真实业务规则。 消费者未在约定期限内寄回商品的，按订单实付金额的 10% 收取逾期退货手续费，最低收取 5 元。 手续费从退款金额中直接扣除，并在退款明细中单独列示。",
+              "dense_similarity": 0.6415066123008728
+            },
+            {
+              "citation_id": "cit_f8a3bb5ec2e458f2",
+              "label": "c7",
+              "title": "货到付款规则",
+              "version": "2026.10.1",
+              "page_no": 1,
+              "chunk_id": "62380741-f89c-562c-ac3d-412024963c15",
+              "snippet": "版本 2026.10.1 · 生效日期 2026-09-01 货到付款仅支持中国大陆地区部分城市，单笔订单金额不得超过 2000 元。 货到付款订单支持开箱验货，验货时请核对商品型号、数量与外观。 签收后视为外观完好，后续外观问题按保修与售",
+              "dense_similarity": 0.6493535041809082
+            },
+            {
+              "citation_id": "cit_0874c65aab7330fb",
+              "label": "c8",
+              "title": "分期付款说明",
+              "version": "2026.10.1",
+              "page_no": 1,
+              "chunk_id": "40c10aea-a0b6-5d2b-8827-af3f4a53c0b5",
+              "snippet": "版本 2026.10.1 · 生效日期 2026-09-01 部分商品支持 3 期、6 期与 12 期分期，具体期数以结算页展示为准。 3 期免手续费； 6 期与 12 期按银行或支付渠道标准收取手续费，手续费不退还。 分期订单退款时，已收",
+              "dense_similarity": 0.6230044960975647
+            }
+          ],
+          "audit": {
+            "fused_candidates": 26,
+            "authorized_candidates": 26,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ok",
+              "sparse": "ok"
+            },
+            "latency_ms": 310.25
+          },
+          "question": "退款一般多久能到账？"
+        },
+        {
+          "case_id": "normal-03",
+          "category": "normal",
+          "behavior": "answered",
+          "expected_behavior": "answered",
+          "behavior_ok": true,
+          "retrieval_hit": true,
+          "mrr": 1.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": false,
+          "selected": 8,
+          "top_dense_similarity": 0.77,
+          "citations": [
+            {
+              "citation_id": "cit_a0c805a86acc79bf",
+              "label": "c1",
+              "title": "商品保修政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "48cd50e4-f391-5104-956d-e822a5c22264",
+              "snippet": "耳机、鼠标、充电器、移动电源、摄像头默认保修十二个月； 机械键盘与部分智能手表保修二十四个月。 具体保修期以商品属性中的保修月数字段为准，不以聊天描述为准。 保修覆盖非人为因素导致的性能故障，包括无法开机、无法充电、按键失灵与异常断连。 进",
+              "dense_similarity": 0.7699891328811646
+            },
+            {
+              "citation_id": "cit_a726dc6d4cb41c1b",
+              "label": "c2",
+              "title": "商品保修政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "2c2391cd-4501-5e3d-8960-4d2d2d36ce65",
+              "snippet": "保修以订单号或发票作为购买凭证，二者缺一不可时按订单支付记录判断。 保修服务不随二手转让转移，转让后的商品按付费维修处理。 保修期自签收之日起计算，换货商品沿用原订单的保修截止日期。 维修更换的零部件保修至原保修期结束，不单独延长。 人为损",
+              "dense_similarity": 0.7111700773239136
+            },
+            {
+              "citation_id": "cit_202317228108b9eb",
+              "label": "c3",
+              "title": "个护与卫生类商品售后规则",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "1d5bfa88-d8f8-578c-924d-5fc62596a84d",
+              "snippet": "耳机耳塞、剃须刀、电动牙刷等直接接触皮肤或个人卫生的商品，拆封后不适用七天无理由退货。 未拆封商品可无理由退货； 拆封后出现质量问题的，按保修政策检测处理。 退回商品需保持清洁，存在使用痕迹或污渍时可能被判定为影响二次销售。 未拆封且包装完",
+              "dense_similarity": 0.6790011525154114
+            },
+            {
+              "citation_id": "cit_d4aae14b582e3132",
+              "label": "c4",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "c7317253-6249-5dc1-8d9b-3fc650c3ad99",
+              "snippet": "同款有库存时优先换货，无库存且消费者不同意等待时，可转为退货并按实付金额退款。 换货完成后原订单不可再申请退货，新商品按换货发出日重新计算保修期。 质量问题换货的往返运费由商城承担，非质量问题换货的往返运费由消费者承担。 消费者选择保价寄回",
+              "dense_similarity": 0.5446013808250427
+            },
+            {
+              "citation_id": "cit_45946362c8f9494d",
+              "label": "c5",
+              "title": "价格保护政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "e3685778-12ca-5967-8d06-736e007e9dc9",
+              "snippet": "自订单支付成功之日起七日内，同一商品在同一店铺出现降价时，可以申请价格保护。 申请价保的订单不得已退货或已取消，且商品需为同型号同规格。 使用优惠券、限时秒杀、会员专享价产生的价差不在价保范围内。 价保差额以优惠券或原路退款方式返还，具体方",
+              "dense_similarity": 0.5353163480758667
+            },
+            {
+              "citation_id": "cit_e5d273c04d237d65",
+              "label": "c6",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "61bae80e-1436-56fb-b563-5540cf3886fe",
+              "snippet": "本政策适用于中国大陆地区自营商品的质量换货与非质量换货申请。 商品自签收之日起十五日内出现性能故障，经检测确认为质量问题的，可申请换货。 换货优先更换同型号同规格商品； 无同款库存时，可按消费者意愿改为退货。 非质量问题换货需在签收之日起七",
+              "dense_similarity": 0.5436562895774841
+            },
+            {
+              "citation_id": "cit_5f1f79712474b9d2",
+              "label": "c7",
+              "title": "定制商品售后规则",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "2a65c1ab-067f-5881-a20e-c01118a672de",
+              "snippet": "版本 2026.10.1 · 生效日期 2026-09-01 按消费者要求刻字、改色、改尺寸或专属配置的商品属于定制商品，下单前需确认设计稿。 情形 | 处理方式 尺寸与确认稿不符 | 免费重做或退货 颜色存在明显偏差 | 按确认稿重做 刻",
+              "dense_similarity": 0.5579649209976196
+            },
+            {
+              "citation_id": "cit_fd45740b09d63dc5",
+              "label": "c8",
+              "title": "丢件与破损处理流程",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "3691aca5-af30-5d77-804d-17400118c2e7",
+              "snippet": "签收时发现外包装破损，应当场拍照并拒收； 已签收的，需在签收后四十八小时内提交照片举证。 物流信息超过七十二小时无更新时，可提交丢件核查，承运商核查周期为三至七个工作日。 核查确认丢件后，优先补发同款商品； 无库存时按实付金额退款。 赔付方",
+              "dense_similarity": 0.5212138295173645
+            }
+          ],
+          "audit": {
+            "fused_candidates": 26,
+            "authorized_candidates": 26,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ok",
+              "sparse": "ok"
+            },
+            "latency_ms": 315.66
+          },
+          "question": "耳机的保修期是多久？"
+        },
+        {
+          "case_id": "normal-04",
+          "category": "normal",
+          "behavior": "answered",
+          "expected_behavior": "answered",
+          "behavior_ok": true,
+          "retrieval_hit": true,
+          "mrr": 1.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": true,
+          "selected": 8,
+          "top_dense_similarity": 0.8108,
+          "citations": [
+            {
+              "citation_id": "cit_c206ce80983d1f12",
+              "label": "c1",
+              "title": "偏远地区配送附加费说明",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "65c6d95b-9587-500d-a5b3-664987b20149",
+              "snippet": "新疆、西藏、内蒙古部分区域、青海与甘肃部分区域属于偏远地区，配送时效与运费标准单独计算。 偏远地区订单按重量收取附加费，首重 1 公斤 12 元，续重每公斤 8 元，具体金额以结算页为准。 偏远地区配送时效一般为五至十日，遇极端天气可能进一",
+              "dense_similarity": 0.8108473420143127
+            },
+            {
+              "citation_id": "cit_0e06521e0453b1cc",
+              "label": "c2",
+              "title": "配送范围与时效",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "4f0c7378-0987-5442-b62c-6d6c9647dfab",
+              "snippet": "自营商品配送范围为中国大陆地区（不含港澳台），跨境订单按目的地地区政策单独履约。 部分偏远地区可能产生附加运费，详见《偏远地区配送附加费说明》。 现货订单在付款后四十八小时内发出，预售商品以商品页标注的发货时间为准。 法定节假日期间发货时效",
+              "dense_similarity": 0.6423009634017944
+            },
+            {
+              "citation_id": "cit_1cdcadb38e198c42",
+              "label": "c3",
+              "title": "配送范围与时效",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "6b8f36c2-8dff-5060-bbb7-30bc8dc04df0",
+              "snippet": "遇极端天气、交通管制或公共事件，配送时效顺延，顺延天数以公告为准。 顺延期间订单状态保持运输中，消费者可随时查看物流节点。 同一订单包含不同仓库商品时会拆单发货，拆单不额外收取运费。 拆单后各包裹独立显示物流信息，部分包裹延迟不影响其他包裹",
+              "dense_similarity": 0.638145387172699
+            },
+            {
+              "citation_id": "cit_1db00a96079abcc5",
+              "label": "c4",
+              "title": "包邮门槛说明",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "07693f37-6895-5526-ad4c-c43a538e4443",
+              "snippet": "单笔订单实付金额满 99 元即可享受普通快递包邮，门槛按实付金额计算，不含运费与增值服务费。 大件商品、超重商品与偏远地区订单不参与包邮，具体以结算页展示为准。 同一订单包含多个仓库商品时可能拆单发货，拆单不额外收取运费。 会员等级达到指定",
+              "dense_similarity": 0.5840689539909363
+            },
+            {
+              "citation_id": "cit_262b561352d85b77",
+              "label": "c5",
+              "title": "积分规则",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "58c24d57-937f-5226-83cc-3239ee3a19f2",
+              "snippet": "订单完成后按实付金额累计积分，每消费 1 元累计 1 分，运费不计入积分。 退货订单按退款金额扣减对应积分，扣减后积分可为负数。 100 积分可抵扣 1 元，单笔订单最多抵扣订单金额的 20%。 积分抵扣部分不参与优惠券门槛计算。 积分自获",
+              "dense_similarity": 0.5486605763435364
+            },
+            {
+              "citation_id": "cit_fe8b0ffe51beadc0",
+              "label": "c6",
+              "title": "退货手续费说明（评测冲突样本）",
+              "version": "2026.09.1",
+              "page_no": null,
+              "chunk_id": "6d81ffb3-4056-51c0-89ff-c0885f136bb3",
+              "snippet": "本文件仅用于检索评测中的版本冲突场景，属于合成数据，不对应任何真实业务规则。 消费者未在约定期限内寄回商品的，按订单实付金额的 10% 收取逾期退货手续费，最低收取 5 元。 手续费从退款金额中直接扣除，并在退款明细中单独列示。",
+              "dense_similarity": 0.5586637258529663
+            },
+            {
+              "citation_id": "cit_8e0e1eab6fae2689",
+              "label": "c7",
+              "title": "退货手续费说明（评测冲突样本）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "d70ee9b4-1733-51a7-abbf-0ef0051b6057",
+              "snippet": "本文件仅用于检索评测中的版本冲突场景，属于合成数据，不对应任何真实业务规则。 消费者未在约定期限内寄回商品的，每笔订单收取 20 元固定逾期退货手续费，不按金额比例计算。 手续费从退款金额中直接扣除，并在退款明细中单独列示。",
+              "dense_similarity": 0.5544933676719666
+            },
+            {
+              "citation_id": "cit_f8a3bb5ec2e458f2",
+              "label": "c8",
+              "title": "货到付款规则",
+              "version": "2026.10.1",
+              "page_no": 1,
+              "chunk_id": "62380741-f89c-562c-ac3d-412024963c15",
+              "snippet": "版本 2026.10.1 · 生效日期 2026-09-01 货到付款仅支持中国大陆地区部分城市，单笔订单金额不得超过 2000 元。 货到付款订单支持开箱验货，验货时请核对商品型号、数量与外观。 签收后视为外观完好，后续外观问题按保修与售",
+              "dense_similarity": 0.5380556583404541
+            }
+          ],
+          "audit": {
+            "fused_candidates": 26,
+            "authorized_candidates": 26,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ok",
+              "sparse": "ok"
+            },
+            "latency_ms": 288.54
+          },
+          "question": "偏远地区配送附加费怎么计算？"
+        },
+        {
+          "case_id": "normal-05",
+          "category": "normal",
+          "behavior": "answered",
+          "expected_behavior": "answered",
+          "behavior_ok": true,
+          "retrieval_hit": true,
+          "mrr": 1.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": false,
+          "selected": 7,
+          "top_dense_similarity": 0.7859,
+          "citations": [
+            {
+              "citation_id": "cit_1db00a96079abcc5",
+              "label": "c1",
+              "title": "包邮门槛说明",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "07693f37-6895-5526-ad4c-c43a538e4443",
+              "snippet": "单笔订单实付金额满 99 元即可享受普通快递包邮，门槛按实付金额计算，不含运费与增值服务费。 大件商品、超重商品与偏远地区订单不参与包邮，具体以结算页展示为准。 同一订单包含多个仓库商品时可能拆单发货，拆单不额外收取运费。 会员等级达到指定",
+              "dense_similarity": 0.7858542799949646
+            },
+            {
+              "citation_id": "cit_f8a3bb5ec2e458f2",
+              "label": "c2",
+              "title": "货到付款规则",
+              "version": "2026.10.1",
+              "page_no": 1,
+              "chunk_id": "62380741-f89c-562c-ac3d-412024963c15",
+              "snippet": "版本 2026.10.1 · 生效日期 2026-09-01 货到付款仅支持中国大陆地区部分城市，单笔订单金额不得超过 2000 元。 货到付款订单支持开箱验货，验货时请核对商品型号、数量与外观。 签收后视为外观完好，后续外观问题按保修与售",
+              "dense_similarity": 0.672674298286438
+            },
+            {
+              "citation_id": "cit_262b561352d85b77",
+              "label": "c3",
+              "title": "积分规则",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "58c24d57-937f-5226-83cc-3239ee3a19f2",
+              "snippet": "订单完成后按实付金额累计积分，每消费 1 元累计 1 分，运费不计入积分。 退货订单按退款金额扣减对应积分，扣减后积分可为负数。 100 积分可抵扣 1 元，单笔订单最多抵扣订单金额的 20%。 积分抵扣部分不参与优惠券门槛计算。 积分自获",
+              "dense_similarity": 0.6042895317077637
+            },
+            {
+              "citation_id": "cit_c206ce80983d1f12",
+              "label": "c4",
+              "title": "偏远地区配送附加费说明",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "65c6d95b-9587-500d-a5b3-664987b20149",
+              "snippet": "新疆、西藏、内蒙古部分区域、青海与甘肃部分区域属于偏远地区，配送时效与运费标准单独计算。 偏远地区订单按重量收取附加费，首重 1 公斤 12 元，续重每公斤 8 元，具体金额以结算页为准。 偏远地区配送时效一般为五至十日，遇极端天气可能进一",
+              "dense_similarity": 0.611686110496521
+            },
+            {
+              "citation_id": "cit_1e240462052651b1",
+              "label": "c5",
+              "title": "退款到账时效说明",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "60ada2fa-4db1-56c8-82d6-1fa880a2e475",
+              "snippet": "退款在退货商品验收通过后发起，或在取消未发货订单后立即发起。 退款金额以订单实付金额为准，优惠券按规则退回，积分按规则返还。 原路退回的退款通常在发起后一至七个工作日内到账，具体取决于支付渠道。 银行卡渠道一般为一至三个工作日，第三方支付渠",
+              "dense_similarity": 0.5707930326461792
+            },
+            {
+              "citation_id": "cit_550d0393d404ee20",
+              "label": "c6",
+              "title": "发票开具与补开规则",
+              "version": "2026.10.1",
+              "page_no": 1,
+              "chunk_id": "dfe7d723-93cc-5954-9eea-9b77d2798125",
+              "snippet": "版本 2026.10.1 · 生效日期 2026-09-01 订单默认开具电子普通发票，发票内容为商品明细，金额为订单实付金额。 需要增值税专用发票的消费者，应在下单后三十日内提交企业资质，经审核通过后开具。 订单完成后的九十日内可以申请补",
+              "dense_similarity": 0.550915002822876
+            },
+            {
+              "citation_id": "cit_45946362c8f9494d",
+              "label": "c7",
+              "title": "价格保护政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "e3685778-12ca-5967-8d06-736e007e9dc9",
+              "snippet": "自订单支付成功之日起七日内，同一商品在同一店铺出现降价时，可以申请价格保护。 申请价保的订单不得已退货或已取消，且商品需为同型号同规格。 使用优惠券、限时秒杀、会员专享价产生的价差不在价保范围内。 价保差额以优惠券或原路退款方式返还，具体方",
+              "dense_similarity": 0.5732695460319519
+            }
+          ],
+          "audit": {
+            "fused_candidates": 26,
+            "authorized_candidates": 26,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ok",
+              "sparse": "ok"
+            },
+            "latency_ms": 298.44
+          },
+          "question": "订单金额满多少可以包邮？"
+        },
+        {
+          "case_id": "normal-06",
+          "category": "normal",
+          "behavior": "answered",
+          "expected_behavior": "answered",
+          "behavior_ok": true,
+          "retrieval_hit": true,
+          "mrr": 1.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": true,
+          "selected": 8,
+          "top_dense_similarity": 0.6961,
+          "citations": [
+            {
+              "citation_id": "cit_b7f40c594c87c0b1",
+              "label": "c1",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "94d9c1b8-8037-570b-93e4-6973b44f9481",
+              "snippet": "退款在仓库验收通过后发起，原路退回，具体到账时间见《退款到账时效说明》。 消费者在订单页选择退货原因并提交申请，系统即时校验订单状态、签收时间与商品类目。 审核通过后七日内将商品寄回指定仓库，超时未寄回的申请自动关闭，可重新提交。 仓库在签",
+              "dense_similarity": 0.6961235404014587
+            },
+            {
+              "citation_id": "cit_b32200dabad18830",
+              "label": "c2",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "4c20d4fc-ab49-5e65-8b3b-e5e1344e8a93",
+              "snippet": "本政策自 2026 年 10 月 1 日起生效，替代 2026.07.1 版本，适用于中国大陆地区的自营商品订单。 政策版本、生效日期与适用地区以文档元数据为准； 跨境订单适用目的地地区的单独政策。 消费者自签收之日起七日内，可对符合条件的",
+              "dense_similarity": 0.6589345932006836
+            },
+            {
+              "citation_id": "cit_fb01856581989a70",
+              "label": "c3",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "0fdd772b-5aea-59cd-b44b-3190188a932d",
+              "snippet": "大促期间（以活动公告为准）退货审核时效由二十四小时延长至四十八小时，仓库验收时效由三个工作日延长至五个工作日。 大促期间产生的订单仍适用七天无理由期限，期限不因审核排队而顺延。 企业采购订单需在合同中约定退货条款，合同未约定时按本政策执行。",
+              "dense_similarity": 0.6514068841934204
+            },
+            {
+              "citation_id": "cit_d4aae14b582e3132",
+              "label": "c4",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "c7317253-6249-5dc1-8d9b-3fc650c3ad99",
+              "snippet": "同款有库存时优先换货，无库存且消费者不同意等待时，可转为退货并按实付金额退款。 换货完成后原订单不可再申请退货，新商品按换货发出日重新计算保修期。 质量问题换货的往返运费由商城承担，非质量问题换货的往返运费由消费者承担。 消费者选择保价寄回",
+              "dense_similarity": 0.6533668637275696
+            },
+            {
+              "citation_id": "cit_fe8b0ffe51beadc0",
+              "label": "c5",
+              "title": "退货手续费说明（评测冲突样本）",
+              "version": "2026.09.1",
+              "page_no": null,
+              "chunk_id": "6d81ffb3-4056-51c0-89ff-c0885f136bb3",
+              "snippet": "本文件仅用于检索评测中的版本冲突场景，属于合成数据，不对应任何真实业务规则。 消费者未在约定期限内寄回商品的，按订单实付金额的 10% 收取逾期退货手续费，最低收取 5 元。 手续费从退款金额中直接扣除，并在退款明细中单独列示。",
+              "dense_similarity": 0.6469169855117798
+            },
+            {
+              "citation_id": "cit_8e0e1eab6fae2689",
+              "label": "c6",
+              "title": "退货手续费说明（评测冲突样本）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "d70ee9b4-1733-51a7-abbf-0ef0051b6057",
+              "snippet": "本文件仅用于检索评测中的版本冲突场景，属于合成数据，不对应任何真实业务规则。 消费者未在约定期限内寄回商品的，每笔订单收取 20 元固定逾期退货手续费，不按金额比例计算。 手续费从退款金额中直接扣除，并在退款明细中单独列示。",
+              "dense_similarity": 0.6443222165107727
+            },
+            {
+              "citation_id": "cit_f8a3bb5ec2e458f2",
+              "label": "c7",
+              "title": "货到付款规则",
+              "version": "2026.10.1",
+              "page_no": 1,
+              "chunk_id": "62380741-f89c-562c-ac3d-412024963c15",
+              "snippet": "版本 2026.10.1 · 生效日期 2026-09-01 货到付款仅支持中国大陆地区部分城市，单笔订单金额不得超过 2000 元。 货到付款订单支持开箱验货，验货时请核对商品型号、数量与外观。 签收后视为外观完好，后续外观问题按保修与售",
+              "dense_similarity": 0.5797585248947144
+            },
+            {
+              "citation_id": "cit_e5d273c04d237d65",
+              "label": "c8",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "61bae80e-1436-56fb-b563-5540cf3886fe",
+              "snippet": "本政策适用于中国大陆地区自营商品的质量换货与非质量换货申请。 商品自签收之日起十五日内出现性能故障，经检测确认为质量问题的，可申请换货。 换货优先更换同型号同规格商品； 无同款库存时，可按消费者意愿改为退货。 非质量问题换货需在签收之日起七",
+              "dense_similarity": 0.5862526297569275
+            }
+          ],
+          "audit": {
+            "fused_candidates": 26,
+            "authorized_candidates": 26,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ok",
+              "sparse": "ok"
+            },
+            "latency_ms": 299.49
+          },
+          "question": "无理由退货运费由谁承担？"
+        },
+        {
+          "case_id": "normal-07",
+          "category": "normal",
+          "behavior": "answered",
+          "expected_behavior": "answered",
+          "behavior_ok": true,
+          "retrieval_hit": true,
+          "mrr": 1.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": false,
+          "selected": 2,
+          "top_dense_similarity": 0.8097,
+          "citations": [
+            {
+              "citation_id": "cit_ed351ddd3f98e9ad",
+              "label": "c1",
+              "title": "退货与退款政策（新加坡）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "0ab60905-31f1-566a-9dbb-926fc73217b1",
+              "snippet": "本政策适用于配送地址在新加坡的订单，自 2026 年 9 月 1 日起生效。 消费者自签收之日起十五日内可申请退货，商品需保持完好并附原包装。 无理由退货的寄回运费由消费者承担； 已缴纳的进口关税不予退还。 退款在验收通过后五至十个工作日内",
+              "dense_similarity": 0.8096974492073059
+            },
+            {
+              "citation_id": "cit_2af90e3be875f0ba",
+              "label": "c2",
+              "title": "配送政策（新加坡）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "222cab4b-8ffb-55b3-8ff2-7b4f9a01082b",
+              "snippet": "版本 2026.10.1 · 生效日期 2026-09-01 配送范围覆盖新加坡全境，圣淘沙与离岛区域可能延长一日。 标准配送为三至七个工作日，满 120 新元包邮，未满收取 8 新元运费。 订单金额超过当地免税额度时，可能产生进口税，由消",
+              "dense_similarity": 0.7036628127098083
+            }
+          ],
+          "audit": {
+            "fused_candidates": 2,
+            "authorized_candidates": 2,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ok",
+              "sparse": "ok"
+            },
+            "latency_ms": 309.49
+          },
+          "question": "新加坡订单的退货期限是多久？"
+        },
+        {
+          "case_id": "normal-08",
+          "category": "normal",
+          "behavior": "answered",
+          "expected_behavior": "answered",
+          "behavior_ok": true,
+          "retrieval_hit": true,
+          "mrr": 1.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": false,
+          "selected": 8,
+          "top_dense_similarity": 0.7258,
+          "citations": [
+            {
+              "citation_id": "cit_b32200dabad18830",
+              "label": "c1",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "4c20d4fc-ab49-5e65-8b3b-e5e1344e8a93",
+              "snippet": "本政策自 2026 年 10 月 1 日起生效，替代 2026.07.1 版本，适用于中国大陆地区的自营商品订单。 政策版本、生效日期与适用地区以文档元数据为准； 跨境订单适用目的地地区的单独政策。 消费者自签收之日起七日内，可对符合条件的",
+              "dense_similarity": 0.7257514595985413
+            },
+            {
+              "citation_id": "cit_b7f40c594c87c0b1",
+              "label": "c2",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "94d9c1b8-8037-570b-93e4-6973b44f9481",
+              "snippet": "退款在仓库验收通过后发起，原路退回，具体到账时间见《退款到账时效说明》。 消费者在订单页选择退货原因并提交申请，系统即时校验订单状态、签收时间与商品类目。 审核通过后七日内将商品寄回指定仓库，超时未寄回的申请自动关闭，可重新提交。 仓库在签",
+              "dense_similarity": 0.6774330735206604
+            },
+            {
+              "citation_id": "cit_fb01856581989a70",
+              "label": "c3",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "0fdd772b-5aea-59cd-b44b-3190188a932d",
+              "snippet": "大促期间（以活动公告为准）退货审核时效由二十四小时延长至四十八小时，仓库验收时效由三个工作日延长至五个工作日。 大促期间产生的订单仍适用七天无理由期限，期限不因审核排队而顺延。 企业采购订单需在合同中约定退货条款，合同未约定时按本政策执行。",
+              "dense_similarity": 0.6689583659172058
+            },
+            {
+              "citation_id": "cit_202317228108b9eb",
+              "label": "c4",
+              "title": "个护与卫生类商品售后规则",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "1d5bfa88-d8f8-578c-924d-5fc62596a84d",
+              "snippet": "耳机耳塞、剃须刀、电动牙刷等直接接触皮肤或个人卫生的商品，拆封后不适用七天无理由退货。 未拆封商品可无理由退货； 拆封后出现质量问题的，按保修政策检测处理。 退回商品需保持清洁，存在使用痕迹或污渍时可能被判定为影响二次销售。 未拆封且包装完",
+              "dense_similarity": 0.6748006939888
+            },
+            {
+              "citation_id": "cit_e5d273c04d237d65",
+              "label": "c5",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "61bae80e-1436-56fb-b563-5540cf3886fe",
+              "snippet": "本政策适用于中国大陆地区自营商品的质量换货与非质量换货申请。 商品自签收之日起十五日内出现性能故障，经检测确认为质量问题的，可申请换货。 换货优先更换同型号同规格商品； 无同款库存时，可按消费者意愿改为退货。 非质量问题换货需在签收之日起七",
+              "dense_similarity": 0.6485105156898499
+            },
+            {
+              "citation_id": "cit_5f1f79712474b9d2",
+              "label": "c6",
+              "title": "定制商品售后规则",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "2a65c1ab-067f-5881-a20e-c01118a672de",
+              "snippet": "版本 2026.10.1 · 生效日期 2026-09-01 按消费者要求刻字、改色、改尺寸或专属配置的商品属于定制商品，下单前需确认设计稿。 情形 | 处理方式 尺寸与确认稿不符 | 免费重做或退货 颜色存在明显偏差 | 按确认稿重做 刻",
+              "dense_similarity": 0.6135702729225159
+            },
+            {
+              "citation_id": "cit_d4aae14b582e3132",
+              "label": "c7",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "c7317253-6249-5dc1-8d9b-3fc650c3ad99",
+              "snippet": "同款有库存时优先换货，无库存且消费者不同意等待时，可转为退货并按实付金额退款。 换货完成后原订单不可再申请退货，新商品按换货发出日重新计算保修期。 质量问题换货的往返运费由商城承担，非质量问题换货的往返运费由消费者承担。 消费者选择保价寄回",
+              "dense_similarity": 0.6277754902839661
+            },
+            {
+              "citation_id": "cit_fe8b0ffe51beadc0",
+              "label": "c8",
+              "title": "退货手续费说明（评测冲突样本）",
+              "version": "2026.09.1",
+              "page_no": null,
+              "chunk_id": "6d81ffb3-4056-51c0-89ff-c0885f136bb3",
+              "snippet": "本文件仅用于检索评测中的版本冲突场景，属于合成数据，不对应任何真实业务规则。 消费者未在约定期限内寄回商品的，按订单实付金额的 10% 收取逾期退货手续费，最低收取 5 元。 手续费从退款金额中直接扣除，并在退款明细中单独列示。",
+              "dense_similarity": 0.5429081320762634
+            }
+          ],
+          "audit": {
+            "fused_candidates": 26,
+            "authorized_candidates": 26,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ok",
+              "sparse": "ok"
+            },
+            "latency_ms": 319.95
+          },
+          "question": "哪些商品不适用七天无理由退货？"
+        },
+        {
+          "case_id": "no-answer-01",
+          "category": "no_answer",
+          "behavior": "answered",
+          "expected_behavior": "refused",
+          "behavior_ok": false,
+          "retrieval_hit": false,
+          "mrr": 0.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": false,
+          "selected": 8,
+          "top_dense_similarity": 0.4393,
+          "citations": [
+            {
+              "citation_id": "cit_0e06521e0453b1cc",
+              "label": "c1",
+              "title": "配送范围与时效",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "4f0c7378-0987-5442-b62c-6d6c9647dfab",
+              "snippet": "自营商品配送范围为中国大陆地区（不含港澳台），跨境订单按目的地地区政策单独履约。 部分偏远地区可能产生附加运费，详见《偏远地区配送附加费说明》。 现货订单在付款后四十八小时内发出，预售商品以商品页标注的发货时间为准。 法定节假日期间发货时效",
+              "dense_similarity": 0.4392561912536621
+            },
+            {
+              "citation_id": "cit_d4aae14b582e3132",
+              "label": "c2",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "c7317253-6249-5dc1-8d9b-3fc650c3ad99",
+              "snippet": "同款有库存时优先换货，无库存且消费者不同意等待时，可转为退货并按实付金额退款。 换货完成后原订单不可再申请退货，新商品按换货发出日重新计算保修期。 质量问题换货的往返运费由商城承担，非质量问题换货的往返运费由消费者承担。 消费者选择保价寄回",
+              "dense_similarity": 0.4019300043582916
+            },
+            {
+              "citation_id": "cit_a0c805a86acc79bf",
+              "label": "c3",
+              "title": "商品保修政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "48cd50e4-f391-5104-956d-e822a5c22264",
+              "snippet": "耳机、鼠标、充电器、移动电源、摄像头默认保修十二个月； 机械键盘与部分智能手表保修二十四个月。 具体保修期以商品属性中的保修月数字段为准，不以聊天描述为准。 保修覆盖非人为因素导致的性能故障，包括无法开机、无法充电、按键失灵与异常断连。 进",
+              "dense_similarity": 0.40137872099876404
+            },
+            {
+              "citation_id": "cit_e5d273c04d237d65",
+              "label": "c4",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "61bae80e-1436-56fb-b563-5540cf3886fe",
+              "snippet": "本政策适用于中国大陆地区自营商品的质量换货与非质量换货申请。 商品自签收之日起十五日内出现性能故障，经检测确认为质量问题的，可申请换货。 换货优先更换同型号同规格商品； 无同款库存时，可按消费者意愿改为退货。 非质量问题换货需在签收之日起七",
+              "dense_similarity": 0.4013761878013611
+            },
+            {
+              "citation_id": "cit_f8a3bb5ec2e458f2",
+              "label": "c5",
+              "title": "货到付款规则",
+              "version": "2026.10.1",
+              "page_no": 1,
+              "chunk_id": "62380741-f89c-562c-ac3d-412024963c15",
+              "snippet": "版本 2026.10.1 · 生效日期 2026-09-01 货到付款仅支持中国大陆地区部分城市，单笔订单金额不得超过 2000 元。 货到付款订单支持开箱验货，验货时请核对商品型号、数量与外观。 签收后视为外观完好，后续外观问题按保修与售",
+              "dense_similarity": 0.42625486850738525
+            },
+            {
+              "citation_id": "cit_a726dc6d4cb41c1b",
+              "label": "c6",
+              "title": "商品保修政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "2c2391cd-4501-5e3d-8960-4d2d2d36ce65",
+              "snippet": "保修以订单号或发票作为购买凭证，二者缺一不可时按订单支付记录判断。 保修服务不随二手转让转移，转让后的商品按付费维修处理。 保修期自签收之日起计算，换货商品沿用原订单的保修截止日期。 维修更换的零部件保修至原保修期结束，不单独延长。 人为损",
+              "dense_similarity": 0.3828572928905487
+            },
+            {
+              "citation_id": "cit_fb01856581989a70",
+              "label": "c7",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "0fdd772b-5aea-59cd-b44b-3190188a932d",
+              "snippet": "大促期间（以活动公告为准）退货审核时效由二十四小时延长至四十八小时，仓库验收时效由三个工作日延长至五个工作日。 大促期间产生的订单仍适用七天无理由期限，期限不因审核排队而顺延。 企业采购订单需在合同中约定退货条款，合同未约定时按本政策执行。",
+              "dense_similarity": 0.38040679693222046
+            },
+            {
+              "citation_id": "cit_6feac7ed7d30a531",
+              "label": "c8",
+              "title": "隐私与个人信息保护说明",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "e2ed2daa-516e-5df7-8cfd-9de5070317ad",
+              "snippet": "为完成下单与配送，商城收集账号标识、联系方式、收货地址与订单信息； 支付信息由支付渠道处理，商城不存储完整卡号。 收集的信息仅用于订单履约、售后服务、安全风控与依法配合监管要求。 未经授权不会将个人信息用于营销推送。 客服与聊天系统仅展示脱",
+              "dense_similarity": 0.39486780762672424
+            }
+          ],
+          "audit": {
+            "fused_candidates": 26,
+            "authorized_candidates": 26,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ok",
+              "sparse": "ok"
+            },
+            "latency_ms": 335.81
+          },
+          "question": "你们在上海有线下体验店吗？店里有停车场吗？"
+        },
+        {
+          "case_id": "no-answer-02",
+          "category": "no_answer",
+          "behavior": "answered",
+          "expected_behavior": "refused",
+          "behavior_ok": false,
+          "retrieval_hit": false,
+          "mrr": 0.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": false,
+          "selected": 8,
+          "top_dense_similarity": 0.5836,
+          "citations": [
+            {
+              "citation_id": "cit_262b561352d85b77",
+              "label": "c1",
+              "title": "积分规则",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "58c24d57-937f-5226-83cc-3239ee3a19f2",
+              "snippet": "订单完成后按实付金额累计积分，每消费 1 元累计 1 分，运费不计入积分。 退货订单按退款金额扣减对应积分，扣减后积分可为负数。 100 积分可抵扣 1 元，单笔订单最多抵扣订单金额的 20%。 积分抵扣部分不参与优惠券门槛计算。 积分自获",
+              "dense_similarity": 0.5836109519004822
+            },
+            {
+              "citation_id": "cit_d4aae14b582e3132",
+              "label": "c2",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "c7317253-6249-5dc1-8d9b-3fc650c3ad99",
+              "snippet": "同款有库存时优先换货，无库存且消费者不同意等待时，可转为退货并按实付金额退款。 换货完成后原订单不可再申请退货，新商品按换货发出日重新计算保修期。 质量问题换货的往返运费由商城承担，非质量问题换货的往返运费由消费者承担。 消费者选择保价寄回",
+              "dense_similarity": 0.5701974034309387
+            },
+            {
+              "citation_id": "cit_e5d273c04d237d65",
+              "label": "c3",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "61bae80e-1436-56fb-b563-5540cf3886fe",
+              "snippet": "本政策适用于中国大陆地区自营商品的质量换货与非质量换货申请。 商品自签收之日起十五日内出现性能故障，经检测确认为质量问题的，可申请换货。 换货优先更换同型号同规格商品； 无同款库存时，可按消费者意愿改为退货。 非质量问题换货需在签收之日起七",
+              "dense_similarity": 0.5311538577079773
+            },
+            {
+              "citation_id": "cit_f8a3bb5ec2e458f2",
+              "label": "c4",
+              "title": "货到付款规则",
+              "version": "2026.10.1",
+              "page_no": 1,
+              "chunk_id": "62380741-f89c-562c-ac3d-412024963c15",
+              "snippet": "版本 2026.10.1 · 生效日期 2026-09-01 货到付款仅支持中国大陆地区部分城市，单笔订单金额不得超过 2000 元。 货到付款订单支持开箱验货，验货时请核对商品型号、数量与外观。 签收后视为外观完好，后续外观问题按保修与售",
+              "dense_similarity": 0.5808345675468445
+            },
+            {
+              "citation_id": "cit_a726dc6d4cb41c1b",
+              "label": "c5",
+              "title": "商品保修政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "2c2391cd-4501-5e3d-8960-4d2d2d36ce65",
+              "snippet": "保修以订单号或发票作为购买凭证，二者缺一不可时按订单支付记录判断。 保修服务不随二手转让转移，转让后的商品按付费维修处理。 保修期自签收之日起计算，换货商品沿用原订单的保修截止日期。 维修更换的零部件保修至原保修期结束，不单独延长。 人为损",
+              "dense_similarity": 0.5332894921302795
+            },
+            {
+              "citation_id": "cit_550d0393d404ee20",
+              "label": "c6",
+              "title": "发票开具与补开规则",
+              "version": "2026.10.1",
+              "page_no": 1,
+              "chunk_id": "dfe7d723-93cc-5954-9eea-9b77d2798125",
+              "snippet": "版本 2026.10.1 · 生效日期 2026-09-01 订单默认开具电子普通发票，发票内容为商品明细，金额为订单实付金额。 需要增值税专用发票的消费者，应在下单后三十日内提交企业资质，经审核通过后开具。 订单完成后的九十日内可以申请补",
+              "dense_similarity": 0.49878978729248047
+            },
+            {
+              "citation_id": "cit_0874c65aab7330fb",
+              "label": "c7",
+              "title": "分期付款说明",
+              "version": "2026.10.1",
+              "page_no": 1,
+              "chunk_id": "40c10aea-a0b6-5d2b-8827-af3f4a53c0b5",
+              "snippet": "版本 2026.10.1 · 生效日期 2026-09-01 部分商品支持 3 期、6 期与 12 期分期，具体期数以结算页展示为准。 3 期免手续费； 6 期与 12 期按银行或支付渠道标准收取手续费，手续费不退还。 分期订单退款时，已收",
+              "dense_similarity": 0.5180527567863464
+            },
+            {
+              "citation_id": "cit_b32200dabad18830",
+              "label": "c8",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "4c20d4fc-ab49-5e65-8b3b-e5e1344e8a93",
+              "snippet": "本政策自 2026 年 10 月 1 日起生效，替代 2026.07.1 版本，适用于中国大陆地区的自营商品订单。 政策版本、生效日期与适用地区以文档元数据为准； 跨境订单适用目的地地区的单独政策。 消费者自签收之日起七日内，可对符合条件的",
+              "dense_similarity": 0.48654526472091675
+            }
+          ],
+          "audit": {
+            "fused_candidates": 26,
+            "authorized_candidates": 26,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ok",
+              "sparse": "ok"
+            },
+            "latency_ms": 330.16
+          },
+          "question": "支持以旧换新抵扣吗？旧的平板能抵多少钱？"
+        },
+        {
+          "case_id": "no-answer-03",
+          "category": "no_answer",
+          "behavior": "answered",
+          "expected_behavior": "refused",
+          "behavior_ok": false,
+          "retrieval_hit": false,
+          "mrr": 0.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": false,
+          "selected": 7,
+          "top_dense_similarity": 0.4933,
+          "citations": [
+            {
+              "citation_id": "cit_fb01856581989a70",
+              "label": "c1",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "0fdd772b-5aea-59cd-b44b-3190188a932d",
+              "snippet": "大促期间（以活动公告为准）退货审核时效由二十四小时延长至四十八小时，仓库验收时效由三个工作日延长至五个工作日。 大促期间产生的订单仍适用七天无理由期限，期限不因审核排队而顺延。 企业采购订单需在合同中约定退货条款，合同未约定时按本政策执行。",
+              "dense_similarity": 0.47331365942955017
+            },
+            {
+              "citation_id": "cit_8b54c1b7f367addc",
+              "label": "c2",
+              "title": "促销活动通用规则",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "134f945b-532a-50ec-886f-b9a2bbdc4d94",
+              "snippet": "同一商品同时参与多个活动时，默认按优惠力度最大的一个活动生效，不自动叠加。 活动页面明确标注可叠加的，按页面说明执行。 商品详情页展示的价格为当前有效价，活动价以结算页为准。 聊天中的价格说明仅供参考，实际价格以订单工具读取的结构化价格为准",
+              "dense_similarity": 0.48073065280914307
+            },
+            {
+              "citation_id": "cit_f8a3bb5ec2e458f2",
+              "label": "c3",
+              "title": "货到付款规则",
+              "version": "2026.10.1",
+              "page_no": 1,
+              "chunk_id": "62380741-f89c-562c-ac3d-412024963c15",
+              "snippet": "版本 2026.10.1 · 生效日期 2026-09-01 货到付款仅支持中国大陆地区部分城市，单笔订单金额不得超过 2000 元。 货到付款订单支持开箱验货，验货时请核对商品型号、数量与外观。 签收后视为外观完好，后续外观问题按保修与售",
+              "dense_similarity": 0.49329161643981934
+            },
+            {
+              "citation_id": "cit_11ba694d74edf8c9",
+              "label": "c4",
+              "title": "发票开具与补开规则",
+              "version": "2026.10.1",
+              "page_no": 2,
+              "chunk_id": "4a043663-d20c-51c7-b019-887b3811d8ad",
+              "snippet": "个人抬头需填写姓名，企业抬头需填写完整名称与纳税人识别号，两者不得混填。 发票内容默认按商品明细开具，需要汇总开具时应在申请时单独说明。 问题一：订单完成后多久可以开票？ 答复：电子普通发票二十四小时内开出，专用发票三个工作日内开出。 问题",
+              "dense_similarity": 0.45502471923828125
+            },
+            {
+              "citation_id": "cit_d4aae14b582e3132",
+              "label": "c5",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "c7317253-6249-5dc1-8d9b-3fc650c3ad99",
+              "snippet": "同款有库存时优先换货，无库存且消费者不同意等待时，可转为退货并按实付金额退款。 换货完成后原订单不可再申请退货，新商品按换货发出日重新计算保修期。 质量问题换货的往返运费由商城承担，非质量问题换货的往返运费由消费者承担。 消费者选择保价寄回",
+              "dense_similarity": 0.49049803614616394
+            },
+            {
+              "citation_id": "cit_6feac7ed7d30a531",
+              "label": "c6",
+              "title": "隐私与个人信息保护说明",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "e2ed2daa-516e-5df7-8cfd-9de5070317ad",
+              "snippet": "为完成下单与配送，商城收集账号标识、联系方式、收货地址与订单信息； 支付信息由支付渠道处理，商城不存储完整卡号。 收集的信息仅用于订单履约、售后服务、安全风控与依法配合监管要求。 未经授权不会将个人信息用于营销推送。 客服与聊天系统仅展示脱",
+              "dense_similarity": 0.4773900806903839
+            },
+            {
+              "citation_id": "cit_e5d273c04d237d65",
+              "label": "c7",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "61bae80e-1436-56fb-b563-5540cf3886fe",
+              "snippet": "本政策适用于中国大陆地区自营商品的质量换货与非质量换货申请。 商品自签收之日起十五日内出现性能故障，经检测确认为质量问题的，可申请换货。 换货优先更换同型号同规格商品； 无同款库存时，可按消费者意愿改为退货。 非质量问题换货需在签收之日起七",
+              "dense_similarity": 0.4694896936416626
+            }
+          ],
+          "audit": {
+            "fused_candidates": 26,
+            "authorized_candidates": 26,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ok",
+              "sparse": "ok"
+            },
+            "latency_ms": 321.19
+          },
+          "question": "可以安排真人导购陪同逛店选购吗？"
+        },
+        {
+          "case_id": "expired-01",
+          "category": "expired",
+          "behavior": "answered",
+          "expected_behavior": "answered",
+          "behavior_ok": true,
+          "retrieval_hit": true,
+          "mrr": 1.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": false,
+          "selected": 8,
+          "top_dense_similarity": 0.7802,
+          "citations": [
+            {
+              "citation_id": "cit_52a2fe77e7402148",
+              "label": "c1",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.07.1",
+              "page_no": null,
+              "chunk_id": "755a2895-a0a8-5d8c-9bbe-06c7df206b62",
+              "snippet": "本政策适用于在中国大陆地区通过 ShopMate 示例商城下单的消费者，自 2026 年 7 月 1 日起生效。 本版本已于 2026 年 9 月 30 日停止适用，请以最新版本为准。 消费者自签收之日起七日内，可以在商品完好、配件齐全、不",
+              "dense_similarity": 0.7802005410194397
+            },
+            {
+              "citation_id": "cit_d4aae14b582e3132",
+              "label": "c2",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "c7317253-6249-5dc1-8d9b-3fc650c3ad99",
+              "snippet": "同款有库存时优先换货，无库存且消费者不同意等待时，可转为退货并按实付金额退款。 换货完成后原订单不可再申请退货，新商品按换货发出日重新计算保修期。 质量问题换货的往返运费由商城承担，非质量问题换货的往返运费由消费者承担。 消费者选择保价寄回",
+              "dense_similarity": 0.6331988573074341
+            },
+            {
+              "citation_id": "cit_e5d273c04d237d65",
+              "label": "c3",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "61bae80e-1436-56fb-b563-5540cf3886fe",
+              "snippet": "本政策适用于中国大陆地区自营商品的质量换货与非质量换货申请。 商品自签收之日起十五日内出现性能故障，经检测确认为质量问题的，可申请换货。 换货优先更换同型号同规格商品； 无同款库存时，可按消费者意愿改为退货。 非质量问题换货需在签收之日起七",
+              "dense_similarity": 0.6422109603881836
+            },
+            {
+              "citation_id": "cit_1e240462052651b1",
+              "label": "c4",
+              "title": "退款到账时效说明",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "60ada2fa-4db1-56c8-82d6-1fa880a2e475",
+              "snippet": "退款在退货商品验收通过后发起，或在取消未发货订单后立即发起。 退款金额以订单实付金额为准，优惠券按规则退回，积分按规则返还。 原路退回的退款通常在发起后一至七个工作日内到账，具体取决于支付渠道。 银行卡渠道一般为一至三个工作日，第三方支付渠",
+              "dense_similarity": 0.6620588898658752
+            },
+            {
+              "citation_id": "cit_202317228108b9eb",
+              "label": "c5",
+              "title": "个护与卫生类商品售后规则",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "1d5bfa88-d8f8-578c-924d-5fc62596a84d",
+              "snippet": "耳机耳塞、剃须刀、电动牙刷等直接接触皮肤或个人卫生的商品，拆封后不适用七天无理由退货。 未拆封商品可无理由退货； 拆封后出现质量问题的，按保修政策检测处理。 退回商品需保持清洁，存在使用痕迹或污渍时可能被判定为影响二次销售。 未拆封且包装完",
+              "dense_similarity": 0.6050092577934265
+            },
+            {
+              "citation_id": "cit_f8a3bb5ec2e458f2",
+              "label": "c6",
+              "title": "货到付款规则",
+              "version": "2026.10.1",
+              "page_no": 1,
+              "chunk_id": "62380741-f89c-562c-ac3d-412024963c15",
+              "snippet": "版本 2026.10.1 · 生效日期 2026-09-01 货到付款仅支持中国大陆地区部分城市，单笔订单金额不得超过 2000 元。 货到付款订单支持开箱验货，验货时请核对商品型号、数量与外观。 签收后视为外观完好，后续外观问题按保修与售",
+              "dense_similarity": 0.5838293433189392
+            },
+            {
+              "citation_id": "cit_5f1f79712474b9d2",
+              "label": "c7",
+              "title": "定制商品售后规则",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "2a65c1ab-067f-5881-a20e-c01118a672de",
+              "snippet": "版本 2026.10.1 · 生效日期 2026-09-01 按消费者要求刻字、改色、改尺寸或专属配置的商品属于定制商品，下单前需确认设计稿。 情形 | 处理方式 尺寸与确认稿不符 | 免费重做或退货 颜色存在明显偏差 | 按确认稿重做 刻",
+              "dense_similarity": 0.6170151233673096
+            },
+            {
+              "citation_id": "cit_fe8b0ffe51beadc0",
+              "label": "c8",
+              "title": "退货手续费说明（评测冲突样本）",
+              "version": "2026.09.1",
+              "page_no": null,
+              "chunk_id": "6d81ffb3-4056-51c0-89ff-c0885f136bb3",
+              "snippet": "本文件仅用于检索评测中的版本冲突场景，属于合成数据，不对应任何真实业务规则。 消费者未在约定期限内寄回商品的，按订单实付金额的 10% 收取逾期退货手续费，最低收取 5 元。 手续费从退款金额中直接扣除，并在退款明细中单独列示。",
+              "dense_similarity": 0.5696892738342285
+            }
+          ],
+          "audit": {
+            "fused_candidates": 23,
+            "authorized_candidates": 23,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ok",
+              "sparse": "ok"
+            },
+            "latency_ms": 345.71
+          },
+          "question": "七天无理由退货从什么时候开始计算？"
+        },
+        {
+          "case_id": "expired-02",
+          "category": "expired",
+          "behavior": "answered",
+          "expected_behavior": "answered",
+          "behavior_ok": true,
+          "retrieval_hit": true,
+          "mrr": 1.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": false,
+          "selected": 8,
+          "top_dense_similarity": 0.7894,
+          "citations": [
+            {
+              "citation_id": "cit_b32200dabad18830",
+              "label": "c1",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "4c20d4fc-ab49-5e65-8b3b-e5e1344e8a93",
+              "snippet": "本政策自 2026 年 10 月 1 日起生效，替代 2026.07.1 版本，适用于中国大陆地区的自营商品订单。 政策版本、生效日期与适用地区以文档元数据为准； 跨境订单适用目的地地区的单独政策。 消费者自签收之日起七日内，可对符合条件的",
+              "dense_similarity": 0.7894278764724731
+            },
+            {
+              "citation_id": "cit_fb01856581989a70",
+              "label": "c2",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "0fdd772b-5aea-59cd-b44b-3190188a932d",
+              "snippet": "大促期间（以活动公告为准）退货审核时效由二十四小时延长至四十八小时，仓库验收时效由三个工作日延长至五个工作日。 大促期间产生的订单仍适用七天无理由期限，期限不因审核排队而顺延。 企业采购订单需在合同中约定退货条款，合同未约定时按本政策执行。",
+              "dense_similarity": 0.7176938652992249
+            },
+            {
+              "citation_id": "cit_b7f40c594c87c0b1",
+              "label": "c3",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "94d9c1b8-8037-570b-93e4-6973b44f9481",
+              "snippet": "退款在仓库验收通过后发起，原路退回，具体到账时间见《退款到账时效说明》。 消费者在订单页选择退货原因并提交申请，系统即时校验订单状态、签收时间与商品类目。 审核通过后七日内将商品寄回指定仓库，超时未寄回的申请自动关闭，可重新提交。 仓库在签",
+              "dense_similarity": 0.748629629611969
+            },
+            {
+              "citation_id": "cit_d4aae14b582e3132",
+              "label": "c4",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "c7317253-6249-5dc1-8d9b-3fc650c3ad99",
+              "snippet": "同款有库存时优先换货，无库存且消费者不同意等待时，可转为退货并按实付金额退款。 换货完成后原订单不可再申请退货，新商品按换货发出日重新计算保修期。 质量问题换货的往返运费由商城承担，非质量问题换货的往返运费由消费者承担。 消费者选择保价寄回",
+              "dense_similarity": 0.6331988573074341
+            },
+            {
+              "citation_id": "cit_e5d273c04d237d65",
+              "label": "c5",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "61bae80e-1436-56fb-b563-5540cf3886fe",
+              "snippet": "本政策适用于中国大陆地区自营商品的质量换货与非质量换货申请。 商品自签收之日起十五日内出现性能故障，经检测确认为质量问题的，可申请换货。 换货优先更换同型号同规格商品； 无同款库存时，可按消费者意愿改为退货。 非质量问题换货需在签收之日起七",
+              "dense_similarity": 0.6422109603881836
+            },
+            {
+              "citation_id": "cit_202317228108b9eb",
+              "label": "c6",
+              "title": "个护与卫生类商品售后规则",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "1d5bfa88-d8f8-578c-924d-5fc62596a84d",
+              "snippet": "耳机耳塞、剃须刀、电动牙刷等直接接触皮肤或个人卫生的商品，拆封后不适用七天无理由退货。 未拆封商品可无理由退货； 拆封后出现质量问题的，按保修政策检测处理。 退回商品需保持清洁，存在使用痕迹或污渍时可能被判定为影响二次销售。 未拆封且包装完",
+              "dense_similarity": 0.6050092577934265
+            },
+            {
+              "citation_id": "cit_1e240462052651b1",
+              "label": "c7",
+              "title": "退款到账时效说明",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "60ada2fa-4db1-56c8-82d6-1fa880a2e475",
+              "snippet": "退款在退货商品验收通过后发起，或在取消未发货订单后立即发起。 退款金额以订单实付金额为准，优惠券按规则退回，积分按规则返还。 原路退回的退款通常在发起后一至七个工作日内到账，具体取决于支付渠道。 银行卡渠道一般为一至三个工作日，第三方支付渠",
+              "dense_similarity": 0.6620588898658752
+            },
+            {
+              "citation_id": "cit_8e0e1eab6fae2689",
+              "label": "c8",
+              "title": "退货手续费说明（评测冲突样本）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "d70ee9b4-1733-51a7-abbf-0ef0051b6057",
+              "snippet": "本文件仅用于检索评测中的版本冲突场景，属于合成数据，不对应任何真实业务规则。 消费者未在约定期限内寄回商品的，每笔订单收取 20 元固定逾期退货手续费，不按金额比例计算。 手续费从退款金额中直接扣除，并在退款明细中单独列示。",
+              "dense_similarity": 0.5689781308174133
+            }
+          ],
+          "audit": {
+            "fused_candidates": 26,
+            "authorized_candidates": 26,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ok",
+              "sparse": "ok"
+            },
+            "latency_ms": 351.73
+          },
+          "question": "七天无理由退货从什么时候开始计算？"
+        },
+        {
+          "case_id": "conflict-01",
+          "category": "conflict",
+          "behavior": "handoff",
+          "expected_behavior": "handoff",
+          "behavior_ok": true,
+          "retrieval_hit": true,
+          "mrr": 1.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": true,
+          "selected": 2,
+          "top_dense_similarity": 0.8015,
+          "citations": [
+            {
+              "citation_id": "cit_fe8b0ffe51beadc0",
+              "label": "c1",
+              "title": "退货手续费说明（评测冲突样本）",
+              "version": "2026.09.1",
+              "page_no": null,
+              "chunk_id": "6d81ffb3-4056-51c0-89ff-c0885f136bb3",
+              "snippet": "本文件仅用于检索评测中的版本冲突场景，属于合成数据，不对应任何真实业务规则。 消费者未在约定期限内寄回商品的，按订单实付金额的 10% 收取逾期退货手续费，最低收取 5 元。 手续费从退款金额中直接扣除，并在退款明细中单独列示。",
+              "dense_similarity": 0.8015329837799072
+            },
+            {
+              "citation_id": "cit_8e0e1eab6fae2689",
+              "label": "c2",
+              "title": "退货手续费说明（评测冲突样本）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "d70ee9b4-1733-51a7-abbf-0ef0051b6057",
+              "snippet": "本文件仅用于检索评测中的版本冲突场景，属于合成数据，不对应任何真实业务规则。 消费者未在约定期限内寄回商品的，每笔订单收取 20 元固定逾期退货手续费，不按金额比例计算。 手续费从退款金额中直接扣除，并在退款明细中单独列示。",
+              "dense_similarity": 0.7904596924781799
+            }
+          ],
+          "audit": {
+            "fused_candidates": 2,
+            "authorized_candidates": 2,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ok",
+              "sparse": "ok"
+            },
+            "latency_ms": 308.41
+          },
+          "question": "逾期退货要收取多少手续费？"
+        },
+        {
+          "case_id": "conflict-02",
+          "category": "conflict",
+          "behavior": "handoff",
+          "expected_behavior": "handoff",
+          "behavior_ok": true,
+          "retrieval_hit": true,
+          "mrr": 1.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": true,
+          "selected": 2,
+          "top_dense_similarity": 0.7748,
+          "citations": [
+            {
+              "citation_id": "cit_fe8b0ffe51beadc0",
+              "label": "c1",
+              "title": "退货手续费说明（评测冲突样本）",
+              "version": "2026.09.1",
+              "page_no": null,
+              "chunk_id": "6d81ffb3-4056-51c0-89ff-c0885f136bb3",
+              "snippet": "本文件仅用于检索评测中的版本冲突场景，属于合成数据，不对应任何真实业务规则。 消费者未在约定期限内寄回商品的，按订单实付金额的 10% 收取逾期退货手续费，最低收取 5 元。 手续费从退款金额中直接扣除，并在退款明细中单独列示。",
+              "dense_similarity": 0.7747786045074463
+            },
+            {
+              "citation_id": "cit_8e0e1eab6fae2689",
+              "label": "c2",
+              "title": "退货手续费说明（评测冲突样本）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "d70ee9b4-1733-51a7-abbf-0ef0051b6057",
+              "snippet": "本文件仅用于检索评测中的版本冲突场景，属于合成数据，不对应任何真实业务规则。 消费者未在约定期限内寄回商品的，每笔订单收取 20 元固定逾期退货手续费，不按金额比例计算。 手续费从退款金额中直接扣除，并在退款明细中单独列示。",
+              "dense_similarity": 0.7642715573310852
+            }
+          ],
+          "audit": {
+            "fused_candidates": 2,
+            "authorized_candidates": 2,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ok",
+              "sparse": "ok"
+            },
+            "latency_ms": 294.57
+          },
+          "question": "退货手续费按什么标准扣？"
+        },
+        {
+          "case_id": "cross-shop-01",
+          "category": "cross_shop",
+          "behavior": "refused",
+          "expected_behavior": "refused",
+          "behavior_ok": true,
+          "retrieval_hit": false,
+          "mrr": 0.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": false,
+          "selected": 0,
+          "top_dense_similarity": null,
+          "citations": [],
+          "audit": {
+            "fused_candidates": 0,
+            "authorized_candidates": 0,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ok",
+              "sparse": "ok"
+            },
+            "latency_ms": 250.65
+          },
+          "question": "七天无理由退货从什么时候开始计算？"
+        },
+        {
+          "case_id": "cross-shop-02",
+          "category": "cross_shop",
+          "behavior": "refused",
+          "expected_behavior": "refused",
+          "behavior_ok": true,
+          "retrieval_hit": false,
+          "mrr": 0.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": false,
+          "selected": 0,
+          "top_dense_similarity": null,
+          "citations": [],
+          "audit": {
+            "fused_candidates": 0,
+            "authorized_candidates": 0,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ok",
+              "sparse": "ok"
+            },
+            "latency_ms": 236.99
+          },
+          "question": "退货期限是多久？"
+        }
+      ]
+    },
+    "dense_only_ablation": {
+      "summary": {
+        "cases": 17,
+        "behavior_accuracy": 0.8235,
+        "retrieval_hit_rate": 0.7059,
+        "mrr": 0.7059,
+        "phrase_recall": 1.0,
+        "leak_cases": 0,
+        "false_answer_cases": 3,
+        "false_refusal_cases": 0,
+        "avg_selected": 6.0,
+        "avg_latency_ms": 302.34
+      },
+      "by_category": {
+        "conflict": {
+          "cases": 2,
+          "behavior_accuracy": 1.0,
+          "retrieval_hit_rate": 1.0,
+          "mrr": 1.0,
+          "phrase_recall": 1.0,
+          "leak_cases": 0,
+          "false_answer_cases": 0,
+          "false_refusal_cases": 0,
+          "avg_selected": 2.0,
+          "avg_latency_ms": 329.83
+        },
+        "cross_shop": {
+          "cases": 2,
+          "behavior_accuracy": 1.0,
+          "retrieval_hit_rate": 0.0,
+          "mrr": 0.0,
+          "phrase_recall": 1.0,
+          "leak_cases": 0,
+          "false_answer_cases": 0,
+          "false_refusal_cases": 0,
+          "avg_selected": 0.0,
+          "avg_latency_ms": 253.26
+        },
+        "expired": {
+          "cases": 2,
+          "behavior_accuracy": 1.0,
+          "retrieval_hit_rate": 1.0,
+          "mrr": 1.0,
+          "phrase_recall": 1.0,
+          "leak_cases": 0,
+          "false_answer_cases": 0,
+          "false_refusal_cases": 0,
+          "avg_selected": 8.0,
+          "avg_latency_ms": 316.97
+        },
+        "no_answer": {
+          "cases": 3,
+          "behavior_accuracy": 0.0,
+          "retrieval_hit_rate": 0.0,
+          "mrr": 0.0,
+          "phrase_recall": 1.0,
+          "leak_cases": 0,
+          "false_answer_cases": 3,
+          "false_refusal_cases": 0,
+          "avg_selected": 8.0,
+          "avg_latency_ms": 338.23
+        },
+        "normal": {
+          "cases": 8,
+          "behavior_accuracy": 1.0,
+          "retrieval_hit_rate": 1.0,
+          "mrr": 1.0,
+          "phrase_recall": 1.0,
+          "leak_cases": 0,
+          "false_answer_cases": 0,
+          "false_refusal_cases": 0,
+          "avg_selected": 7.25,
+          "avg_latency_ms": 290.61
+        }
+      },
+      "records": [
+        {
+          "case_id": "normal-01",
+          "category": "normal",
+          "behavior": "answered",
+          "expected_behavior": "answered",
+          "behavior_ok": true,
+          "retrieval_hit": true,
+          "mrr": 1.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": false,
+          "selected": 8,
+          "top_dense_similarity": 0.7894,
+          "citations": [
+            {
+              "citation_id": "cit_b32200dabad18830",
+              "label": "c1",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "4c20d4fc-ab49-5e65-8b3b-e5e1344e8a93",
+              "snippet": "本政策自 2026 年 10 月 1 日起生效，替代 2026.07.1 版本，适用于中国大陆地区的自营商品订单。 政策版本、生效日期与适用地区以文档元数据为准； 跨境订单适用目的地地区的单独政策。 消费者自签收之日起七日内，可对符合条件的",
+              "dense_similarity": 0.7894278764724731
+            },
+            {
+              "citation_id": "cit_b7f40c594c87c0b1",
+              "label": "c2",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "94d9c1b8-8037-570b-93e4-6973b44f9481",
+              "snippet": "退款在仓库验收通过后发起，原路退回，具体到账时间见《退款到账时效说明》。 消费者在订单页选择退货原因并提交申请，系统即时校验订单状态、签收时间与商品类目。 审核通过后七日内将商品寄回指定仓库，超时未寄回的申请自动关闭，可重新提交。 仓库在签",
+              "dense_similarity": 0.748629629611969
+            },
+            {
+              "citation_id": "cit_fb01856581989a70",
+              "label": "c3",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "0fdd772b-5aea-59cd-b44b-3190188a932d",
+              "snippet": "大促期间（以活动公告为准）退货审核时效由二十四小时延长至四十八小时，仓库验收时效由三个工作日延长至五个工作日。 大促期间产生的订单仍适用七天无理由期限，期限不因审核排队而顺延。 企业采购订单需在合同中约定退货条款，合同未约定时按本政策执行。",
+              "dense_similarity": 0.7176938652992249
+            },
+            {
+              "citation_id": "cit_1e240462052651b1",
+              "label": "c4",
+              "title": "退款到账时效说明",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "60ada2fa-4db1-56c8-82d6-1fa880a2e475",
+              "snippet": "退款在退货商品验收通过后发起，或在取消未发货订单后立即发起。 退款金额以订单实付金额为准，优惠券按规则退回，积分按规则返还。 原路退回的退款通常在发起后一至七个工作日内到账，具体取决于支付渠道。 银行卡渠道一般为一至三个工作日，第三方支付渠",
+              "dense_similarity": 0.6620588898658752
+            },
+            {
+              "citation_id": "cit_e5d273c04d237d65",
+              "label": "c5",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "61bae80e-1436-56fb-b563-5540cf3886fe",
+              "snippet": "本政策适用于中国大陆地区自营商品的质量换货与非质量换货申请。 商品自签收之日起十五日内出现性能故障，经检测确认为质量问题的，可申请换货。 换货优先更换同型号同规格商品； 无同款库存时，可按消费者意愿改为退货。 非质量问题换货需在签收之日起七",
+              "dense_similarity": 0.6422109603881836
+            },
+            {
+              "citation_id": "cit_d4aae14b582e3132",
+              "label": "c6",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "c7317253-6249-5dc1-8d9b-3fc650c3ad99",
+              "snippet": "同款有库存时优先换货，无库存且消费者不同意等待时，可转为退货并按实付金额退款。 换货完成后原订单不可再申请退货，新商品按换货发出日重新计算保修期。 质量问题换货的往返运费由商城承担，非质量问题换货的往返运费由消费者承担。 消费者选择保价寄回",
+              "dense_similarity": 0.6331988573074341
+            },
+            {
+              "citation_id": "cit_5f1f79712474b9d2",
+              "label": "c7",
+              "title": "定制商品售后规则",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "2a65c1ab-067f-5881-a20e-c01118a672de",
+              "snippet": "版本 2026.10.1 · 生效日期 2026-09-01 按消费者要求刻字、改色、改尺寸或专属配置的商品属于定制商品，下单前需确认设计稿。 情形 | 处理方式 尺寸与确认稿不符 | 免费重做或退货 颜色存在明显偏差 | 按确认稿重做 刻",
+              "dense_similarity": 0.6170151233673096
+            },
+            {
+              "citation_id": "cit_fe8b0ffe51beadc0",
+              "label": "c8",
+              "title": "退货手续费说明（评测冲突样本）",
+              "version": "2026.09.1",
+              "page_no": null,
+              "chunk_id": "6d81ffb3-4056-51c0-89ff-c0885f136bb3",
+              "snippet": "本文件仅用于检索评测中的版本冲突场景，属于合成数据，不对应任何真实业务规则。 消费者未在约定期限内寄回商品的，按订单实付金额的 10% 收取逾期退货手续费，最低收取 5 元。 手续费从退款金额中直接扣除，并在退款明细中单独列示。",
+              "dense_similarity": 0.5696892738342285
+            }
+          ],
+          "audit": {
+            "fused_candidates": 26,
+            "authorized_candidates": 26,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ablation_only",
+              "sparse": "disabled_by_request"
+            },
+            "latency_ms": 301.33
+          },
+          "question": "七天无理由退货从什么时候开始计算？"
+        },
+        {
+          "case_id": "normal-02",
+          "category": "normal",
+          "behavior": "answered",
+          "expected_behavior": "answered",
+          "behavior_ok": true,
+          "retrieval_hit": true,
+          "mrr": 1.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": false,
+          "selected": 8,
+          "top_dense_similarity": 0.7841,
+          "citations": [
+            {
+              "citation_id": "cit_1e240462052651b1",
+              "label": "c1",
+              "title": "退款到账时效说明",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "60ada2fa-4db1-56c8-82d6-1fa880a2e475",
+              "snippet": "退款在退货商品验收通过后发起，或在取消未发货订单后立即发起。 退款金额以订单实付金额为准，优惠券按规则退回，积分按规则返还。 原路退回的退款通常在发起后一至七个工作日内到账，具体取决于支付渠道。 银行卡渠道一般为一至三个工作日，第三方支付渠",
+              "dense_similarity": 0.7841293215751648
+            },
+            {
+              "citation_id": "cit_b7f40c594c87c0b1",
+              "label": "c2",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "94d9c1b8-8037-570b-93e4-6973b44f9481",
+              "snippet": "退款在仓库验收通过后发起，原路退回，具体到账时间见《退款到账时效说明》。 消费者在订单页选择退货原因并提交申请，系统即时校验订单状态、签收时间与商品类目。 审核通过后七日内将商品寄回指定仓库，超时未寄回的申请自动关闭，可重新提交。 仓库在签",
+              "dense_similarity": 0.7379344701766968
+            },
+            {
+              "citation_id": "cit_fb01856581989a70",
+              "label": "c3",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "0fdd772b-5aea-59cd-b44b-3190188a932d",
+              "snippet": "大促期间（以活动公告为准）退货审核时效由二十四小时延长至四十八小时，仓库验收时效由三个工作日延长至五个工作日。 大促期间产生的订单仍适用七天无理由期限，期限不因审核排队而顺延。 企业采购订单需在合同中约定退货条款，合同未约定时按本政策执行。",
+              "dense_similarity": 0.6656635403633118
+            },
+            {
+              "citation_id": "cit_f8a3bb5ec2e458f2",
+              "label": "c4",
+              "title": "货到付款规则",
+              "version": "2026.10.1",
+              "page_no": 1,
+              "chunk_id": "62380741-f89c-562c-ac3d-412024963c15",
+              "snippet": "版本 2026.10.1 · 生效日期 2026-09-01 货到付款仅支持中国大陆地区部分城市，单笔订单金额不得超过 2000 元。 货到付款订单支持开箱验货，验货时请核对商品型号、数量与外观。 签收后视为外观完好，后续外观问题按保修与售",
+              "dense_similarity": 0.6493535041809082
+            },
+            {
+              "citation_id": "cit_fe8b0ffe51beadc0",
+              "label": "c5",
+              "title": "退货手续费说明（评测冲突样本）",
+              "version": "2026.09.1",
+              "page_no": null,
+              "chunk_id": "6d81ffb3-4056-51c0-89ff-c0885f136bb3",
+              "snippet": "本文件仅用于检索评测中的版本冲突场景，属于合成数据，不对应任何真实业务规则。 消费者未在约定期限内寄回商品的，按订单实付金额的 10% 收取逾期退货手续费，最低收取 5 元。 手续费从退款金额中直接扣除，并在退款明细中单独列示。",
+              "dense_similarity": 0.6415066123008728
+            },
+            {
+              "citation_id": "cit_d4aae14b582e3132",
+              "label": "c6",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "c7317253-6249-5dc1-8d9b-3fc650c3ad99",
+              "snippet": "同款有库存时优先换货，无库存且消费者不同意等待时，可转为退货并按实付金额退款。 换货完成后原订单不可再申请退货，新商品按换货发出日重新计算保修期。 质量问题换货的往返运费由商城承担，非质量问题换货的往返运费由消费者承担。 消费者选择保价寄回",
+              "dense_similarity": 0.6415055394172668
+            },
+            {
+              "citation_id": "cit_262b561352d85b77",
+              "label": "c7",
+              "title": "积分规则",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "58c24d57-937f-5226-83cc-3239ee3a19f2",
+              "snippet": "订单完成后按实付金额累计积分，每消费 1 元累计 1 分，运费不计入积分。 退货订单按退款金额扣减对应积分，扣减后积分可为负数。 100 积分可抵扣 1 元，单笔订单最多抵扣订单金额的 20%。 积分抵扣部分不参与优惠券门槛计算。 积分自获",
+              "dense_similarity": 0.637758195400238
+            },
+            {
+              "citation_id": "cit_0e06521e0453b1cc",
+              "label": "c8",
+              "title": "配送范围与时效",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "4f0c7378-0987-5442-b62c-6d6c9647dfab",
+              "snippet": "自营商品配送范围为中国大陆地区（不含港澳台），跨境订单按目的地地区政策单独履约。 部分偏远地区可能产生附加运费，详见《偏远地区配送附加费说明》。 现货订单在付款后四十八小时内发出，预售商品以商品页标注的发货时间为准。 法定节假日期间发货时效",
+              "dense_similarity": 0.6355350613594055
+            }
+          ],
+          "audit": {
+            "fused_candidates": 26,
+            "authorized_candidates": 26,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ablation_only",
+              "sparse": "disabled_by_request"
+            },
+            "latency_ms": 304.38
+          },
+          "question": "退款一般多久能到账？"
+        },
+        {
+          "case_id": "normal-03",
+          "category": "normal",
+          "behavior": "answered",
+          "expected_behavior": "answered",
+          "behavior_ok": true,
+          "retrieval_hit": true,
+          "mrr": 1.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": false,
+          "selected": 8,
+          "top_dense_similarity": 0.77,
+          "citations": [
+            {
+              "citation_id": "cit_a0c805a86acc79bf",
+              "label": "c1",
+              "title": "商品保修政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "48cd50e4-f391-5104-956d-e822a5c22264",
+              "snippet": "耳机、鼠标、充电器、移动电源、摄像头默认保修十二个月； 机械键盘与部分智能手表保修二十四个月。 具体保修期以商品属性中的保修月数字段为准，不以聊天描述为准。 保修覆盖非人为因素导致的性能故障，包括无法开机、无法充电、按键失灵与异常断连。 进",
+              "dense_similarity": 0.7699891328811646
+            },
+            {
+              "citation_id": "cit_a726dc6d4cb41c1b",
+              "label": "c2",
+              "title": "商品保修政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "2c2391cd-4501-5e3d-8960-4d2d2d36ce65",
+              "snippet": "保修以订单号或发票作为购买凭证，二者缺一不可时按订单支付记录判断。 保修服务不随二手转让转移，转让后的商品按付费维修处理。 保修期自签收之日起计算，换货商品沿用原订单的保修截止日期。 维修更换的零部件保修至原保修期结束，不单独延长。 人为损",
+              "dense_similarity": 0.7111700773239136
+            },
+            {
+              "citation_id": "cit_202317228108b9eb",
+              "label": "c3",
+              "title": "个护与卫生类商品售后规则",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "1d5bfa88-d8f8-578c-924d-5fc62596a84d",
+              "snippet": "耳机耳塞、剃须刀、电动牙刷等直接接触皮肤或个人卫生的商品，拆封后不适用七天无理由退货。 未拆封商品可无理由退货； 拆封后出现质量问题的，按保修政策检测处理。 退回商品需保持清洁，存在使用痕迹或污渍时可能被判定为影响二次销售。 未拆封且包装完",
+              "dense_similarity": 0.6790011525154114
+            },
+            {
+              "citation_id": "cit_5f1f79712474b9d2",
+              "label": "c4",
+              "title": "定制商品售后规则",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "2a65c1ab-067f-5881-a20e-c01118a672de",
+              "snippet": "版本 2026.10.1 · 生效日期 2026-09-01 按消费者要求刻字、改色、改尺寸或专属配置的商品属于定制商品，下单前需确认设计稿。 情形 | 处理方式 尺寸与确认稿不符 | 免费重做或退货 颜色存在明显偏差 | 按确认稿重做 刻",
+              "dense_similarity": 0.5579649209976196
+            },
+            {
+              "citation_id": "cit_d4aae14b582e3132",
+              "label": "c5",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "c7317253-6249-5dc1-8d9b-3fc650c3ad99",
+              "snippet": "同款有库存时优先换货，无库存且消费者不同意等待时，可转为退货并按实付金额退款。 换货完成后原订单不可再申请退货，新商品按换货发出日重新计算保修期。 质量问题换货的往返运费由商城承担，非质量问题换货的往返运费由消费者承担。 消费者选择保价寄回",
+              "dense_similarity": 0.5446013808250427
+            },
+            {
+              "citation_id": "cit_e5d273c04d237d65",
+              "label": "c6",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "61bae80e-1436-56fb-b563-5540cf3886fe",
+              "snippet": "本政策适用于中国大陆地区自营商品的质量换货与非质量换货申请。 商品自签收之日起十五日内出现性能故障，经检测确认为质量问题的，可申请换货。 换货优先更换同型号同规格商品； 无同款库存时，可按消费者意愿改为退货。 非质量问题换货需在签收之日起七",
+              "dense_similarity": 0.5436562895774841
+            },
+            {
+              "citation_id": "cit_45946362c8f9494d",
+              "label": "c7",
+              "title": "价格保护政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "e3685778-12ca-5967-8d06-736e007e9dc9",
+              "snippet": "自订单支付成功之日起七日内，同一商品在同一店铺出现降价时，可以申请价格保护。 申请价保的订单不得已退货或已取消，且商品需为同型号同规格。 使用优惠券、限时秒杀、会员专享价产生的价差不在价保范围内。 价保差额以优惠券或原路退款方式返还，具体方",
+              "dense_similarity": 0.5353163480758667
+            },
+            {
+              "citation_id": "cit_fd45740b09d63dc5",
+              "label": "c8",
+              "title": "丢件与破损处理流程",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "3691aca5-af30-5d77-804d-17400118c2e7",
+              "snippet": "签收时发现外包装破损，应当场拍照并拒收； 已签收的，需在签收后四十八小时内提交照片举证。 物流信息超过七十二小时无更新时，可提交丢件核查，承运商核查周期为三至七个工作日。 核查确认丢件后，优先补发同款商品； 无库存时按实付金额退款。 赔付方",
+              "dense_similarity": 0.5212138295173645
+            }
+          ],
+          "audit": {
+            "fused_candidates": 26,
+            "authorized_candidates": 26,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ablation_only",
+              "sparse": "disabled_by_request"
+            },
+            "latency_ms": 290.54
+          },
+          "question": "耳机的保修期是多久？"
+        },
+        {
+          "case_id": "normal-04",
+          "category": "normal",
+          "behavior": "answered",
+          "expected_behavior": "answered",
+          "behavior_ok": true,
+          "retrieval_hit": true,
+          "mrr": 1.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": true,
+          "selected": 8,
+          "top_dense_similarity": 0.8108,
+          "citations": [
+            {
+              "citation_id": "cit_c206ce80983d1f12",
+              "label": "c1",
+              "title": "偏远地区配送附加费说明",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "65c6d95b-9587-500d-a5b3-664987b20149",
+              "snippet": "新疆、西藏、内蒙古部分区域、青海与甘肃部分区域属于偏远地区，配送时效与运费标准单独计算。 偏远地区订单按重量收取附加费，首重 1 公斤 12 元，续重每公斤 8 元，具体金额以结算页为准。 偏远地区配送时效一般为五至十日，遇极端天气可能进一",
+              "dense_similarity": 0.8108473420143127
+            },
+            {
+              "citation_id": "cit_0e06521e0453b1cc",
+              "label": "c2",
+              "title": "配送范围与时效",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "4f0c7378-0987-5442-b62c-6d6c9647dfab",
+              "snippet": "自营商品配送范围为中国大陆地区（不含港澳台），跨境订单按目的地地区政策单独履约。 部分偏远地区可能产生附加运费，详见《偏远地区配送附加费说明》。 现货订单在付款后四十八小时内发出，预售商品以商品页标注的发货时间为准。 法定节假日期间发货时效",
+              "dense_similarity": 0.6423009634017944
+            },
+            {
+              "citation_id": "cit_1cdcadb38e198c42",
+              "label": "c3",
+              "title": "配送范围与时效",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "6b8f36c2-8dff-5060-bbb7-30bc8dc04df0",
+              "snippet": "遇极端天气、交通管制或公共事件，配送时效顺延，顺延天数以公告为准。 顺延期间订单状态保持运输中，消费者可随时查看物流节点。 同一订单包含不同仓库商品时会拆单发货，拆单不额外收取运费。 拆单后各包裹独立显示物流信息，部分包裹延迟不影响其他包裹",
+              "dense_similarity": 0.638145387172699
+            },
+            {
+              "citation_id": "cit_1db00a96079abcc5",
+              "label": "c4",
+              "title": "包邮门槛说明",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "07693f37-6895-5526-ad4c-c43a538e4443",
+              "snippet": "单笔订单实付金额满 99 元即可享受普通快递包邮，门槛按实付金额计算，不含运费与增值服务费。 大件商品、超重商品与偏远地区订单不参与包邮，具体以结算页展示为准。 同一订单包含多个仓库商品时可能拆单发货，拆单不额外收取运费。 会员等级达到指定",
+              "dense_similarity": 0.5840689539909363
+            },
+            {
+              "citation_id": "cit_fe8b0ffe51beadc0",
+              "label": "c5",
+              "title": "退货手续费说明（评测冲突样本）",
+              "version": "2026.09.1",
+              "page_no": null,
+              "chunk_id": "6d81ffb3-4056-51c0-89ff-c0885f136bb3",
+              "snippet": "本文件仅用于检索评测中的版本冲突场景，属于合成数据，不对应任何真实业务规则。 消费者未在约定期限内寄回商品的，按订单实付金额的 10% 收取逾期退货手续费，最低收取 5 元。 手续费从退款金额中直接扣除，并在退款明细中单独列示。",
+              "dense_similarity": 0.5586637258529663
+            },
+            {
+              "citation_id": "cit_550d0393d404ee20",
+              "label": "c6",
+              "title": "发票开具与补开规则",
+              "version": "2026.10.1",
+              "page_no": 1,
+              "chunk_id": "dfe7d723-93cc-5954-9eea-9b77d2798125",
+              "snippet": "版本 2026.10.1 · 生效日期 2026-09-01 订单默认开具电子普通发票，发票内容为商品明细，金额为订单实付金额。 需要增值税专用发票的消费者，应在下单后三十日内提交企业资质，经审核通过后开具。 订单完成后的九十日内可以申请补",
+              "dense_similarity": 0.5582507848739624
+            },
+            {
+              "citation_id": "cit_8e0e1eab6fae2689",
+              "label": "c7",
+              "title": "退货手续费说明（评测冲突样本）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "d70ee9b4-1733-51a7-abbf-0ef0051b6057",
+              "snippet": "本文件仅用于检索评测中的版本冲突场景，属于合成数据，不对应任何真实业务规则。 消费者未在约定期限内寄回商品的，每笔订单收取 20 元固定逾期退货手续费，不按金额比例计算。 手续费从退款金额中直接扣除，并在退款明细中单独列示。",
+              "dense_similarity": 0.5544933676719666
+            },
+            {
+              "citation_id": "cit_262b561352d85b77",
+              "label": "c8",
+              "title": "积分规则",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "58c24d57-937f-5226-83cc-3239ee3a19f2",
+              "snippet": "订单完成后按实付金额累计积分，每消费 1 元累计 1 分，运费不计入积分。 退货订单按退款金额扣减对应积分，扣减后积分可为负数。 100 积分可抵扣 1 元，单笔订单最多抵扣订单金额的 20%。 积分抵扣部分不参与优惠券门槛计算。 积分自获",
+              "dense_similarity": 0.5486605763435364
+            }
+          ],
+          "audit": {
+            "fused_candidates": 26,
+            "authorized_candidates": 26,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ablation_only",
+              "sparse": "disabled_by_request"
+            },
+            "latency_ms": 294.85
+          },
+          "question": "偏远地区配送附加费怎么计算？"
+        },
+        {
+          "case_id": "normal-05",
+          "category": "normal",
+          "behavior": "answered",
+          "expected_behavior": "answered",
+          "behavior_ok": true,
+          "retrieval_hit": true,
+          "mrr": 1.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": false,
+          "selected": 8,
+          "top_dense_similarity": 0.7859,
+          "citations": [
+            {
+              "citation_id": "cit_1db00a96079abcc5",
+              "label": "c1",
+              "title": "包邮门槛说明",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "07693f37-6895-5526-ad4c-c43a538e4443",
+              "snippet": "单笔订单实付金额满 99 元即可享受普通快递包邮，门槛按实付金额计算，不含运费与增值服务费。 大件商品、超重商品与偏远地区订单不参与包邮，具体以结算页展示为准。 同一订单包含多个仓库商品时可能拆单发货，拆单不额外收取运费。 会员等级达到指定",
+              "dense_similarity": 0.7858542799949646
+            },
+            {
+              "citation_id": "cit_f8a3bb5ec2e458f2",
+              "label": "c2",
+              "title": "货到付款规则",
+              "version": "2026.10.1",
+              "page_no": 1,
+              "chunk_id": "62380741-f89c-562c-ac3d-412024963c15",
+              "snippet": "版本 2026.10.1 · 生效日期 2026-09-01 货到付款仅支持中国大陆地区部分城市，单笔订单金额不得超过 2000 元。 货到付款订单支持开箱验货，验货时请核对商品型号、数量与外观。 签收后视为外观完好，后续外观问题按保修与售",
+              "dense_similarity": 0.672674298286438
+            },
+            {
+              "citation_id": "cit_0e06521e0453b1cc",
+              "label": "c3",
+              "title": "配送范围与时效",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "4f0c7378-0987-5442-b62c-6d6c9647dfab",
+              "snippet": "自营商品配送范围为中国大陆地区（不含港澳台），跨境订单按目的地地区政策单独履约。 部分偏远地区可能产生附加运费，详见《偏远地区配送附加费说明》。 现货订单在付款后四十八小时内发出，预售商品以商品页标注的发货时间为准。 法定节假日期间发货时效",
+              "dense_similarity": 0.6265372037887573
+            },
+            {
+              "citation_id": "cit_c206ce80983d1f12",
+              "label": "c4",
+              "title": "偏远地区配送附加费说明",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "65c6d95b-9587-500d-a5b3-664987b20149",
+              "snippet": "新疆、西藏、内蒙古部分区域、青海与甘肃部分区域属于偏远地区，配送时效与运费标准单独计算。 偏远地区订单按重量收取附加费，首重 1 公斤 12 元，续重每公斤 8 元，具体金额以结算页为准。 偏远地区配送时效一般为五至十日，遇极端天气可能进一",
+              "dense_similarity": 0.611686110496521
+            },
+            {
+              "citation_id": "cit_1cdcadb38e198c42",
+              "label": "c5",
+              "title": "配送范围与时效",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "6b8f36c2-8dff-5060-bbb7-30bc8dc04df0",
+              "snippet": "遇极端天气、交通管制或公共事件，配送时效顺延，顺延天数以公告为准。 顺延期间订单状态保持运输中，消费者可随时查看物流节点。 同一订单包含不同仓库商品时会拆单发货，拆单不额外收取运费。 拆单后各包裹独立显示物流信息，部分包裹延迟不影响其他包裹",
+              "dense_similarity": 0.6060104370117188
+            },
+            {
+              "citation_id": "cit_262b561352d85b77",
+              "label": "c6",
+              "title": "积分规则",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "58c24d57-937f-5226-83cc-3239ee3a19f2",
+              "snippet": "订单完成后按实付金额累计积分，每消费 1 元累计 1 分，运费不计入积分。 退货订单按退款金额扣减对应积分，扣减后积分可为负数。 100 积分可抵扣 1 元，单笔订单最多抵扣订单金额的 20%。 积分抵扣部分不参与优惠券门槛计算。 积分自获",
+              "dense_similarity": 0.6042895317077637
+            },
+            {
+              "citation_id": "cit_b7f40c594c87c0b1",
+              "label": "c7",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "94d9c1b8-8037-570b-93e4-6973b44f9481",
+              "snippet": "退款在仓库验收通过后发起，原路退回，具体到账时间见《退款到账时效说明》。 消费者在订单页选择退货原因并提交申请，系统即时校验订单状态、签收时间与商品类目。 审核通过后七日内将商品寄回指定仓库，超时未寄回的申请自动关闭，可重新提交。 仓库在签",
+              "dense_similarity": 0.5759473443031311
+            },
+            {
+              "citation_id": "cit_45946362c8f9494d",
+              "label": "c8",
+              "title": "价格保护政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "e3685778-12ca-5967-8d06-736e007e9dc9",
+              "snippet": "自订单支付成功之日起七日内，同一商品在同一店铺出现降价时，可以申请价格保护。 申请价保的订单不得已退货或已取消，且商品需为同型号同规格。 使用优惠券、限时秒杀、会员专享价产生的价差不在价保范围内。 价保差额以优惠券或原路退款方式返还，具体方",
+              "dense_similarity": 0.5732695460319519
+            }
+          ],
+          "audit": {
+            "fused_candidates": 26,
+            "authorized_candidates": 26,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ablation_only",
+              "sparse": "disabled_by_request"
+            },
+            "latency_ms": 275.98
+          },
+          "question": "订单金额满多少可以包邮？"
+        },
+        {
+          "case_id": "normal-06",
+          "category": "normal",
+          "behavior": "answered",
+          "expected_behavior": "answered",
+          "behavior_ok": true,
+          "retrieval_hit": true,
+          "mrr": 1.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": true,
+          "selected": 8,
+          "top_dense_similarity": 0.6961,
+          "citations": [
+            {
+              "citation_id": "cit_b7f40c594c87c0b1",
+              "label": "c1",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "94d9c1b8-8037-570b-93e4-6973b44f9481",
+              "snippet": "退款在仓库验收通过后发起，原路退回，具体到账时间见《退款到账时效说明》。 消费者在订单页选择退货原因并提交申请，系统即时校验订单状态、签收时间与商品类目。 审核通过后七日内将商品寄回指定仓库，超时未寄回的申请自动关闭，可重新提交。 仓库在签",
+              "dense_similarity": 0.6961235404014587
+            },
+            {
+              "citation_id": "cit_b32200dabad18830",
+              "label": "c2",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "4c20d4fc-ab49-5e65-8b3b-e5e1344e8a93",
+              "snippet": "本政策自 2026 年 10 月 1 日起生效，替代 2026.07.1 版本，适用于中国大陆地区的自营商品订单。 政策版本、生效日期与适用地区以文档元数据为准； 跨境订单适用目的地地区的单独政策。 消费者自签收之日起七日内，可对符合条件的",
+              "dense_similarity": 0.6589345932006836
+            },
+            {
+              "citation_id": "cit_d4aae14b582e3132",
+              "label": "c3",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "c7317253-6249-5dc1-8d9b-3fc650c3ad99",
+              "snippet": "同款有库存时优先换货，无库存且消费者不同意等待时，可转为退货并按实付金额退款。 换货完成后原订单不可再申请退货，新商品按换货发出日重新计算保修期。 质量问题换货的往返运费由商城承担，非质量问题换货的往返运费由消费者承担。 消费者选择保价寄回",
+              "dense_similarity": 0.6533668637275696
+            },
+            {
+              "citation_id": "cit_fb01856581989a70",
+              "label": "c4",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "0fdd772b-5aea-59cd-b44b-3190188a932d",
+              "snippet": "大促期间（以活动公告为准）退货审核时效由二十四小时延长至四十八小时，仓库验收时效由三个工作日延长至五个工作日。 大促期间产生的订单仍适用七天无理由期限，期限不因审核排队而顺延。 企业采购订单需在合同中约定退货条款，合同未约定时按本政策执行。",
+              "dense_similarity": 0.6514068841934204
+            },
+            {
+              "citation_id": "cit_fe8b0ffe51beadc0",
+              "label": "c5",
+              "title": "退货手续费说明（评测冲突样本）",
+              "version": "2026.09.1",
+              "page_no": null,
+              "chunk_id": "6d81ffb3-4056-51c0-89ff-c0885f136bb3",
+              "snippet": "本文件仅用于检索评测中的版本冲突场景，属于合成数据，不对应任何真实业务规则。 消费者未在约定期限内寄回商品的，按订单实付金额的 10% 收取逾期退货手续费，最低收取 5 元。 手续费从退款金额中直接扣除，并在退款明细中单独列示。",
+              "dense_similarity": 0.6469169855117798
+            },
+            {
+              "citation_id": "cit_8e0e1eab6fae2689",
+              "label": "c6",
+              "title": "退货手续费说明（评测冲突样本）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "d70ee9b4-1733-51a7-abbf-0ef0051b6057",
+              "snippet": "本文件仅用于检索评测中的版本冲突场景，属于合成数据，不对应任何真实业务规则。 消费者未在约定期限内寄回商品的，每笔订单收取 20 元固定逾期退货手续费，不按金额比例计算。 手续费从退款金额中直接扣除，并在退款明细中单独列示。",
+              "dense_similarity": 0.6443222165107727
+            },
+            {
+              "citation_id": "cit_1e240462052651b1",
+              "label": "c7",
+              "title": "退款到账时效说明",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "60ada2fa-4db1-56c8-82d6-1fa880a2e475",
+              "snippet": "退款在退货商品验收通过后发起，或在取消未发货订单后立即发起。 退款金额以订单实付金额为准，优惠券按规则退回，积分按规则返还。 原路退回的退款通常在发起后一至七个工作日内到账，具体取决于支付渠道。 银行卡渠道一般为一至三个工作日，第三方支付渠",
+              "dense_similarity": 0.6090282797813416
+            },
+            {
+              "citation_id": "cit_1db00a96079abcc5",
+              "label": "c8",
+              "title": "包邮门槛说明",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "07693f37-6895-5526-ad4c-c43a538e4443",
+              "snippet": "单笔订单实付金额满 99 元即可享受普通快递包邮，门槛按实付金额计算，不含运费与增值服务费。 大件商品、超重商品与偏远地区订单不参与包邮，具体以结算页展示为准。 同一订单包含多个仓库商品时可能拆单发货，拆单不额外收取运费。 会员等级达到指定",
+              "dense_similarity": 0.6031936407089233
+            }
+          ],
+          "audit": {
+            "fused_candidates": 26,
+            "authorized_candidates": 26,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ablation_only",
+              "sparse": "disabled_by_request"
+            },
+            "latency_ms": 291.65
+          },
+          "question": "无理由退货运费由谁承担？"
+        },
+        {
+          "case_id": "normal-07",
+          "category": "normal",
+          "behavior": "answered",
+          "expected_behavior": "answered",
+          "behavior_ok": true,
+          "retrieval_hit": true,
+          "mrr": 1.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": false,
+          "selected": 2,
+          "top_dense_similarity": 0.8097,
+          "citations": [
+            {
+              "citation_id": "cit_ed351ddd3f98e9ad",
+              "label": "c1",
+              "title": "退货与退款政策（新加坡）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "0ab60905-31f1-566a-9dbb-926fc73217b1",
+              "snippet": "本政策适用于配送地址在新加坡的订单，自 2026 年 9 月 1 日起生效。 消费者自签收之日起十五日内可申请退货，商品需保持完好并附原包装。 无理由退货的寄回运费由消费者承担； 已缴纳的进口关税不予退还。 退款在验收通过后五至十个工作日内",
+              "dense_similarity": 0.8096974492073059
+            },
+            {
+              "citation_id": "cit_2af90e3be875f0ba",
+              "label": "c2",
+              "title": "配送政策（新加坡）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "222cab4b-8ffb-55b3-8ff2-7b4f9a01082b",
+              "snippet": "版本 2026.10.1 · 生效日期 2026-09-01 配送范围覆盖新加坡全境，圣淘沙与离岛区域可能延长一日。 标准配送为三至七个工作日，满 120 新元包邮，未满收取 8 新元运费。 订单金额超过当地免税额度时，可能产生进口税，由消",
+              "dense_similarity": 0.7036628127098083
+            }
+          ],
+          "audit": {
+            "fused_candidates": 2,
+            "authorized_candidates": 2,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ablation_only",
+              "sparse": "disabled_by_request"
+            },
+            "latency_ms": 285.1
+          },
+          "question": "新加坡订单的退货期限是多久？"
+        },
+        {
+          "case_id": "normal-08",
+          "category": "normal",
+          "behavior": "answered",
+          "expected_behavior": "answered",
+          "behavior_ok": true,
+          "retrieval_hit": true,
+          "mrr": 1.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": false,
+          "selected": 8,
+          "top_dense_similarity": 0.7258,
+          "citations": [
+            {
+              "citation_id": "cit_b32200dabad18830",
+              "label": "c1",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "4c20d4fc-ab49-5e65-8b3b-e5e1344e8a93",
+              "snippet": "本政策自 2026 年 10 月 1 日起生效，替代 2026.07.1 版本，适用于中国大陆地区的自营商品订单。 政策版本、生效日期与适用地区以文档元数据为准； 跨境订单适用目的地地区的单独政策。 消费者自签收之日起七日内，可对符合条件的",
+              "dense_similarity": 0.7257514595985413
+            },
+            {
+              "citation_id": "cit_b7f40c594c87c0b1",
+              "label": "c2",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "94d9c1b8-8037-570b-93e4-6973b44f9481",
+              "snippet": "退款在仓库验收通过后发起，原路退回，具体到账时间见《退款到账时效说明》。 消费者在订单页选择退货原因并提交申请，系统即时校验订单状态、签收时间与商品类目。 审核通过后七日内将商品寄回指定仓库，超时未寄回的申请自动关闭，可重新提交。 仓库在签",
+              "dense_similarity": 0.6774330735206604
+            },
+            {
+              "citation_id": "cit_202317228108b9eb",
+              "label": "c3",
+              "title": "个护与卫生类商品售后规则",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "1d5bfa88-d8f8-578c-924d-5fc62596a84d",
+              "snippet": "耳机耳塞、剃须刀、电动牙刷等直接接触皮肤或个人卫生的商品，拆封后不适用七天无理由退货。 未拆封商品可无理由退货； 拆封后出现质量问题的，按保修政策检测处理。 退回商品需保持清洁，存在使用痕迹或污渍时可能被判定为影响二次销售。 未拆封且包装完",
+              "dense_similarity": 0.6748006939888
+            },
+            {
+              "citation_id": "cit_fb01856581989a70",
+              "label": "c4",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "0fdd772b-5aea-59cd-b44b-3190188a932d",
+              "snippet": "大促期间（以活动公告为准）退货审核时效由二十四小时延长至四十八小时，仓库验收时效由三个工作日延长至五个工作日。 大促期间产生的订单仍适用七天无理由期限，期限不因审核排队而顺延。 企业采购订单需在合同中约定退货条款，合同未约定时按本政策执行。",
+              "dense_similarity": 0.6689583659172058
+            },
+            {
+              "citation_id": "cit_e5d273c04d237d65",
+              "label": "c5",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "61bae80e-1436-56fb-b563-5540cf3886fe",
+              "snippet": "本政策适用于中国大陆地区自营商品的质量换货与非质量换货申请。 商品自签收之日起十五日内出现性能故障，经检测确认为质量问题的，可申请换货。 换货优先更换同型号同规格商品； 无同款库存时，可按消费者意愿改为退货。 非质量问题换货需在签收之日起七",
+              "dense_similarity": 0.6485105156898499
+            },
+            {
+              "citation_id": "cit_d4aae14b582e3132",
+              "label": "c6",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "c7317253-6249-5dc1-8d9b-3fc650c3ad99",
+              "snippet": "同款有库存时优先换货，无库存且消费者不同意等待时，可转为退货并按实付金额退款。 换货完成后原订单不可再申请退货，新商品按换货发出日重新计算保修期。 质量问题换货的往返运费由商城承担，非质量问题换货的往返运费由消费者承担。 消费者选择保价寄回",
+              "dense_similarity": 0.6277754902839661
+            },
+            {
+              "citation_id": "cit_a726dc6d4cb41c1b",
+              "label": "c7",
+              "title": "商品保修政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "2c2391cd-4501-5e3d-8960-4d2d2d36ce65",
+              "snippet": "保修以订单号或发票作为购买凭证，二者缺一不可时按订单支付记录判断。 保修服务不随二手转让转移，转让后的商品按付费维修处理。 保修期自签收之日起计算，换货商品沿用原订单的保修截止日期。 维修更换的零部件保修至原保修期结束，不单独延长。 人为损",
+              "dense_similarity": 0.6177980899810791
+            },
+            {
+              "citation_id": "cit_45946362c8f9494d",
+              "label": "c8",
+              "title": "价格保护政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "e3685778-12ca-5967-8d06-736e007e9dc9",
+              "snippet": "自订单支付成功之日起七日内，同一商品在同一店铺出现降价时，可以申请价格保护。 申请价保的订单不得已退货或已取消，且商品需为同型号同规格。 使用优惠券、限时秒杀、会员专享价产生的价差不在价保范围内。 价保差额以优惠券或原路退款方式返还，具体方",
+              "dense_similarity": 0.5903513431549072
+            }
+          ],
+          "audit": {
+            "fused_candidates": 26,
+            "authorized_candidates": 26,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ablation_only",
+              "sparse": "disabled_by_request"
+            },
+            "latency_ms": 281.06
+          },
+          "question": "哪些商品不适用七天无理由退货？"
+        },
+        {
+          "case_id": "no-answer-01",
+          "category": "no_answer",
+          "behavior": "answered",
+          "expected_behavior": "refused",
+          "behavior_ok": false,
+          "retrieval_hit": false,
+          "mrr": 0.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": false,
+          "selected": 8,
+          "top_dense_similarity": 0.4418,
+          "citations": [
+            {
+              "citation_id": "cit_1cdcadb38e198c42",
+              "label": "c1",
+              "title": "配送范围与时效",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "6b8f36c2-8dff-5060-bbb7-30bc8dc04df0",
+              "snippet": "遇极端天气、交通管制或公共事件，配送时效顺延，顺延天数以公告为准。 顺延期间订单状态保持运输中，消费者可随时查看物流节点。 同一订单包含不同仓库商品时会拆单发货，拆单不额外收取运费。 拆单后各包裹独立显示物流信息，部分包裹延迟不影响其他包裹",
+              "dense_similarity": 0.4418173134326935
+            },
+            {
+              "citation_id": "cit_0e06521e0453b1cc",
+              "label": "c2",
+              "title": "配送范围与时效",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "4f0c7378-0987-5442-b62c-6d6c9647dfab",
+              "snippet": "自营商品配送范围为中国大陆地区（不含港澳台），跨境订单按目的地地区政策单独履约。 部分偏远地区可能产生附加运费，详见《偏远地区配送附加费说明》。 现货订单在付款后四十八小时内发出，预售商品以商品页标注的发货时间为准。 法定节假日期间发货时效",
+              "dense_similarity": 0.4392561912536621
+            },
+            {
+              "citation_id": "cit_f8a3bb5ec2e458f2",
+              "label": "c3",
+              "title": "货到付款规则",
+              "version": "2026.10.1",
+              "page_no": 1,
+              "chunk_id": "62380741-f89c-562c-ac3d-412024963c15",
+              "snippet": "版本 2026.10.1 · 生效日期 2026-09-01 货到付款仅支持中国大陆地区部分城市，单笔订单金额不得超过 2000 元。 货到付款订单支持开箱验货，验货时请核对商品型号、数量与外观。 签收后视为外观完好，后续外观问题按保修与售",
+              "dense_similarity": 0.42625486850738525
+            },
+            {
+              "citation_id": "cit_d4aae14b582e3132",
+              "label": "c4",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "c7317253-6249-5dc1-8d9b-3fc650c3ad99",
+              "snippet": "同款有库存时优先换货，无库存且消费者不同意等待时，可转为退货并按实付金额退款。 换货完成后原订单不可再申请退货，新商品按换货发出日重新计算保修期。 质量问题换货的往返运费由商城承担，非质量问题换货的往返运费由消费者承担。 消费者选择保价寄回",
+              "dense_similarity": 0.4019300043582916
+            },
+            {
+              "citation_id": "cit_a0c805a86acc79bf",
+              "label": "c5",
+              "title": "商品保修政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "48cd50e4-f391-5104-956d-e822a5c22264",
+              "snippet": "耳机、鼠标、充电器、移动电源、摄像头默认保修十二个月； 机械键盘与部分智能手表保修二十四个月。 具体保修期以商品属性中的保修月数字段为准，不以聊天描述为准。 保修覆盖非人为因素导致的性能故障，包括无法开机、无法充电、按键失灵与异常断连。 进",
+              "dense_similarity": 0.40137872099876404
+            },
+            {
+              "citation_id": "cit_e5d273c04d237d65",
+              "label": "c6",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "61bae80e-1436-56fb-b563-5540cf3886fe",
+              "snippet": "本政策适用于中国大陆地区自营商品的质量换货与非质量换货申请。 商品自签收之日起十五日内出现性能故障，经检测确认为质量问题的，可申请换货。 换货优先更换同型号同规格商品； 无同款库存时，可按消费者意愿改为退货。 非质量问题换货需在签收之日起七",
+              "dense_similarity": 0.4013761878013611
+            },
+            {
+              "citation_id": "cit_6feac7ed7d30a531",
+              "label": "c7",
+              "title": "隐私与个人信息保护说明",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "e2ed2daa-516e-5df7-8cfd-9de5070317ad",
+              "snippet": "为完成下单与配送，商城收集账号标识、联系方式、收货地址与订单信息； 支付信息由支付渠道处理，商城不存储完整卡号。 收集的信息仅用于订单履约、售后服务、安全风控与依法配合监管要求。 未经授权不会将个人信息用于营销推送。 客服与聊天系统仅展示脱",
+              "dense_similarity": 0.39486780762672424
+            },
+            {
+              "citation_id": "cit_5f1f79712474b9d2",
+              "label": "c8",
+              "title": "定制商品售后规则",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "2a65c1ab-067f-5881-a20e-c01118a672de",
+              "snippet": "版本 2026.10.1 · 生效日期 2026-09-01 按消费者要求刻字、改色、改尺寸或专属配置的商品属于定制商品，下单前需确认设计稿。 情形 | 处理方式 尺寸与确认稿不符 | 免费重做或退货 颜色存在明显偏差 | 按确认稿重做 刻",
+              "dense_similarity": 0.39100298285484314
+            }
+          ],
+          "audit": {
+            "fused_candidates": 26,
+            "authorized_candidates": 26,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ablation_only",
+              "sparse": "disabled_by_request"
+            },
+            "latency_ms": 302.95
+          },
+          "question": "你们在上海有线下体验店吗？店里有停车场吗？"
+        },
+        {
+          "case_id": "no-answer-02",
+          "category": "no_answer",
+          "behavior": "answered",
+          "expected_behavior": "refused",
+          "behavior_ok": false,
+          "retrieval_hit": false,
+          "mrr": 0.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": false,
+          "selected": 8,
+          "top_dense_similarity": 0.5836,
+          "citations": [
+            {
+              "citation_id": "cit_262b561352d85b77",
+              "label": "c1",
+              "title": "积分规则",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "58c24d57-937f-5226-83cc-3239ee3a19f2",
+              "snippet": "订单完成后按实付金额累计积分，每消费 1 元累计 1 分，运费不计入积分。 退货订单按退款金额扣减对应积分，扣减后积分可为负数。 100 积分可抵扣 1 元，单笔订单最多抵扣订单金额的 20%。 积分抵扣部分不参与优惠券门槛计算。 积分自获",
+              "dense_similarity": 0.5836109519004822
+            },
+            {
+              "citation_id": "cit_f8a3bb5ec2e458f2",
+              "label": "c2",
+              "title": "货到付款规则",
+              "version": "2026.10.1",
+              "page_no": 1,
+              "chunk_id": "62380741-f89c-562c-ac3d-412024963c15",
+              "snippet": "版本 2026.10.1 · 生效日期 2026-09-01 货到付款仅支持中国大陆地区部分城市，单笔订单金额不得超过 2000 元。 货到付款订单支持开箱验货，验货时请核对商品型号、数量与外观。 签收后视为外观完好，后续外观问题按保修与售",
+              "dense_similarity": 0.5808345675468445
+            },
+            {
+              "citation_id": "cit_d4aae14b582e3132",
+              "label": "c3",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "c7317253-6249-5dc1-8d9b-3fc650c3ad99",
+              "snippet": "同款有库存时优先换货，无库存且消费者不同意等待时，可转为退货并按实付金额退款。 换货完成后原订单不可再申请退货，新商品按换货发出日重新计算保修期。 质量问题换货的往返运费由商城承担，非质量问题换货的往返运费由消费者承担。 消费者选择保价寄回",
+              "dense_similarity": 0.5701974034309387
+            },
+            {
+              "citation_id": "cit_4fbb98107e268e5c",
+              "label": "c4",
+              "title": "优惠券使用规则",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "a8b99287-4790-5a1d-827a-7e1ff90f8695",
+              "snippet": "优惠券需满足券面标注的金额门槛与品类限制，门槛按商品实付金额计算，不含运费。 每笔订单默认只能使用一张优惠券，特殊活动券以券面说明为准。 优惠券在券面标注的有效期内可用，过期自动失效，不补发。 订单取消或全额退款后，未过期的优惠券原路退回账",
+              "dense_similarity": 0.5663458704948425
+            },
+            {
+              "citation_id": "cit_45946362c8f9494d",
+              "label": "c5",
+              "title": "价格保护政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "e3685778-12ca-5967-8d06-736e007e9dc9",
+              "snippet": "自订单支付成功之日起七日内，同一商品在同一店铺出现降价时，可以申请价格保护。 申请价保的订单不得已退货或已取消，且商品需为同型号同规格。 使用优惠券、限时秒杀、会员专享价产生的价差不在价保范围内。 价保差额以优惠券或原路退款方式返还，具体方",
+              "dense_similarity": 0.5377711653709412
+            },
+            {
+              "citation_id": "cit_a726dc6d4cb41c1b",
+              "label": "c6",
+              "title": "商品保修政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "2c2391cd-4501-5e3d-8960-4d2d2d36ce65",
+              "snippet": "保修以订单号或发票作为购买凭证，二者缺一不可时按订单支付记录判断。 保修服务不随二手转让转移，转让后的商品按付费维修处理。 保修期自签收之日起计算，换货商品沿用原订单的保修截止日期。 维修更换的零部件保修至原保修期结束，不单独延长。 人为损",
+              "dense_similarity": 0.5332894921302795
+            },
+            {
+              "citation_id": "cit_e5d273c04d237d65",
+              "label": "c7",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "61bae80e-1436-56fb-b563-5540cf3886fe",
+              "snippet": "本政策适用于中国大陆地区自营商品的质量换货与非质量换货申请。 商品自签收之日起十五日内出现性能故障，经检测确认为质量问题的，可申请换货。 换货优先更换同型号同规格商品； 无同款库存时，可按消费者意愿改为退货。 非质量问题换货需在签收之日起七",
+              "dense_similarity": 0.5311538577079773
+            },
+            {
+              "citation_id": "cit_0874c65aab7330fb",
+              "label": "c8",
+              "title": "分期付款说明",
+              "version": "2026.10.1",
+              "page_no": 1,
+              "chunk_id": "40c10aea-a0b6-5d2b-8827-af3f4a53c0b5",
+              "snippet": "版本 2026.10.1 · 生效日期 2026-09-01 部分商品支持 3 期、6 期与 12 期分期，具体期数以结算页展示为准。 3 期免手续费； 6 期与 12 期按银行或支付渠道标准收取手续费，手续费不退还。 分期订单退款时，已收",
+              "dense_similarity": 0.5180527567863464
+            }
+          ],
+          "audit": {
+            "fused_candidates": 26,
+            "authorized_candidates": 26,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ablation_only",
+              "sparse": "disabled_by_request"
+            },
+            "latency_ms": 313.51
+          },
+          "question": "支持以旧换新抵扣吗？旧的平板能抵多少钱？"
+        },
+        {
+          "case_id": "no-answer-03",
+          "category": "no_answer",
+          "behavior": "answered",
+          "expected_behavior": "refused",
+          "behavior_ok": false,
+          "retrieval_hit": false,
+          "mrr": 0.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": false,
+          "selected": 8,
+          "top_dense_similarity": 0.4933,
+          "citations": [
+            {
+              "citation_id": "cit_f8a3bb5ec2e458f2",
+              "label": "c1",
+              "title": "货到付款规则",
+              "version": "2026.10.1",
+              "page_no": 1,
+              "chunk_id": "62380741-f89c-562c-ac3d-412024963c15",
+              "snippet": "版本 2026.10.1 · 生效日期 2026-09-01 货到付款仅支持中国大陆地区部分城市，单笔订单金额不得超过 2000 元。 货到付款订单支持开箱验货，验货时请核对商品型号、数量与外观。 签收后视为外观完好，后续外观问题按保修与售",
+              "dense_similarity": 0.49329161643981934
+            },
+            {
+              "citation_id": "cit_d4aae14b582e3132",
+              "label": "c2",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "c7317253-6249-5dc1-8d9b-3fc650c3ad99",
+              "snippet": "同款有库存时优先换货，无库存且消费者不同意等待时，可转为退货并按实付金额退款。 换货完成后原订单不可再申请退货，新商品按换货发出日重新计算保修期。 质量问题换货的往返运费由商城承担，非质量问题换货的往返运费由消费者承担。 消费者选择保价寄回",
+              "dense_similarity": 0.49049803614616394
+            },
+            {
+              "citation_id": "cit_5f1f79712474b9d2",
+              "label": "c3",
+              "title": "定制商品售后规则",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "2a65c1ab-067f-5881-a20e-c01118a672de",
+              "snippet": "版本 2026.10.1 · 生效日期 2026-09-01 按消费者要求刻字、改色、改尺寸或专属配置的商品属于定制商品，下单前需确认设计稿。 情形 | 处理方式 尺寸与确认稿不符 | 免费重做或退货 颜色存在明显偏差 | 按确认稿重做 刻",
+              "dense_similarity": 0.48099982738494873
+            },
+            {
+              "citation_id": "cit_8b54c1b7f367addc",
+              "label": "c4",
+              "title": "促销活动通用规则",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "134f945b-532a-50ec-886f-b9a2bbdc4d94",
+              "snippet": "同一商品同时参与多个活动时，默认按优惠力度最大的一个活动生效，不自动叠加。 活动页面明确标注可叠加的，按页面说明执行。 商品详情页展示的价格为当前有效价，活动价以结算页为准。 聊天中的价格说明仅供参考，实际价格以订单工具读取的结构化价格为准",
+              "dense_similarity": 0.48073065280914307
+            },
+            {
+              "citation_id": "cit_6feac7ed7d30a531",
+              "label": "c5",
+              "title": "隐私与个人信息保护说明",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "e2ed2daa-516e-5df7-8cfd-9de5070317ad",
+              "snippet": "为完成下单与配送，商城收集账号标识、联系方式、收货地址与订单信息； 支付信息由支付渠道处理，商城不存储完整卡号。 收集的信息仅用于订单履约、售后服务、安全风控与依法配合监管要求。 未经授权不会将个人信息用于营销推送。 客服与聊天系统仅展示脱",
+              "dense_similarity": 0.4773900806903839
+            },
+            {
+              "citation_id": "cit_fb01856581989a70",
+              "label": "c6",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "0fdd772b-5aea-59cd-b44b-3190188a932d",
+              "snippet": "大促期间（以活动公告为准）退货审核时效由二十四小时延长至四十八小时，仓库验收时效由三个工作日延长至五个工作日。 大促期间产生的订单仍适用七天无理由期限，期限不因审核排队而顺延。 企业采购订单需在合同中约定退货条款，合同未约定时按本政策执行。",
+              "dense_similarity": 0.47331365942955017
+            },
+            {
+              "citation_id": "cit_0e06521e0453b1cc",
+              "label": "c7",
+              "title": "配送范围与时效",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "4f0c7378-0987-5442-b62c-6d6c9647dfab",
+              "snippet": "自营商品配送范围为中国大陆地区（不含港澳台），跨境订单按目的地地区政策单独履约。 部分偏远地区可能产生附加运费，详见《偏远地区配送附加费说明》。 现货订单在付款后四十八小时内发出，预售商品以商品页标注的发货时间为准。 法定节假日期间发货时效",
+              "dense_similarity": 0.4710279107093811
+            },
+            {
+              "citation_id": "cit_8e0e1eab6fae2689",
+              "label": "c8",
+              "title": "退货手续费说明（评测冲突样本）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "d70ee9b4-1733-51a7-abbf-0ef0051b6057",
+              "snippet": "本文件仅用于检索评测中的版本冲突场景，属于合成数据，不对应任何真实业务规则。 消费者未在约定期限内寄回商品的，每笔订单收取 20 元固定逾期退货手续费，不按金额比例计算。 手续费从退款金额中直接扣除，并在退款明细中单独列示。",
+              "dense_similarity": 0.37856438755989075
+            }
+          ],
+          "audit": {
+            "fused_candidates": 26,
+            "authorized_candidates": 26,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ablation_only",
+              "sparse": "disabled_by_request"
+            },
+            "latency_ms": 398.24
+          },
+          "question": "可以安排真人导购陪同逛店选购吗？"
+        },
+        {
+          "case_id": "expired-01",
+          "category": "expired",
+          "behavior": "answered",
+          "expected_behavior": "answered",
+          "behavior_ok": true,
+          "retrieval_hit": true,
+          "mrr": 1.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": false,
+          "selected": 8,
+          "top_dense_similarity": 0.7802,
+          "citations": [
+            {
+              "citation_id": "cit_52a2fe77e7402148",
+              "label": "c1",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.07.1",
+              "page_no": null,
+              "chunk_id": "755a2895-a0a8-5d8c-9bbe-06c7df206b62",
+              "snippet": "本政策适用于在中国大陆地区通过 ShopMate 示例商城下单的消费者，自 2026 年 7 月 1 日起生效。 本版本已于 2026 年 9 月 30 日停止适用，请以最新版本为准。 消费者自签收之日起七日内，可以在商品完好、配件齐全、不",
+              "dense_similarity": 0.7802005410194397
+            },
+            {
+              "citation_id": "cit_1e240462052651b1",
+              "label": "c2",
+              "title": "退款到账时效说明",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "60ada2fa-4db1-56c8-82d6-1fa880a2e475",
+              "snippet": "退款在退货商品验收通过后发起，或在取消未发货订单后立即发起。 退款金额以订单实付金额为准，优惠券按规则退回，积分按规则返还。 原路退回的退款通常在发起后一至七个工作日内到账，具体取决于支付渠道。 银行卡渠道一般为一至三个工作日，第三方支付渠",
+              "dense_similarity": 0.6620588898658752
+            },
+            {
+              "citation_id": "cit_e5d273c04d237d65",
+              "label": "c3",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "61bae80e-1436-56fb-b563-5540cf3886fe",
+              "snippet": "本政策适用于中国大陆地区自营商品的质量换货与非质量换货申请。 商品自签收之日起十五日内出现性能故障，经检测确认为质量问题的，可申请换货。 换货优先更换同型号同规格商品； 无同款库存时，可按消费者意愿改为退货。 非质量问题换货需在签收之日起七",
+              "dense_similarity": 0.6422109603881836
+            },
+            {
+              "citation_id": "cit_d4aae14b582e3132",
+              "label": "c4",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "c7317253-6249-5dc1-8d9b-3fc650c3ad99",
+              "snippet": "同款有库存时优先换货，无库存且消费者不同意等待时，可转为退货并按实付金额退款。 换货完成后原订单不可再申请退货，新商品按换货发出日重新计算保修期。 质量问题换货的往返运费由商城承担，非质量问题换货的往返运费由消费者承担。 消费者选择保价寄回",
+              "dense_similarity": 0.6331988573074341
+            },
+            {
+              "citation_id": "cit_5f1f79712474b9d2",
+              "label": "c5",
+              "title": "定制商品售后规则",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "2a65c1ab-067f-5881-a20e-c01118a672de",
+              "snippet": "版本 2026.10.1 · 生效日期 2026-09-01 按消费者要求刻字、改色、改尺寸或专属配置的商品属于定制商品，下单前需确认设计稿。 情形 | 处理方式 尺寸与确认稿不符 | 免费重做或退货 颜色存在明显偏差 | 按确认稿重做 刻",
+              "dense_similarity": 0.6170151233673096
+            },
+            {
+              "citation_id": "cit_202317228108b9eb",
+              "label": "c6",
+              "title": "个护与卫生类商品售后规则",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "1d5bfa88-d8f8-578c-924d-5fc62596a84d",
+              "snippet": "耳机耳塞、剃须刀、电动牙刷等直接接触皮肤或个人卫生的商品，拆封后不适用七天无理由退货。 未拆封商品可无理由退货； 拆封后出现质量问题的，按保修政策检测处理。 退回商品需保持清洁，存在使用痕迹或污渍时可能被判定为影响二次销售。 未拆封且包装完",
+              "dense_similarity": 0.6050092577934265
+            },
+            {
+              "citation_id": "cit_45946362c8f9494d",
+              "label": "c7",
+              "title": "价格保护政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "e3685778-12ca-5967-8d06-736e007e9dc9",
+              "snippet": "自订单支付成功之日起七日内，同一商品在同一店铺出现降价时，可以申请价格保护。 申请价保的订单不得已退货或已取消，且商品需为同型号同规格。 使用优惠券、限时秒杀、会员专享价产生的价差不在价保范围内。 价保差额以优惠券或原路退款方式返还，具体方",
+              "dense_similarity": 0.5969977974891663
+            },
+            {
+              "citation_id": "cit_fe8b0ffe51beadc0",
+              "label": "c8",
+              "title": "退货手续费说明（评测冲突样本）",
+              "version": "2026.09.1",
+              "page_no": null,
+              "chunk_id": "6d81ffb3-4056-51c0-89ff-c0885f136bb3",
+              "snippet": "本文件仅用于检索评测中的版本冲突场景，属于合成数据，不对应任何真实业务规则。 消费者未在约定期限内寄回商品的，按订单实付金额的 10% 收取逾期退货手续费，最低收取 5 元。 手续费从退款金额中直接扣除，并在退款明细中单独列示。",
+              "dense_similarity": 0.5696892738342285
+            }
+          ],
+          "audit": {
+            "fused_candidates": 23,
+            "authorized_candidates": 23,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ablation_only",
+              "sparse": "disabled_by_request"
+            },
+            "latency_ms": 321.73
+          },
+          "question": "七天无理由退货从什么时候开始计算？"
+        },
+        {
+          "case_id": "expired-02",
+          "category": "expired",
+          "behavior": "answered",
+          "expected_behavior": "answered",
+          "behavior_ok": true,
+          "retrieval_hit": true,
+          "mrr": 1.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": false,
+          "selected": 8,
+          "top_dense_similarity": 0.7894,
+          "citations": [
+            {
+              "citation_id": "cit_b32200dabad18830",
+              "label": "c1",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "4c20d4fc-ab49-5e65-8b3b-e5e1344e8a93",
+              "snippet": "本政策自 2026 年 10 月 1 日起生效，替代 2026.07.1 版本，适用于中国大陆地区的自营商品订单。 政策版本、生效日期与适用地区以文档元数据为准； 跨境订单适用目的地地区的单独政策。 消费者自签收之日起七日内，可对符合条件的",
+              "dense_similarity": 0.7894278764724731
+            },
+            {
+              "citation_id": "cit_b7f40c594c87c0b1",
+              "label": "c2",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "94d9c1b8-8037-570b-93e4-6973b44f9481",
+              "snippet": "退款在仓库验收通过后发起，原路退回，具体到账时间见《退款到账时效说明》。 消费者在订单页选择退货原因并提交申请，系统即时校验订单状态、签收时间与商品类目。 审核通过后七日内将商品寄回指定仓库，超时未寄回的申请自动关闭，可重新提交。 仓库在签",
+              "dense_similarity": 0.748629629611969
+            },
+            {
+              "citation_id": "cit_fb01856581989a70",
+              "label": "c3",
+              "title": "七天无理由退货政策（中国大陆）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "0fdd772b-5aea-59cd-b44b-3190188a932d",
+              "snippet": "大促期间（以活动公告为准）退货审核时效由二十四小时延长至四十八小时，仓库验收时效由三个工作日延长至五个工作日。 大促期间产生的订单仍适用七天无理由期限，期限不因审核排队而顺延。 企业采购订单需在合同中约定退货条款，合同未约定时按本政策执行。",
+              "dense_similarity": 0.7176938652992249
+            },
+            {
+              "citation_id": "cit_1e240462052651b1",
+              "label": "c4",
+              "title": "退款到账时效说明",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "60ada2fa-4db1-56c8-82d6-1fa880a2e475",
+              "snippet": "退款在退货商品验收通过后发起，或在取消未发货订单后立即发起。 退款金额以订单实付金额为准，优惠券按规则退回，积分按规则返还。 原路退回的退款通常在发起后一至七个工作日内到账，具体取决于支付渠道。 银行卡渠道一般为一至三个工作日，第三方支付渠",
+              "dense_similarity": 0.6620588898658752
+            },
+            {
+              "citation_id": "cit_e5d273c04d237d65",
+              "label": "c5",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "61bae80e-1436-56fb-b563-5540cf3886fe",
+              "snippet": "本政策适用于中国大陆地区自营商品的质量换货与非质量换货申请。 商品自签收之日起十五日内出现性能故障，经检测确认为质量问题的，可申请换货。 换货优先更换同型号同规格商品； 无同款库存时，可按消费者意愿改为退货。 非质量问题换货需在签收之日起七",
+              "dense_similarity": 0.6422109603881836
+            },
+            {
+              "citation_id": "cit_d4aae14b582e3132",
+              "label": "c6",
+              "title": "换货政策",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "c7317253-6249-5dc1-8d9b-3fc650c3ad99",
+              "snippet": "同款有库存时优先换货，无库存且消费者不同意等待时，可转为退货并按实付金额退款。 换货完成后原订单不可再申请退货，新商品按换货发出日重新计算保修期。 质量问题换货的往返运费由商城承担，非质量问题换货的往返运费由消费者承担。 消费者选择保价寄回",
+              "dense_similarity": 0.6331988573074341
+            },
+            {
+              "citation_id": "cit_5f1f79712474b9d2",
+              "label": "c7",
+              "title": "定制商品售后规则",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "2a65c1ab-067f-5881-a20e-c01118a672de",
+              "snippet": "版本 2026.10.1 · 生效日期 2026-09-01 按消费者要求刻字、改色、改尺寸或专属配置的商品属于定制商品，下单前需确认设计稿。 情形 | 处理方式 尺寸与确认稿不符 | 免费重做或退货 颜色存在明显偏差 | 按确认稿重做 刻",
+              "dense_similarity": 0.6170151233673096
+            },
+            {
+              "citation_id": "cit_fe8b0ffe51beadc0",
+              "label": "c8",
+              "title": "退货手续费说明（评测冲突样本）",
+              "version": "2026.09.1",
+              "page_no": null,
+              "chunk_id": "6d81ffb3-4056-51c0-89ff-c0885f136bb3",
+              "snippet": "本文件仅用于检索评测中的版本冲突场景，属于合成数据，不对应任何真实业务规则。 消费者未在约定期限内寄回商品的，按订单实付金额的 10% 收取逾期退货手续费，最低收取 5 元。 手续费从退款金额中直接扣除，并在退款明细中单独列示。",
+              "dense_similarity": 0.5696892738342285
+            }
+          ],
+          "audit": {
+            "fused_candidates": 26,
+            "authorized_candidates": 26,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ablation_only",
+              "sparse": "disabled_by_request"
+            },
+            "latency_ms": 312.2
+          },
+          "question": "七天无理由退货从什么时候开始计算？"
+        },
+        {
+          "case_id": "conflict-01",
+          "category": "conflict",
+          "behavior": "handoff",
+          "expected_behavior": "handoff",
+          "behavior_ok": true,
+          "retrieval_hit": true,
+          "mrr": 1.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": true,
+          "selected": 2,
+          "top_dense_similarity": 0.8015,
+          "citations": [
+            {
+              "citation_id": "cit_fe8b0ffe51beadc0",
+              "label": "c1",
+              "title": "退货手续费说明（评测冲突样本）",
+              "version": "2026.09.1",
+              "page_no": null,
+              "chunk_id": "6d81ffb3-4056-51c0-89ff-c0885f136bb3",
+              "snippet": "本文件仅用于检索评测中的版本冲突场景，属于合成数据，不对应任何真实业务规则。 消费者未在约定期限内寄回商品的，按订单实付金额的 10% 收取逾期退货手续费，最低收取 5 元。 手续费从退款金额中直接扣除，并在退款明细中单独列示。",
+              "dense_similarity": 0.8015329837799072
+            },
+            {
+              "citation_id": "cit_8e0e1eab6fae2689",
+              "label": "c2",
+              "title": "退货手续费说明（评测冲突样本）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "d70ee9b4-1733-51a7-abbf-0ef0051b6057",
+              "snippet": "本文件仅用于检索评测中的版本冲突场景，属于合成数据，不对应任何真实业务规则。 消费者未在约定期限内寄回商品的，每笔订单收取 20 元固定逾期退货手续费，不按金额比例计算。 手续费从退款金额中直接扣除，并在退款明细中单独列示。",
+              "dense_similarity": 0.7904596924781799
+            }
+          ],
+          "audit": {
+            "fused_candidates": 2,
+            "authorized_candidates": 2,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ablation_only",
+              "sparse": "disabled_by_request"
+            },
+            "latency_ms": 292.73
+          },
+          "question": "逾期退货要收取多少手续费？"
+        },
+        {
+          "case_id": "conflict-02",
+          "category": "conflict",
+          "behavior": "handoff",
+          "expected_behavior": "handoff",
+          "behavior_ok": true,
+          "retrieval_hit": true,
+          "mrr": 1.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": true,
+          "selected": 2,
+          "top_dense_similarity": 0.7748,
+          "citations": [
+            {
+              "citation_id": "cit_fe8b0ffe51beadc0",
+              "label": "c1",
+              "title": "退货手续费说明（评测冲突样本）",
+              "version": "2026.09.1",
+              "page_no": null,
+              "chunk_id": "6d81ffb3-4056-51c0-89ff-c0885f136bb3",
+              "snippet": "本文件仅用于检索评测中的版本冲突场景，属于合成数据，不对应任何真实业务规则。 消费者未在约定期限内寄回商品的，按订单实付金额的 10% 收取逾期退货手续费，最低收取 5 元。 手续费从退款金额中直接扣除，并在退款明细中单独列示。",
+              "dense_similarity": 0.7747786045074463
+            },
+            {
+              "citation_id": "cit_8e0e1eab6fae2689",
+              "label": "c2",
+              "title": "退货手续费说明（评测冲突样本）",
+              "version": "2026.10.1",
+              "page_no": null,
+              "chunk_id": "d70ee9b4-1733-51a7-abbf-0ef0051b6057",
+              "snippet": "本文件仅用于检索评测中的版本冲突场景，属于合成数据，不对应任何真实业务规则。 消费者未在约定期限内寄回商品的，每笔订单收取 20 元固定逾期退货手续费，不按金额比例计算。 手续费从退款金额中直接扣除，并在退款明细中单独列示。",
+              "dense_similarity": 0.7642715573310852
+            }
+          ],
+          "audit": {
+            "fused_candidates": 2,
+            "authorized_candidates": 2,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ablation_only",
+              "sparse": "disabled_by_request"
+            },
+            "latency_ms": 366.93
+          },
+          "question": "退货手续费按什么标准扣？"
+        },
+        {
+          "case_id": "cross-shop-01",
+          "category": "cross_shop",
+          "behavior": "refused",
+          "expected_behavior": "refused",
+          "behavior_ok": true,
+          "retrieval_hit": false,
+          "mrr": 0.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": false,
+          "selected": 0,
+          "top_dense_similarity": null,
+          "citations": [],
+          "audit": {
+            "fused_candidates": 0,
+            "authorized_candidates": 0,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ablation_only",
+              "sparse": "disabled_by_request"
+            },
+            "latency_ms": 253.54
+          },
+          "question": "七天无理由退货从什么时候开始计算？"
+        },
+        {
+          "case_id": "cross-shop-02",
+          "category": "cross_shop",
+          "behavior": "refused",
+          "expected_behavior": "refused",
+          "behavior_ok": true,
+          "retrieval_hit": false,
+          "mrr": 0.0,
+          "phrase_recall": 1.0,
+          "forbidden_titles": [],
+          "version_leaks": [],
+          "leak": false,
+          "conflict_detected": false,
+          "selected": 0,
+          "top_dense_similarity": null,
+          "citations": [],
+          "audit": {
+            "fused_candidates": 0,
+            "authorized_candidates": 0,
+            "rejected": {},
+            "rrf_k": 60,
+            "dense_limit": 30,
+            "sparse_limit": 30,
+            "branch": {
+              "dense": "ablation_only",
+              "sparse": "disabled_by_request"
+            },
+            "latency_ms": 252.98
+          },
+          "question": "退货期限是多久？"
+        }
+      ]
+    }
+  }
+}

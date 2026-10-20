@@ -1,0 +1,75 @@
+{
+  "generated_at": "2026-10-19T18:36:38.673474+00:00",
+  "mode": "stage13",
+  "datasets": {
+    "business": {
+      "path": "E:\\project\\shopmate-ecommerce-assistant\\data\\eval\\eval_questions.jsonl",
+      "sha256": "6cc9dc7c5a50e9cb4025e57e5cc74a1c8b7d021bb91d15dfa2a477156f5f168f",
+      "cases": 100
+    },
+    "retrieval": {
+      "path": "E:\\project\\shopmate-ecommerce-assistant\\data\\eval\\retrieval_cases.jsonl",
+      "sha256": "856f3338d00b8c44dd5468413ee30428b32168bd8386e84a1747eef8546c8710",
+      "cases": 58
+    }
+  },
+  "config": {
+    "dense_limit": 30,
+    "sparse_limit": 30,
+    "rrf_k": 60,
+    "candidate_limit": 30,
+    "min_chunks": 4,
+    "max_chunks": 8,
+    "max_chunks_per_document": 3,
+    "min_evidence_similarity": 0.62,
+    "reranker_enabled": false,
+    "answer_model_configured": false
+  },
+  "parts": {
+    "policy_llm": {
+      "answer_model": "qwen2.5:7b",
+      "answer_model_base_url": "http://localhost:11434/v1",
+      "cases": 0,
+      "status_counts": {},
+      "answered_rate": null,
+      "answer_rate_on_answerable": null,
+      "refused_or_handoff_on_no_answer": null,
+      "citation_compliance": null,
+      "faithfulness_llm": null,
+      "faithfulness_judged_cases": 0,
+      "relevancy_llm": null,
+      "relevancy_judged_cases": 0,
+      "tokens": {
+        "answer_prompt": 0,
+        "answer_completion": 0,
+        "answer_total": 0,
+        "judge": {
+          "judge_model": "qwen2.5:7b",
+          "judge_calls": 0,
+          "judge_failures": 0,
+          "judge_prompt_tokens": 0,
+          "judge_completion_tokens": 0
+        },
+        "cost_usd": 0.0,
+        "cost_note": "本地 Ollama 推理，无 API 计费；成本记账为 0，不代表云模型成本"
+      },
+      "latency": {
+        "n": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "mean_ms": null
+      },
+      "judge_method": "LLM-as-judge（本地 qwen2.5:7b，temperature=0，强制 JSON 输出）；不是官方 ragas 包，prompt 为本项目自建，见 scripts/eval_stage13.py",
+      "records": []
+    }
+  },
+  "embedding": {
+    "model": "BAAI/bge-m3",
+    "provider": "bge-m3",
+    "dimension": 1024,
+    "revision": "local",
+    "fingerprint": "468b391066f99bc2703682b65930cc82",
+    "dense_normalized": true,
+    "sparse": "bge-m3-lexical"
+  }
+}

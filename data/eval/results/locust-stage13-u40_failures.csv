@@ -1,0 +1,3 @@
+Method,Name,Error,Occurrences,First Seen,Last Seen
+GET,/api/v1/orders,RemoteDisconnected('Remote end closed connection without response'),1,2026-10-19T17:59:51Z,2026-10-19T17:59:51Z
+GET,/api/v1/products/search,RemoteDisconnected('Remote end closed connection without response'),1,2026-10-19T17:59:38Z,2026-10-19T17:59:38Z

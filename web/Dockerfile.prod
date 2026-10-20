@@ -1,0 +1,46 @@
+# ShopMate 生产前端镜像（阶段 14）
+#
+# 构建上下文是仓库根目录（需要同时读取 frontend/ 源码与 web/ 配置）：
+#   docker build -f web/Dockerfile.prod -t shopmate-web:0.1.0 .
+#
+# 两段式：Node 构建 Vue 产物 -> Nginx 非 root 提供静态资源并反代 /api。
+# 前端产物不提交仓库（frontend/dist 在 .gitignore 中），每次发布从源码构建。
+#
+# 受限网络（无法直连 Docker Hub）时用 ARG 覆盖为内网镜像仓库地址：
+#   docker build -f web/Dockerfile.prod \
+#     --build-arg NODE_IMAGE=registry.internal/library/node:22.22.2-alpine \
+#     --build-arg NGINX_IMAGE=registry.internal/library/nginx:1.27.5-alpine \
+#     -t shopmate-web:0.1.0 .
+ARG NODE_IMAGE=node:22.22.2-alpine@sha256:8ea2348b068a9544dae7317b4f3aafcdc032df1647bb7d768a05a5cad1a7683f
+ARG NGINX_IMAGE=nginx:1.27.5-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
+
+FROM ${NODE_IMAGE} AS build
+
+WORKDIR /app
+
+# 先拷锁文件，利用层缓存；npm ci 严格按 package-lock.json 安装。
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+
+COPY frontend/ ./
+RUN npm run build
+
+FROM ${NGINX_IMAGE} AS runtime
+
+# 生产配置：只读根文件系统下运行，pid/临时目录都指向 tmpfs。
+COPY web/nginx.prod.conf /etc/nginx/nginx.conf
+COPY web/shopmate-proxy.inc /etc/nginx/conf.d/shopmate-proxy.inc
+COPY --from=build /app/dist /usr/share/nginx/html
+
+RUN chown -R nginx:nginx /usr/share/nginx/html \
+    && mkdir -p /var/cache/nginx \
+    && chown -R nginx:nginx /var/cache/nginx
+
+USER nginx
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=10s --timeout=3s --retries=5 --start-period=10s \
+    CMD ["wget", "-q", "-O", "-", "http://127.0.0.1:8080/healthz"]
+
+CMD ["nginx", "-g", "daemon off;"]

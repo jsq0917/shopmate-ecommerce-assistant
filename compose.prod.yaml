@@ -1,0 +1,372 @@
+# ShopMate 生产部署编排（阶段 14）
+#
+# 与 compose.yaml（开发/演示）的差异，逐条对应 AGENTS.md §14.5：
+#   1. 数据服务（PostgreSQL/Redis/etcd/MinIO/Milvus）不映射宿主端口，只在内部网络可达；
+#      只有 web 暴露 ${WEB_PORT:-8080}，TLS 由上游边缘代理终结。
+#   2. api / web 使用非 root 用户、read_only 根文件系统、cap_drop: ALL、no-new-privileges；
+#   3. 全部服务设置 CPU/内存上限与 pids 上限，json-file 日志轮转（10MB × 3）；
+#   4. 镜像来自固定 tag/digest 的 ${API_IMAGE}/${WEB_IMAGE}，不使用 latest；
+#      编排**不含 build 段**：生产只消费构建机/CI 产出的不可变镜像（构建命令见 docs/08 §3.1）。
+#   5. 迁移拆成一次性 migrate 服务，API 启动命令不再执行 alembic（关闭 reload，单 worker）；
+#   6. 不挂载 Docker socket，不使用 privileged / network_mode: host。
+#
+# 用法见 docs/08-deployment.md。首次部署：
+#   cp .env.prod.example .env.prod && ${EDITOR} .env.prod
+#   docker build -t "$API_IMAGE" .                       # 或由 CI 构建并 push
+#   docker build -f web/Dockerfile.prod -t "$WEB_IMAGE" .
+#   docker compose -f compose.prod.yaml --env-file .env.prod config --quiet
+#   docker compose -f compose.prod.yaml --env-file .env.prod up -d postgres redis etcd minio milvus
+#   docker compose -f compose.prod.yaml --env-file .env.prod run --rm migrate
+#   docker compose -f compose.prod.yaml --env-file .env.prod up -d api web
+
+name: ${COMPOSE_PROJECT_NAME:-shopmate-prod}
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  postgres:
+    image: postgres:16.9-bookworm@sha256:253815cf7579ffa05e1673d92e78d37273e61be0e4414e9a1449337d7925be94
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env.prod}
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env.prod}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.prod}
+      POSTGRES_INITDB_ARGS: --encoding=UTF8 --data-checksums
+    shm_size: 256mb
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    logging: *default-logging
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2g
+
+  redis:
+    image: redis:7.2@sha256:0637954999d01b7c9ce9167db2da50656e2590d3b884f1c600c5f63bb6e6773c
+    command:
+      - sh
+      - -c
+      - >
+        exec redis-server --appendonly yes --requirepass "$${REDIS_PASSWORD}"
+        --maxmemory 400mb --maxmemory-policy volatile-lru
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env.prod}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$${REDIS_PASSWORD}\" redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    logging: *default-logging
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512m
+
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.5@sha256:b83c1d70989e1fe87583607bf5aee1ee34e52773d4755b95f5cf5a451962f3a4
+    command:
+      - etcd
+      - --advertise-client-urls=http://127.0.0.1:2379
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --data-dir=/etcd
+    environment:
+      ETCDCTL_API: "3"
+    volumes:
+      - etcd_data:/etcd
+    healthcheck:
+      test: ["CMD", "etcdctl", "--endpoints=http://127.0.0.1:2379", "endpoint", "health"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    logging: *default-logging
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512m
+
+  minio:
+    image: minio/minio:RELEASE.2023-03-20T20-16-18Z@sha256:6d770d7f255cda1f18d841ffc4365cb7e0d237f6af6a15fcdb587480cd7c3b93
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in .env.prod}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env.prod}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    logging: *default-logging
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1g
+
+  milvus:
+    image: milvusdb/milvus:v2.4.4@sha256:212ec3cd86e35ceda1892adae3bb718278b0e8187b4c797725d98270bc3dcfa7
+    command: ["milvus", "run", "standalone"]
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+      MINIO_ACCESS_KEY_ID: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in .env.prod}
+      MINIO_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env.prod}
+    volumes:
+      - milvus_data:/var/lib/milvus
+    depends_on:
+      etcd:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9091/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
+    logging: *default-logging
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 3g
+
+  # 一次性迁移。API 启动命令不含 alembic，避免多副本/重启时并发迁移。
+  migrate:
+    image: ${API_IMAGE:?set API_IMAGE in .env.prod}
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      APP_ENV: production
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    logging: *default-logging
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512m
+
+  api:
+    image: ${API_IMAGE:?set API_IMAGE in .env.prod}
+    # 生产：关闭 reload、关闭 access log（由边缘代理记录）、单 worker。
+    # 单 worker 是硬约束：BGE-M3 权重在进程内单例加载，多 worker 会重复占用数 GB 内存（AGENTS.md §10.4）。
+    command:
+      - uvicorn
+      - shopmate_ecommerce_assistant.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --no-access-log
+      - --workers
+      - "1"
+      - --proxy-headers
+      # 只信任内网/容器网段的代理（Docker 默认 bridge 在 172.16.0.0/12）。
+      # 写 "*" 会让任何能直连 api:8000 的来源伪造 X-Forwarded-For / X-Forwarded-Proto。
+      - --forwarded-allow-ips
+      - "${FORWARDED_ALLOW_IPS:-172.16.0.0/12,10.0.0.0/8,192.168.0.0/16,127.0.0.1}"
+    environment:
+      APP_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      MILVUS_URI: http://milvus:19530
+      MILVUS_HEALTH_URL: http://milvus:9091/healthz
+      READINESS_TIMEOUT_SECONDS: ${READINESS_TIMEOUT_SECONDS:-2.0}
+      API_CORS_ORIGINS: ${API_CORS_ORIGINS:?set API_CORS_ORIGINS to the public https origin}
+      # 默认值必须包含回环地址：容器内 healthcheck 请求 http://127.0.0.1:8000/health，
+      # Host 头为 127.0.0.1。只写公网域名会让 api 永久 unhealthy（P1-1）。
+      TRUSTED_HOSTS: ${TRUSTED_HOSTS:-127.0.0.1,localhost}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env.prod}
+      TOOL_TOKEN_SECRET: ${TOOL_TOKEN_SECRET:?set TOOL_TOKEN_SECRET in .env.prod}
+      RATE_LIMIT_AUTH_PER_MINUTE: ${RATE_LIMIT_AUTH_PER_MINUTE:-10}
+      RATE_LIMIT_CHAT_PER_MINUTE: ${RATE_LIMIT_CHAT_PER_MINUTE:-20}
+      SSE_KEEPALIVE_SECONDS: ${SSE_KEEPALIVE_SECONDS:-15}
+      SSE_TOTAL_TIMEOUT_SECONDS: ${SSE_TOTAL_TIMEOUT_SECONDS:-120}
+      EMBEDDING_MODEL_NAME: ${EMBEDDING_MODEL_NAME:-BAAI/bge-m3}
+      EMBEDDING_MODEL_PATH: /models/bge-m3
+      EMBEDDING_DEVICE: ${EMBEDDING_DEVICE:-cpu}
+      EMBEDDING_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE:-4}
+      EMBEDDING_MAX_LENGTH: ${EMBEDDING_MAX_LENGTH:-512}
+      EMBEDDING_DIMENSION: ${EMBEDDING_DIMENSION:-1024}
+      RETRIEVAL_RRF_K: ${RETRIEVAL_RRF_K:-60}
+      POLICY_MIN_EVIDENCE_SIMILARITY: ${POLICY_MIN_EVIDENCE_SIMILARITY:-0.42}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      # 只读根文件系统下，torch / huggingface 的缓存必须落到 tmpfs。
+      HOME: /tmp
+      XDG_CACHE_HOME: /tmp/cache
+      HF_HOME: /tmp/hf
+      TORCH_HOME: /tmp/torch
+    volumes:
+      # BGE-M3 权重（约 2.3GB）只挂载只读目录，永不进镜像、不进仓库。
+      - ${MODEL_DIR:-./models}:/models:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      milvus:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    read_only: true
+    tmpfs:
+      - /tmp:size=1g,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 30s
+    logging: *default-logging
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: ${API_CPU_LIMIT:-2.0}
+          memory: ${API_MEMORY_LIMIT:-6g}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).read()",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+
+  web:
+    image: ${WEB_IMAGE:?set WEB_IMAGE in .env.prod}
+    ports:
+      # 唯一的对外端口；前面应是终结 TLS 的边缘代理/负载均衡。
+      - "${WEB_PORT:-8080}:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+      - /var/cache/nginx:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256m
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  # ---- 运维工具（不随 up 启动）---------------------------------------------
+  # 合成数据初始化：仅用于演示/预发。会写 data/ 目录与数据库，禁止在生产数据上运行。
+  seed:
+    profiles: ["tools"]
+    image: ${API_IMAGE:?set API_IMAGE in .env.prod}
+    command: ["python", "/app/scripts/seed.py"]
+    environment:
+      APP_ENV: production
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    volumes:
+      - ./scripts:/app/scripts:ro
+      - ./data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    logging: *default-logging
+
+  # 知识入库：读取 data/knowledge 清单，写 PostgreSQL + Milvus（源文件只读挂载）。
+  ingest:
+    profiles: ["tools"]
+    image: ${API_IMAGE:?set API_IMAGE in .env.prod}
+    command: ["python", "/app/scripts/ingest.py", "--manifest", "/app/data/knowledge/manifest.json"]
+    environment:
+      APP_ENV: production
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      MILVUS_URI: http://milvus:19530
+      EMBEDDING_MODEL_PATH: /models/bge-m3
+      EMBEDDING_DEVICE: ${EMBEDDING_DEVICE:-cpu}
+      EMBEDDING_DIMENSION: ${EMBEDDING_DIMENSION:-1024}
+      HOME: /tmp
+      XDG_CACHE_HOME: /tmp/cache
+      HF_HOME: /tmp/hf
+      TORCH_HOME: /tmp/torch
+    volumes:
+      - ./scripts:/app/scripts:ro
+      - ./data:/app/data:ro
+      - ${MODEL_DIR:-./models}:/models:ro
+    tmpfs:
+      - /tmp:size=2g,mode=1777
+    depends_on:
+      postgres:
+        condition: service_healthy
+      milvus:
+        condition: service_healthy
+    restart: "no"
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 6g
+
+volumes:
+  postgres_data:
+    name: ${COMPOSE_PROJECT_NAME:-shopmate-prod}_postgres_data
+  redis_data:
+    name: ${COMPOSE_PROJECT_NAME:-shopmate-prod}_redis_data
+  etcd_data:
+    name: ${COMPOSE_PROJECT_NAME:-shopmate-prod}_etcd_data
+  minio_data:
+    name: ${COMPOSE_PROJECT_NAME:-shopmate-prod}_minio_data
+  milvus_data:
+    name: ${COMPOSE_PROJECT_NAME:-shopmate-prod}_milvus_data

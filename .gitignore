@@ -1,0 +1,41 @@
+# Python-generated files
+__pycache__/
+*.py[cod]
+build/
+dist/
+wheels/
+*.egg-info
+*.log
+
+# Virtual environments
+.venv/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+!.env.prod.example
+
+# Test, coverage, and tool caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Frontend dependencies and build output
+node_modules/
+frontend/dist/
+
+# IDE and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local model weights (BGE-M3 ~2.3GB): never committed, never baked into images
+models/
+
+# Agent scratch space (one-off recovery scripts); project memory under .workbuddy/memory is tracked
+.workbuddy/tmp/

@@ -1,0 +1,288 @@
+<script setup lang="ts">
+/**
+ * 应用外壳：顶部导航 + Synthetic 横幅 + 用户信息 + 移动端抽屉导航。
+ * 导航按角色展示仅为体验层，权限校验以后端为准。
+ */
+
+import { computed, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ElAlert, ElButton, ElDrawer, ElMessageBox } from 'element-plus'
+
+import { useAuthStore } from '@/stores/auth'
+import { useSystemStore } from '@/stores/system'
+
+const route = useRoute()
+const router = useRouter()
+const auth = useAuthStore()
+const system = useSystemStore()
+
+const drawerVisible = ref(false)
+const forbidden = ref(false)
+
+watch(
+  () => route.query.forbidden,
+  (value) => {
+    forbidden.value = value === '1'
+  },
+  { immediate: true },
+)
+
+const roleLabel = computed(() => {
+  if (auth.role === 'support') return '客服'
+  if (auth.role === 'admin') return '管理员'
+  if (auth.role === 'shopper') return '消费者'
+  return '--'
+})
+
+  const navItems = computed(() => {
+    const items = [
+      { path: '/', label: '智能客服' },
+      { path: '/products', label: '商品中心' },
+      { path: '/orders', label: '我的订单' },
+      { path: '/handoff', label: '我的工单' },
+    ]
+  if (auth.role === 'support' || auth.role === 'admin') {
+    items.push({ path: '/support', label: '客服工作台' })
+  }
+  if (auth.role === 'admin') {
+    items.push({ path: '/admin', label: '管理后台' })
+  }
+  return items
+})
+
+async function onLogout(): Promise<void> {
+  try {
+    await ElMessageBox.confirm('确认退出当前登录账号？', '退出登录', {
+      confirmButtonText: '退出',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+  } catch {
+    return
+  }
+  await auth.logout()
+  await router.push({ name: 'login' })
+}
+</script>
+
+<template>
+  <div class="sm-shell">
+    <header class="sm-shell-header">
+      <button class="sm-menu-button" type="button" aria-label="打开导航菜单" @click="drawerVisible = true">
+        ☰
+      </button>
+      <router-link class="sm-brand" to="/">
+        <span class="sm-brand-mark">SM</span>
+        <span class="sm-brand-name">ShopMate 智能客服</span>
+      </router-link>
+
+      <nav class="sm-nav" aria-label="主导航">
+        <router-link
+          v-for="item in navItems"
+          :key="item.path"
+          :to="item.path"
+          class="sm-nav-link"
+          active-class="sm-nav-link-active"
+        >
+          {{ item.label }}
+        </router-link>
+      </nav>
+
+      <div class="sm-shell-user">
+        <span v-if="auth.user" class="sm-user-name">{{ auth.user.display_name_masked ?? auth.user.email }}</span>
+        <span class="sm-user-role">{{ roleLabel }}</span>
+        <ElButton size="small" text type="danger" @click="onLogout">退出</ElButton>
+      </div>
+    </header>
+
+    <ElAlert
+      v-if="system.meta?.is_synthetic"
+      class="sm-synthetic-banner"
+      type="warning"
+      :closable="false"
+      show-icon
+    >
+      <strong>合成演示数据</strong>
+      <span class="sm-synthetic-text">{{ system.meta.notice }}</span>
+    </ElAlert>
+
+    <ElAlert
+      v-if="forbidden"
+      class="sm-synthetic-banner"
+      type="error"
+      :closable="false"
+      show-icon
+      title="无权访问该页面"
+    >
+      当前账号没有该页面的访问权限（{{ roleLabel }}）。如需访问，请联系管理员。
+    </ElAlert>
+
+    <main class="sm-shell-main">
+      <router-view v-slot="{ Component }">
+        <keep-alive include="ChatView">
+          <component :is="Component" />
+        </keep-alive>
+      </router-view>
+    </main>
+
+    <ElDrawer v-model="drawerVisible" title="导航" direction="ltr" size="70%">
+      <nav class="sm-drawer-nav" aria-label="移动端导航">
+        <router-link
+          v-for="item in navItems"
+          :key="item.path"
+          :to="item.path"
+          class="sm-drawer-link"
+          @click="drawerVisible = false"
+        >
+          {{ item.label }}
+        </router-link>
+      </nav>
+      <div class="sm-drawer-user">
+        <p class="sm-muted">当前账号：{{ auth.user?.display_name_masked ?? '--' }}（{{ roleLabel }}）</p>
+        <p class="sm-muted">数据分类：{{ system.meta?.data_classification ?? '--' }}</p>
+      </div>
+    </ElDrawer>
+  </div>
+</template>
+
+<style scoped>
+.sm-shell {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.sm-shell-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--sm-surface);
+  border-bottom: 1px solid var(--sm-border);
+}
+
+.sm-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--sm-text);
+  font-weight: 700;
+}
+
+.sm-brand-mark {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--sm-primary);
+  color: #fff;
+  font-size: 13px;
+}
+
+.sm-nav {
+  display: flex;
+  gap: 4px;
+  margin-left: 12px;
+}
+
+.sm-nav-link {
+  padding: 6px 12px;
+  border-radius: 8px;
+  color: var(--sm-text-secondary);
+}
+
+.sm-nav-link:hover {
+  background: var(--sm-bg);
+  color: var(--sm-text);
+}
+
+.sm-nav-link-active {
+  background: rgb(31 122 92 / 10%);
+  color: var(--sm-primary-dark);
+  font-weight: 600;
+}
+
+.sm-shell-user {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sm-user-name {
+  font-size: 13px;
+}
+
+.sm-user-role {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--sm-bg);
+  border: 1px solid var(--sm-border);
+  font-size: 12px;
+  color: var(--sm-text-secondary);
+}
+
+.sm-synthetic-banner {
+  margin: 0;
+  border-radius: 0;
+}
+
+.sm-synthetic-text {
+  margin-left: 8px;
+}
+
+.sm-shell-main {
+  flex: 1;
+  min-height: 0;
+}
+
+.sm-menu-button {
+  display: none;
+  border: 1px solid var(--sm-border);
+  background: var(--sm-surface);
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.sm-drawer-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sm-drawer-link {
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: var(--sm-text);
+}
+
+.sm-drawer-link:hover {
+  background: var(--sm-bg);
+}
+
+.sm-drawer-user {
+  margin-top: 16px;
+  border-top: 1px solid var(--sm-border);
+  padding-top: 12px;
+}
+
+@media (max-width: 768px) {
+  .sm-menu-button {
+    display: block;
+  }
+
+  .sm-nav {
+    display: none;
+  }
+
+  .sm-brand-name {
+    display: none;
+  }
+}
+</style>

@@ -1,0 +1,65 @@
+[project]
+name = "shopmate-ecommerce-assistant"
+version = "0.1.0"
+description = "ShopMate 电商智能客服与轻导购助手"
+readme = "README.md"
+authors = [
+    { name = "玖十七", email = "14641293+xuedingedemao0917@user.noreply.gitee.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.20.0",
+    "argon2-cffi>=25.1.0",
+    "asyncpg>=0.32.0",
+    "fastapi>=0.145.0",
+    "flagembedding>=1.4.2",
+    "httpx>=0.28.1",
+    "pydantic-settings>=2.16.0",
+    "pyjwt>=2.15.1",
+    "pymilvus>=2.4.9,<2.5",
+    "pypdf>=6.21.1",
+    "python-docx>=1.2.0",
+    "python-multipart>=0.0.32",
+    "python-pptx>=1.0.2",
+    "redis>=8.1.0",
+    "reportlab>=5.0.1",
+    "setuptools<81",
+    "sqlalchemy[asyncio]>=2.1.5",
+    "torch>=2.14.1",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[project.scripts]
+shopmate-ecommerce-assistant = "shopmate_ecommerce_assistant:main"
+
+[build-system]
+requires = ["uv_build>=0.12.11,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "locust>=2.46.7",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.17.1",
+]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = [
+    "integration: 需要本地 Docker 服务（PostgreSQL / Milvus）的集成测试",
+    "model: 需要本地 BGE-M3 权重（设置 SHOPMATE_RUN_MODEL_TESTS=1 后运行）",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]
+
+[tool.ruff.format]
+quote-style = "double"

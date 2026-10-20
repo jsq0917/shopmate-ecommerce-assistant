@@ -1,0 +1,36 @@
+# web/Dockerfile.prod 专用忽略清单（BuildKit 会优先使用与 Dockerfile 同名的忽略文件）。
+# 构建上下文是仓库根目录，所以这里只保留前端源码与 web/ 配置。
+.git
+.github
+.workbuddy
+.venv
+.pytest_cache
+.ruff_cache
+**/__pycache__
+**/*.py[cod]
+
+src
+tests
+scripts
+docs
+data
+models
+alembic
+alembic.ini
+compose.yaml
+compose.prod.yaml
+Dockerfile
+pyproject.toml
+uv.lock
+
+frontend/node_modules
+frontend/dist
+frontend/e2e
+frontend/test-results
+frontend/playwright-report
+frontend/*.tsbuildinfo
+
+.env
+.env.*
+!.env.example
+*.log

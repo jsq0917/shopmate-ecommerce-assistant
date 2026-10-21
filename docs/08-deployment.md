@@ -475,8 +475,8 @@ docker inspect --format '{{.Name}} readonly={{.HostConfig.ReadonlyRootfs}} privi
 
 | 缺口 | 影响 | 当前替代方案 |
 |---|---|---|
-| `GET/PATCH /api/v1/support/*` 未注册 | 客服工作台页面报错 | 使用 `GET /api/v1/handoff` 查看本人工单；客服数据可查库 |
-| 管理端上传/重建索引/片段编辑未实现 | 管理端知识页面部分按钮无效 | `scripts/ingest.py`、`scripts/rebuild_knowledge_index.py` |
+| 客服工作台需 `support:*` 权限 | 用 `admin01` 打开 `/support` 会 403（admin 默认不含 support 权限） | 用 `support01`；验证：`uv run python scripts/smoke_stage16.py`（阶段 16 起 `/support/*` 已注册） |
+| 上传/重建索引只落 `queued` job | 实例未装配 BGE-M3 时文档停在 `pending`，需有权重的进程解析 | 阶段 16 起接口已实现；用 `scripts/ingest.py` 或具备 BGE-M3 的实例继续 |
 | 无 Prometheus 指标端点 | 只能看日志与 `docker stats` | 后续阶段补 `/metrics`，当前不谎称有监控 |
 | 无自动备份任务 | 依赖人工/外部 cron | 按 §6.2 配置宿主机 cron + 对象存储 |
 | 无多副本/滚动更新 | 发布有秒级中断 | 低峰发布；后续可加负载均衡与共享 embedding 服务 |

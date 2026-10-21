@@ -298,32 +298,49 @@ async def ingest_source(
     shop_id: UUID,
     created_by: UUID | None = None,
     milvus_enabled: bool = True,
+    knowledge_base_id: UUID | None = None,
+    document_id: UUID | None = None,
+    version_id: UUID | None = None,
+    job_id: UUID | None = None,
 ) -> IngestOutcome:
     """Ingest one document version and record an auditable job.
 
     Metadata rows are written before the file is read, so a missing or corrupt file still
     leaves an explicit ``failed`` version with a safe error code. Failures are recorded
     instead of raised so one bad document cannot abort a batch run.
+
+    ``knowledge_base_id`` / ``document_id`` / ``version_id`` / ``job_id`` let the admin
+    upload path re-parse **the rows it already created** (a knowledge base created through
+    ``POST /admin/knowledge-bases`` has a random id, not the manifest's stable id) instead
+    of creating a parallel document. All four default to ``None``, which keeps the CLI
+    manifest behaviour byte-identical to stage 5/7.
     """
     source_uri = _safe_source_uri(spec.file)
     filename = PurePosixPath(source_uri).name or "unknown"
     mime_type = SUPPORTED_SUFFIXES.get(Path(filename).suffix.lower(), "application/octet-stream")
-    kb_id = stable_uuid("knowledge_base", str(shop_id), spec.knowledge_base)
-    document_id = stable_uuid("document", str(shop_id), spec.knowledge_base, spec.document_key)
-    version_id = stable_uuid("version", str(document_id), spec.version)
-    job_id = stable_uuid("ingestion_job", str(version_id), "pending")
+    if knowledge_base_id is not None:
+        kb_id = knowledge_base_id
+    else:
+        kb_id = stable_uuid("knowledge_base", str(shop_id), spec.knowledge_base)
+    document_id = document_id or stable_uuid(
+        "document", str(shop_id), spec.knowledge_base, spec.document_key
+    )
+    version_id = version_id or stable_uuid("version", str(document_id), spec.version)
+    job_id_explicit = job_id is not None
+    job_id = job_id or stable_uuid("ingestion_job", str(version_id), "pending")
     parent_count = 0
     child_count = 0
     milvus_count = 0
 
     try:
-        kb_id = await _upsert_knowledge_base(
-            session,
-            shop_id=shop_id,
-            name=spec.knowledge_base,
-            locale=spec.locale,
-            region=spec.region,
-        )
+        if knowledge_base_id is None:
+            kb_id = await _upsert_knowledge_base(
+                session,
+                shop_id=shop_id,
+                name=spec.knowledge_base,
+                locale=spec.locale,
+                region=spec.region,
+            )
         await _upsert_document(
             session, document_id=document_id, shop_id=shop_id, kb_id=kb_id, spec=spec
         )
@@ -340,18 +357,32 @@ async def ingest_source(
             parse_status=ParseStatus.PROCESSING,
             created_by=created_by,
         )
-        attempt = await _next_attempt(session, version_id)
-        job_id = stable_uuid("ingestion_job", str(version_id), str(attempt))
-        session.add(
-            IngestionJob(
-                id=job_id,
-                shop_id=shop_id,
-                version_id=version_id,
-                status=IngestionStatus.RUNNING.value,
-                attempt_count=attempt,
-                started_at=datetime.now(UTC),
+        reuse_job = job_id if job_id_explicit else None
+        if reuse_job is None:
+            attempt = await _next_attempt(session, version_id)
+            job_id = stable_uuid("ingestion_job", str(version_id), str(attempt))
+            session.add(
+                IngestionJob(
+                    id=job_id,
+                    shop_id=shop_id,
+                    version_id=version_id,
+                    status=IngestionStatus.RUNNING.value,
+                    attempt_count=attempt,
+                    started_at=datetime.now(UTC),
+                )
             )
-        )
+        else:
+            # The admin upload already queued this attempt; mark it running in place so one
+            # HTTP upload maps to exactly one job row.
+            await session.execute(
+                sa.update(IngestionJob)
+                .where(IngestionJob.id == reuse_job)
+                .values(
+                    status=IngestionStatus.RUNNING.value,
+                    started_at=datetime.now(UTC),
+                    updated_at=sa.func.now(),
+                )
+            )
         await session.commit()
 
         # Resolve inside the guard so a path that escapes the knowledge directory is

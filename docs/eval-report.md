@@ -614,6 +614,17 @@ if normalised == "CONFLICT":
 
 并补一条回归测试：`NO_EVIDENCE [c1]` 必须得到 `status="refused"`；`CONFLICT [c1][c2]` 必须得到 `handoff`。
 
+**已修（阶段 16，2026-10-20）**：`rag/policy_qa.py` 新增 `sentinel_of()`——先剥离 `[cN]` 标签、
+首尾空白与句末标点，再忽略大小写比对，命中即进入拒答/转人工分支；`citation_label_issues()` 也把
+这一步放到标签校验之前（否则 `CONFLICT [c1][c2]` 会先报 `unknown_citation:c2` 而掩盖哨兵）。
+回归覆盖见 `tests/unit/test_policy_sentinel.py`：`NO_EVIDENCE`、`NO_EVIDENCE [c1]`、`conflict。`、
+`NO_EVIDENCE[c1].` 四类输入必须分别得到 refused / refused / handoff / refused，正常带标签答案不得误伤。
+
+> **口径声明**：本章（含 §2.4.3、§2.9.1 的 #0、§2.9.4）的历史数字对应**修复前**的行为；
+> `data/eval/results/stage13-*.json` 未改动、也未重跑全量评测。修复后的行为只由上述新增单元测试
+> 覆盖，**不产生任何新的评测数字**。
+
+
 #### 2.9.1 业务失败（50/136）
 
 | # | 现象 | 用例 | 根因 | 修复建议 |

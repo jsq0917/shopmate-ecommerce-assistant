@@ -180,14 +180,13 @@
 | `PRODUCT_FACT` 与 `PRODUCT_DISCOVERY` 合并到搜索分支，与工具契约不一致 | 9 条用例调用 `search_products` 而非 `get_product_detail`/`check_stock` | 报告 2.9.1 #3 | 未修 |
 | 商品对比只认 UUID，抽不到商品名 | 12 条对比用例退化为澄清 | 报告 2.9.1 #2 | 未修 |
 | 退货链路拿不到 `order_item_id` | 11 条退货用例未调用 `check_return_eligibility` | 报告 2.9.1 #4 | 未修 |
-| **`NO_EVIDENCE` / `CONFLICT` 哨兵 fail-open** | 模型输出 `NO_EVIDENCE [c1]…` 时被当答案返回用户，实测 2 条（`eval-058`/`eval-061`） | `rag/policy_qa.py` L397 精确相等判定；报告 2.9.0 | **未修**（属业务逻辑变更，待所有者授权） |
+| **`NO_EVIDENCE` / `CONFLICT` 哨兵 fail-open** | 模型输出 `NO_EVIDENCE [c1]…` 时被当答案返回用户，实测 2 条（`eval-058`/`eval-061`） | `rag/policy_qa.py` 的 `sentinel_of()` 归一化（剥离 `[cN]`/空白/句末标点，忽略大小写）；报告 §2.9.0 | **已修（阶段 16）**，回归 `tests/unit/test_policy_sentinel.py`；未重跑全量评测 |
 | 证据门槛是单一相似度信号 | 1 条元信息类问题误拒（`exact-05`） | 报告 2.9.2 | 未修（建议按意图分档） |
 | 索引卫生：Milvus 1 条孤儿、21 行 PG chunk 未索引 | 规模口径需分列说明 | 报告 2.9.4 | 未修 |
-| `/api/v1/support/*` 未注册 | 前端客服工作台呈错误态 | `docs/06-api.md` §12 勘误 | 未实现 |
+| ~~`/api/v1/support/*` 未注册~~ | 前端客服工作台曾呈错误态 | `docs/06-api.md` §12；`tests/integration/test_support_api.py` | **已实现（阶段 16）** |
 
 ### 5.3 未实现 / 计划中（**不得写成已完成**）
 
-- 管理端文档上传、`reindex`、chunk 编辑（只有只读接口）。
 - 官方 `ragas` 包（当前是自建 LLM-as-judge，两者不是同一实现）。
 - 结构化 faithfulness/relevancy 逐轮落盘（当前需重跑脚本复现）。
 - `/metrics` 端点、自动备份任务。
@@ -225,7 +224,7 @@
 | "混合检索提升召回 xx%" | 58 条数据集上 hybrid 与 dense-only **完全无差异**（报告 2.4.3） |
 | "政策问答准确率 88%" | 0.88 只是 5 条上的 LLM 自评忠实度，且含 2 条哨兵泄漏 |
 | "RAGAS 指标达到 …" | 官方 `ragas` 包未运行，当前是自建同构/代理实现 |
-| "端到端客服系统已完成""全流程可用" | 有 5.2 的已知缺陷与未实现端点 |
+| "端到端客服系统已完成""全流程可用" | 5.2 仍有未修缺陷，5.3 仍有未实现项（阶段 16 已关闭 support 与 admin 写端点） |
 | "节省云成本 xx%" | 只有本地 0 USD 口径 |
 | "支撑 40 并发，P95 2.4s"当作容量承诺 | 单机单 worker + CPU 推理，已饱和 |
 | "参考了 xx 开源项目并实现同样功能" | 参考仓库只借鉴思路，未复制代码 |

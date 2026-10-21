@@ -193,6 +193,10 @@ FAILED tests/integration/test_seed_data.py::test_seeded_orders_have_unique_numbe
 因此 SEC-01 的“客服端”部分与 SEC-19 只能标注**未验证**。前端已按 `docs/06-api.md` 实现，
 后端接线后需补：`test_support_tickets_reject_shoppers`、`test_quality_label_requires_support_scope`。
 
+> **阶段 16 补记（2026-10-20）**：该路由已实现，上述两项补测已按等价形式落地在
+> `tests/integration/test_support_api.py`（`test_consumer_admin_and_anonymous_are_rejected`、
+> `test_quality_label_is_owned_and_idempotent`）。本节保留为阶段 12 的历史结论。
+
 ### 7.2 「已退款」状态在数据契约中不存在（等价语义已闭环）
 
 `OrderStatus` 只有 `created/paid/processing/shipped/delivered/completed/cancelled`，**没有订单级 `refunded`**。
@@ -233,6 +237,9 @@ SKIPPED tests/integration/test_bge_m3_provider.py:61  未设置 SHOPMATE_RUN_MOD
 
 `POST /admin/documents`、`POST /admin/documents/{id}/reindex`、`PATCH|DELETE /admin/chunks/{id}`
 未注册（阶段 11 已记录）。上传相关的 SEC-14 证据来自 ingestion 管线测试，不是 HTTP 上传端点。
+
+> **阶段 16 补记（2026-10-20）**：以上端点已实现，SEC-14 现有 HTTP 层证据
+> （`tests/integration/test_support_api.py::test_upload_rejects_wrong_magic_and_unsafe_name`，415/400）。
 
 ---
 

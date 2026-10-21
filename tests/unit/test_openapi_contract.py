@@ -30,8 +30,8 @@ def _operations(schema: dict) -> list[tuple[str, str, dict]]:
 def test_openapi_exposes_the_full_surface() -> None:
     schema = _schema()
     operations = _operations(schema)
-    assert len(schema["paths"]) == 30
-    assert len(operations) == 34
+    assert len(schema["paths"]) == 36
+    assert len(operations) == 43
     assert schema["components"]["securitySchemes"]["HTTPBearer"]["scheme"] == "bearer"
 
 
@@ -76,9 +76,9 @@ def test_authenticated_operations_declare_401_and_403() -> None:
         authenticated += 1
         assert "401" in operation["responses"], f"{method} {path} misses 401"
         assert "403" in operation["responses"], f"{method} {path} misses 403"
-    # 34 operations minus the 8 unauthenticated ones (captcha/register/login/refresh/
+    # 43 operations minus the 8 unauthenticated ones (captcha/register/login/refresh/
     # logout, health, ready, system/meta).
-    assert authenticated == 26
+    assert authenticated == 35
 
 
 def test_unauthenticated_operations_declare_no_auth_failures() -> None:

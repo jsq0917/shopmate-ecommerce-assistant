@@ -39,3 +39,6 @@ models/
 
 # Agent scratch space (one-off recovery scripts); project memory under .workbuddy/memory is tracked
 .workbuddy/tmp/
+
+# Runtime uploads written by POST /api/v1/admin/documents (content lives in PostgreSQL/Milvus)
+data/knowledge/uploads/

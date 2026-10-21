@@ -584,10 +584,12 @@ Idempotency-Key: 2d44d855-handoff-001
 
 ## 12. 客服工作台 API
 
-> **实现现状（阶段 14 核对，2026-10-20）**：本章为**契约**。截至阶段 14，`/api/v1/support/*` **尚未在
-> 应用中注册**（`src/.../main.py` 未 include 该路由），实际请求返回 404。前端客服工作台页面因此显示错误态；
-> 消费者侧可用 `GET /api/v1/handoff` 查看自己的工单，工单数据已正常入库。
-> 实现本章端点前，不得在演示或文档中宣称客服工作台可用。
+> **实现现状（阶段 16，2026-10-20）**：本章**已实现**，路由由
+> `src/shopmate_ecommerce_assistant/api/support.py` 提供并在 `main.py` 注册；数据访问在
+> `db/repositories/support.py`，状态机在仓储层强制（非法转换 → `409 INVALID_STATE`）。
+> 实测命令：`uv run pytest tests/integration/test_support_api.py -q`（13 passed）与
+> `uv run python scripts/smoke_stage16.py`（support01 → 200，消费者/admin → 403）。
+> 消费者侧仍可用 `GET /api/v1/handoff` 查看自己的工单。
 
 仅 `support` 或具备客服权限的 `admin`，且只能访问授权店铺和授权工单关联资源：
 
@@ -700,12 +702,14 @@ support 查看会话必须由授权工单提供业务理由；admin 默认不浏
 
 ## 13. 管理端 API
 
-> **实现现状（阶段 14 核对，2026-10-20）**：以下接口中**已实现**的是
-> `GET/POST /admin/knowledge-bases`、`GET /admin/documents`、`GET /admin/documents/{id}`、
-> `GET /admin/chunks`、`GET /admin/eval/runs`、`POST /admin/eval/run`、`GET /admin/model-profiles`。
-> **未实现**：`POST /admin/documents`（上传）、`PATCH/DELETE /admin/chunks/{id}`、`POST /admin/documents/{id}/reindex`。
-> 知识入库当前通过 `scripts/ingest.py` 与 `scripts/rebuild_knowledge_index.py` 完成；
-> 前端上传/编辑按钮在未实现前会失败，这属于已知缺口（见 `README.md` §9、`docs/08-deployment.md` §12）。
+> **实现现状（阶段 16，2026-10-20）**：本章**全部已实现**，含
+> `POST /admin/documents`（上传）、`PATCH`/`DELETE /admin/chunks/{id}`、
+> `POST /admin/documents/{id}/reindex`；迁移 `20261020_0005` 只新增列/表，未改已有列。
+> 上传与重建索引都返回 `202` 并落一条 `queued` 的 `ingestion_jobs`；实际解析复用
+> `rag/ingest/pipeline.py::ingest_source`（`rag/ingest/worker.py` 以显式 id 调用，不新建文档）。
+> 当进程未装配 BGE-M3（CI、无权重机器）时 job 保持 `queued`，由 `scripts/ingest.py` 或具备权重的
+> 实例继续处理——这一点是**如实状态**，不是"已解析"。
+> 实测命令：`uv run pytest tests/integration/test_support_api.py tests/integration/test_ingest_worker.py -q`。
 
 所有接口要求 `admin` 和当前店铺范围。
 

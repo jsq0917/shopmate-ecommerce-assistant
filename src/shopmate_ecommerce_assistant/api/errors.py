@@ -47,6 +47,10 @@ _TOOL_STATUS: dict[str, int] = {
     "UPSTREAM_UNAVAILABLE": 503,
     "RATE_LIMITED": 429,
     "INTERNAL_ERROR": 500,
+    # Upload protocol (docs/06-api.md §14).
+    "FILE_TOO_LARGE": 413,
+    "UNSUPPORTED_FILE_TYPE": 415,
+    "UNSAFE_FILE": 400,
 }
 
 #: Auth error code -> HTTP status.

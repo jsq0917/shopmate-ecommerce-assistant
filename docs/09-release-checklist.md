@@ -133,8 +133,8 @@
 | 7.10 | 幂等 | 用同一幂等键重复提交 | 不产生第二条申请 |
 | 7.11 | 转人工 | 输入“我要投诉并起诉，要求立刻赔偿” | 风险标签 + 工单 ID，无资金承诺 |
 | 7.12 | 多会话 | 新建/重命名/删除会话 | 列表即时更新，删除为软删除 |
-| 7.13 | 管理端只读 | `admin01` 登录后打开知识库页 | 列表可加载（上传/编辑按钮不可用属已知缺口） |
-| 7.14 | 客服端 | `support01` 登录后打开工单页 | **预期错误态**：`/api/v1/support/*` 未实现（见 `docs/06-api.md` §12 勘误） |
+| 7.13 | 管理端 | `admin01` 登录后打开知识库页 | 列表可加载；上传一个 `.md`（≤20 MiB）返回 `202` + `parse_status=pending`，片段编辑返回 `reindex_required=true`（阶段 16 起可用；解析由具备 BGE-M3 的进程执行） |
+| 7.14 | 客服端 | `support01` 登录后打开工单页 | 工单队列正常加载，列表项字段与 `docs/06-api.md` §12 一致；打开工单详情可看到状态流转按钮。消费者与 `admin` 访问 `/api/v1/support/tickets` 均返回 `403`（阶段 16 起可用） |
 
 > 7.5 依赖知识入库与 BGE-M3 权重；未完成 §5.1.4 时该项应显示“知识库暂不可用”，这属于**环境未就绪**而不是缺陷。
 
@@ -181,3 +181,4 @@
 |---|---|---|---|
 | 2026-10-20 | 本机 Windows + Docker 29.8 / Compose v5.5（开发栈运行中） | 部分通过 | 完成编排校验、安全复查、前端生产镜像构建、健康检查；未在全新主机上执行完整 5.1–7.14（避免影响现有数据卷），详见 `docs/project-status.md` §22 |
 | 2026-10-20（整改后复评） | 本机，生产栈实跑（独立 `shopmate-prod` 卷） | 通过（§0–§4、§6、§8 实测；§7 部分） | `migrate` 退出码 0；7 个容器全部 healthy（api/web `read_only`）；`/health` `/ready` 正常；`8080` 用 `shopper01` 登录成功（角色=消费者，刷新后仍在登录态）；`docker inspect` 显示 `ReadonlyRootfs=true`、`Privileged=false`、日志 `10m×3`。§5.1 seed 与 §5.1.3 演示口令已执行；§5.1.4 ingest 与 §7 全量烟测未做（见 §22.7） |
+| 2026-10-20（阶段 16 收尾） | 本机 Windows + 开发栈容器（PG/Redis/Milvus 运行中），API 走进程内 ASGI（未启停容器） | 部分通过（§7 的 7.12–7.14 API 层 + §8.1 实测） | `uv run python scripts/smoke_stage16.py` → 7.12/7.13/7.14 全 PASS（support01 工单队列 20 条、admin 文档 21 条、消费者与 admin 访问 `/support/tickets` 均 403）；`check_deploy_security.py` 34 PASS / 0 FAIL；§7.1–7.11 与 7.13/7.14 的**浏览器 UI** 未重跑（需前端 dev server 与 BGE-M3，本轮不启停容器）；详见 `docs/project-status.md` §24 |

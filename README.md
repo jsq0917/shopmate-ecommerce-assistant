@@ -19,7 +19,8 @@
 | 退货资格与申请             | 规则引擎 + 幂等写操作                                                  | 申请 ≠ 退款；LLM 不能批准资金                 |
 | 投诉/法律威胁/大额异常        | 风险识别 → 人工工单                                                   | 高风险不自动承诺，幂等建单                      |
 | 流式聊天                | SSE：`meta/tool_status/product_card/citation/delta/done/error` | 事件结构由后端决定，不由模型决定                   |
-| 管理端                 | 知识库/文档/片段/评测只读接口                                              | 部分写接口尚未实现，见 §9                     |
+| 管理端                 | 知识库/文档/片段/评测 + 上传/片段编辑/重建索引（阶段 16）                          | 上传后由具备 BGE-M3 的进程解析，见 §9          |
+| 客服工作台               | 工单队列/详情/状态流转/质量标记（阶段 16）                                    | 需 `support:*` 权限；admin 默认不含会话读取      |
 | 评测与压测               | 136 条业务评测 + 58 条检索金标 + Locust                                 | 数字全部来自实际运行，见 `docs/eval-report.md` |
 
 不在范围内：真实支付/退款、K8s、微服务、消息队列、多 Agent、模型微调。
@@ -255,13 +256,13 @@ docker compose -f compose.prod.yaml --env-file .env.prod up -d api web
 
 ---
 
-## 9. 已知限制（阶段 14 现状）
+## 9. 已知限制（阶段 16 现状）
 
 | 项                             | 现状                                    | 影响                                           |
 | ----------------------------- | ------------------------------------- | -------------------------------------------- |
 | 开发栈 web 容器（`localhost:3000`） | 只 COPY `web/public/`，是**阶段 4 占位页** | 无法登录、无聊天界面；看真实 UI 走 §4.5 的 (a)/(b)/(c) |
-| `GET/PATCH /api/v1/support/*` | 契约已定义（`docs/06-api.md` §12），**后端未注册** | 前端客服工作台显示错误态；可用 `GET /api/v1/handoff` 查看本人工单 |
-| 管理端文档上传 / 重建索引 / 片段编辑         | **未实现**                               | 管理端知识页面部分操作不可用；入库请用 `scripts/ingest.py`      |
+| `GET/PATCH /api/v1/support/*` | **已实现（阶段 16）**：队列、详情、状态流转、会话取证、质量标记 | admin 默认无 `support:*` 权限，需显式授予 |
+| 管理端文档上传 / 重建索引 / 片段编辑         | **已实现（阶段 16）**，返回 202 + `queued` job | 解析需 BGE-M3：进程未装配时 job 保持 `queued`，用 `scripts/ingest.py` 继续 |
 | 管理端只读接口                       | 已实现（知识库、文档、片段、评测历史、模型配置）              | —                                            |
 | 多副本横向扩展                       | 不支持                                   | 单 worker + 进程内 BGE-M3；扩展需拆独立 embedding 服务    |
 | 真实数据接入                        | 未实现                                   | 仅合成数据；Mock OMS，非真实订单系统                       |
@@ -288,7 +289,7 @@ docker compose -f compose.prod.yaml --env-file .env.prod up -d api web
 | 政策问答总说“知识库暂不可用”              | 权重未挂载 / Milvus 未入库；检查 `./models/bge-m3` 并跑 `scripts/ingest.py`           |
 | 登录后立刻跳回登录页                   | 前端与 API 不同源导致 CSRF cookie 丢失；用 compose 的 web 端口访问，或检查 vite 代理            |
 | 登录报 429                      | 认证限流（默认 10 次/分钟）；等一分钟或调 `RATE_LIMIT_AUTH_PER_MINUTE`                     |
-| 前端页面 404 报错提示                | 见 §9 未实现端点                                                               |
+| 前端页面报“暂无数据 / 加载失败”           | 检查后端是否已跑 `alembic upgrade head`；阶段 16 起 `/support/*` 与 admin 写接口已注册 |
 | `docker compose config` 报缺变量 | 生产必须用 `--env-file .env.prod`，且 `*_IMAGE`、`*_PASSWORD`、`*_SECRET` 不能留空    |
 
 ---

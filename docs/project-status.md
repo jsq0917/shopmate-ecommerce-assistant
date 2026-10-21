@@ -1555,3 +1555,195 @@ uv run pytest -q
 已作为已知缺陷写进台账 §5.2、面试 Q4 与演示自检 §3.4，不构成验收阻断项。
 
 下一阶段（阶段 16）**未开始**，本轮未做任何后续阶段的准备性改动；未提交 Git；未启停容器。
+
+---
+
+## 24. 阶段 16：最终收尾（2026-10-20）
+
+### 24.1 范围与授权
+
+本轮只处理 4 个已确认遗留项（W1 Git 基线、W2 后端端点补齐、W3 fail-open、W4 收尾验证与文档），
+**不新增产品功能、不做重构、不改评测口径**。所有者已通过任务单显式授权 W1–W4。
+
+未做且仍需单独授权的事项（与本轮无关）：`git push` / 打 tag、启停或重建容器、清 Milvus 卷、
+drop/truncate 数据库、修改 `data/eval/` 下的数据集与原始结果、修改 gate 阈值或已对外数字。
+
+### 24.2 W1 · Git 基线
+
+开工时仓库 **0 commit**（`git log` 报 `does not have any commits yet`），全部文件未跟踪，
+因此没有任何回滚点。本轮建立两个提交：
+
+```text
+1bae45dc8479cd0d1d106b27b96cefc64d0d5eeb  docs: 补齐阶段 0-15 文档与评测证据
+f81159b605b30db00d3754aa91dac2f4da77b58c  chore: 建立仓库基线（源码/测试/脚本/前端/编排/配置模板）
+
+git status --short   -> （空）
+git ls-files | wc -l -> 358
+git ls-files | grep -E "^models/|(^|/)\.env$" | wc -l -> 0
+```
+
+`.gitignore` 核对结果：`.venv/`、`node_modules/`、`frontend/dist/`、`models/`（2.2 GB BGE-M3 权重）、
+`.env` / `.env.*`（保留 `!.env.example`、`!.env.prod.example`）、`__pycache__/`、`.pytest_cache/`
+均已覆盖；`data/`（4.9 MB）与 `data/eval/results/`（4.4 MB 评测证据）**未**被忽略，按预期入库。
+
+本轮只对 `.gitignore` 追加两行（均为"运行时产物不应入库"）：
+
+```text
+.workbuddy/tmp/            # agent 一次性脚本；.workbuddy/memory 仍入库
+data/knowledge/uploads/    # POST /admin/documents 的落盘目录
+```
+
+敏感信息扫描（对暂存索引执行，命中项逐条人工确认）：
+
+| 模式 | 命中 | 结论 |
+|---|---|---|
+| `BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY` | 1 处，`docs/final-wrapup-prompt.md` 的**任务说明文字** | 非密钥 |
+| `sk-…` / `AKIA…` | 0 | — |
+| `shopmate-dev-` | `core/config.py` 默认值 + 文档/测试说明 | 占位符，且 `ensure_production_secrets()` 在 production 拒绝 |
+| `postgresql://user:pass@` | `.env.example`（`replace-with-…`）、`alembic.ini`（`change-me-local-only`）、compose 的 `${POSTGRES_PASSWORD}`、测试假串 | 全为占位符 |
+
+### 24.3 W2 · 补齐 4 组后端端点
+
+**契约差异结论（只加不删）**：`docs/06-api.md` §12/§13 的其余字段现有表都已具备，
+唯一缺的是 `handoff_tickets.resolution_summary` / `close_reason` 两个字段与一张质量标记表，
+因此迁移只做 `ADD COLUMN` + `CREATE TABLE`，**不改任何已有列类型、不回填历史语义**。
+
+| 层 | 文件 | 改动 |
+|---|---|---|
+| 迁移 | `alembic/versions/20261020_0005_final_wrapup_support_admin.py` | 新增 2 列 + `support_quality_labels` 表（含 `label` CHECK、`(shop_id,message_id,labeled_by)` 唯一） |
+| 模型 | `db/models/support.py`、`db/models/__init__.py` | `HandoffTicket` 加 2 字段；新增 `SupportQualityLabel` |
+| 仓储 | `db/repositories/support.py`（新） | 队列（风险→等待时长排序）、详情、`assign/resolve/close` 状态机（`SELECT … FOR UPDATE`，非法转换抛 `InvalidTicketTransition`）、会话取证（要求授权工单）、质量标记 upsert |
+| 仓储 | `db/repositories/knowledge_admin.py` | `create_uploaded_document`、`edit_chunk`、`soft_delete_chunk`、`create_ingestion_job`、`load_ingest_target` |
+| 路由 | `api/support.py`（新）、`api/admin.py` | 5 个客服端点；上传/`PATCH`+`DELETE` chunk/`reindex` |
+| 装配 | `main.py` | 注册 support 路由与 OpenAPI tag；把已装配的 BGE-M3 实例复用给 `ingestion_runner` |
+| 解析复用 | `rag/ingest/pipeline.py`、`rag/ingest/worker.py`（新） | `ingest_source` 增加 4 个**可选**显式 id（默认 `None` → 行为不变），worker 用它重解析上传创建的同一版本 |
+| 错误码 | `core/errors.py`、`api/errors.py` | 补 `FILE_TOO_LARGE`(413)、`UNSUPPORTED_FILE_TYPE`(415)、`UNSAFE_FILE`(400) |
+| Schema | `api/schemas.py` | §12/§13 的请求/响应模型（`action` 与字段匹配校验、`text`/`is_enabled` 至少一项） |
+
+关键安全/边界决定：
+
+1. **权限沿用现有 code**，不新增：`support:ticket:read/write`、`support:conversation:read`、
+   `support:quality_label:write`。`admin` 默认不含这些 → 客服端点对 admin 返回 403（契约 §12 要求）。
+2. **会话取证必须有授权工单**：没有关联工单的会话一律 404，不提供"列出全部消费者会话"。
+3. **响应脱敏**：`user_reference_masked` / `assigned_to_masked` 取自 `users.display_name_masked`，
+   缺失时用 `user-****<id 后 2 位>`；消息正文再过一遍 `mask_pii()`；不返回系统 prompt、堆栈、密钥。
+4. **写操作全部审计**：`support.ticket.assign/resolve/close`、`support.quality_label.write`、
+   `admin.document.upload`、`admin.chunk.update/disable`、`admin.document.reindex` 各写一条 `audit_events`。
+5. **上传门禁**：扩展名白名单（PDF/DOCX/PPTX/MD/TXT）、20 MiB 上限、魔数校验
+   （`%PDF-` / `PK\x03\x04`）、文本必须 UTF-8 且无 NUL、文件名拒绝 `..` 与路径分隔符、落盘重命名。
+6. **解析语义如实**：上传/重建索引只落 `queued` 的 `ingestion_jobs` + `parse_status=pending`。
+   进程装配了 BGE-M3 时由 `ingestion_runner` 在后台调用 `ingest_source` 解析；未装配（CI、无权重机）
+   时 job 保持 `queued`——不写成"已解析"。
+
+实测（本节命令均在改动后实际执行）：
+
+```text
+uv run alembic upgrade head
+  -> Running upgrade 20261019_0004 -> 20261020_0005      当前 = 20261020_0005 (head)
+information_schema 核对
+  -> handoff_tickets 新增列 = close_reason / resolution_summary
+  -> support_quality_labels 表存在 = 1
+
+uv run pytest tests/integration/test_support_api.py -q          -> 13 passed
+uv run pytest tests/integration/test_ingest_worker.py -q        -> 1 passed
+uv run pytest tests/unit/test_support_contract.py -q            -> 14 passed
+```
+
+覆盖的验收点：队列字段与 §12 逐字一致；消费者/admin/匿名分别 403/403/401；跨店工单 404 且与
+"不存在"完全同构；`resolve` 从 `open` 触发 `409 INVALID_STATE`；`resolve` 缺 summary 为 `400`；
+跨店 assignee `403`；会话取证 200 且正文无完整手机号、`admin` 403；质量标记越权 404、同客服重复标记
+只保留一条；上传 202 + `pending` + job `queued` + 出现在列表；伪造 PDF 415、路径穿越 400；
+chunk 编辑 `reindex_required=true` 且 hash 变化、软删后 `is_enabled=false`。
+
+### 24.4 W3 · 修 `NO_EVIDENCE` fail-open
+
+`rag/policy_qa.py` 新增 `sentinel_of()`：剥离 `[cN]` 标签 → 去首尾空白 → 去句末标点 → 忽略大小写比对；
+`answer()` 与 `citation_label_issues()` 都改用它。**归一步骤放在标签校验之前**，否则
+`CONFLICT [c1][c2]` 会先报 `unknown_citation:c2` 而掩盖"模型其实拒绝了"。
+
+```text
+uv run pytest tests/unit -k sentinel -q   -> 10 passed
+```
+
+`tests/unit/test_policy_sentinel.py` 覆盖 5 类输入：`NO_EVIDENCE`→refused、`NO_EVIDENCE [c1]`→refused、
+`conflict。`→handoff、`NO_EVIDENCE[c1].`→refused、正常带标签答案→answered（不误伤），
+另有一条"金额承诺仍被拦截"防止过度归一化。**未重跑全量评测**，历史数字仍对应修复前行为，
+`docs/eval-report.md` §2.9.0 已加"已修（阶段 16）"注记与口径声明。
+
+### 24.5 W4 · 门禁与烟测
+
+```text
+uv run ruff check .                                  -> All checks passed!
+uv run pytest -q                                     -> 638 passed, 2 skipped（两次全量复跑：143.92s / 139.30s）
+uv run python scripts/verify_stage13.py              -> 全部一致（0 不一致项），exit 0
+uv run python scripts/check_deploy_security.py       -> 34 PASS / 0 WARN / 0 FAIL，exit 0
+cd frontend && npm run typecheck                     -> 0 错误（前端本轮零改动）
+```
+
+测试增量（600 → 638，**+38，无删除、无新增 skip**）：`tests/unit/test_support_contract.py` 14 条、
+`tests/integration/test_support_api.py` 13 条、`tests/integration/test_ingest_worker.py` 1 条、
+`tests/unit/test_policy_sentinel.py` 10 条。两条既有断言随 schema 变化同步更新（非放宽）：
+`test_migrations.py` 的 head → `20261020_0005`，`test_openapi_contract.py` 的路径/操作数 30→36、34→43、
+需要 401/403 的操作 26→35。
+
+`docs/09-release-checklist.md` §7 逐条（本轮只做到"能证明的"）：
+
+| # | 结果 | 说明 |
+|---|---|---|
+| 7.1 注册 / 7.2 登录 | 未验证（UI） | 代码路径由 `tests/integration/test_api_flow.py` 覆盖，本轮未开浏览器 |
+| 7.3 商品搜索 / 7.4 比较 / 7.5 政策问答 / 7.6 无证据拒答 | 未验证 | 需 BGE-M3 + LLM；本轮不启停容器 |
+| 7.7 订单 / 7.8 越权 / 7.9 退货 / 7.10 幂等 / 7.11 转人工 | 未验证（UI） | 同上；API 层由既有集成测试覆盖 |
+| 7.12 多会话 | 通过（API 层） | `GET /api/v1/conversations` → 200 |
+| 7.13 管理端 | 通过（API 层） | 文档 21 条、知识库 3 条；上传/片段编辑由集成测试证明（202 + `pending`） |
+| 7.14 客服端 | 通过（API 层） | 队列 20 条；消费者 403；admin 403 |
+
+烟测脚本：`scripts/smoke_stage16.py`（进程内 ASGI + 真实开发库，未启停容器，只读）。
+
+### 24.6 仍剩什么
+
+- **未在全新主机按 README 从零复核**（`docs/09` §0–§6 全链路）：本轮沿用既有开发栈，未重建环境。
+- **Milvus 三卷未做端到端恢复演练**：清卷属破坏性操作，仍需单独授权。
+- **官方 `ragas` 包未运行**：报告里的 faithfulness/relevancy 是自建 LLM-as-judge 代理。
+- **上传后的解析只在"有 BGE-M3 的进程"里发生**：CI/无权重机只验证到 `queued`；
+  `ingestion_runner` 在真实模型下的端到端入库未在本轮实测（`test_ingest_worker.py` 用 fake embedder 证明 id 复用与状态流转）。
+- **7.1–7.11 的浏览器端烟测未重跑**（如上表），依赖既有 e2e 与阶段 13 评测记录。
+- `docs/eval-report.md` §2.9.1 的其余失败项（意图路由兜底、商品对比名称解析、
+  `PRODUCT_FACT` 工具分派、退货 `order_item_id`）**未修**，仍按原文记录。
+
+### 24.7 结论
+
+W1–W4 全部完成：仓库有了基线（2 个 commit）、客服工作台与管理端写接口闭环（含迁移、审计、脱敏、
+状态机与上传门禁）、唯一的安全类 fail-open 已修并有回归测试、门禁全绿且测试只增不减。
+
+阶段 16 **完成**，项目可以进入最终演示/交付。§24.6 的 5 项属"需要单独授权的破坏性演练"
+或"未重跑的 UI 烟测"，不构成阻断。
+
+### 24.8 回答模型接入 DeepSeek + 提示词格式约束（2026-10-20 下午）
+
+**背景**：`.env` 配置 `LLM_BASE_URL=https://api.deepseek.com`、`LLM_MODEL=deepseek-v4-flash`
+后，DeepSeek 调用本身 **200 OK**、检索正常（8 条引用），但政策答案被引用校验判为
+`uncited_claim`，用户侧只看到"已转人工"。
+
+**根因（与模型厂商无关，任何模型都可能触发）**：`citation_label_issues()` 用
+`(?<=[。！？；\n])` 切句，**分号也算句子边界**。模型习惯写「甲；乙 [c1]。」，
+切出的「甲；」没有引用 → 整条答案作废。阶段 13 的 4 条 `uncited_claim` 同源。
+
+**处置**：只改 `SYSTEM_PROMPT` 的格式约束（业务规则与校验阈值均未动）：
+
+- 第 9 条扩写为禁止 Markdown（`**`/`#`/`-`/表格）；
+- 新增第 10 条：只输出自然段落，不要标题行、不要「一、二、三」/「1. 2. 3.」分节；
+- 新增第 11 条：**禁止用分号连接分句**，每个分句单独成句、各自在句号前标 `[cN]`。
+
+**实测**（`deepseek-v4-flash`，同一问题"七天无理由怎么退？"）：
+
+```text
+修复前：assistant 内容 35 字 = "这次生成的回答无法逐条对应到知识库引用…"，引用 8 条但正文被丢弃
+修复后：assistant 内容 507 字，引用 c1–c5，逐句带标签，结构自然（结论 → 操作 → 退款 → 大促）
+```
+
+**口径影响**：历史评测（阶段 13）是在旧提示词下跑的，与本次格式约束**不可直接对比**；
+本轮未重跑评测，`scripts/verify_stage13.py` 仍对应旧结果（exit 0，未改动）。
+
+**回退**：`.workbuddy/backup/prompt-20261020-1620/policy_qa.py.bak`，
+或 `git checkout -- src/shopmate_ecommerce_assistant/rag/policy_qa.py`（注意该文件在本轮
+还包含 W3 的 `sentinel_of()` 修复，回退会一并丢掉）。

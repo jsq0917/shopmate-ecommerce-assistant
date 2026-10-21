@@ -1,0 +1,115 @@
+/* ShopMate 全局样式：浅色主题、中文排版、移动端优先的响应式基础。 */
+
+:root {
+  --sm-primary: #1f7a5c;
+  --sm-primary-dark: #175f47;
+  --sm-bg: #f4f7f5;
+  --sm-surface: #ffffff;
+  --sm-border: #d9e2dc;
+  --sm-text: #1c2b25;
+  --sm-text-secondary: #5c6f66;
+  --sm-danger: #c0392b;
+  --sm-warning: #b26a00;
+  --sm-warning-bg: #fdf3e3;
+  --sm-radius: 10px;
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--sm-bg);
+  color: var(--sm-text);
+  font-family: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+a {
+  color: var(--sm-primary);
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--sm-primary);
+  outline-offset: 1px;
+}
+
+.sm-page {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.sm-card {
+  background: var(--sm-surface);
+  border: 1px solid var(--sm-border);
+  border-radius: var(--sm-radius);
+  padding: 16px;
+}
+
+.sm-muted {
+  color: var(--sm-text-secondary);
+  font-size: 12px;
+}
+
+.sm-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+/* 通用布局工具类 */
+.sm-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sm-row-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sm-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sm-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sm-grow {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  .sm-page {
+    padding: 12px;
+  }
+
+  .sm-card {
+    padding: 12px;
+  }
+}

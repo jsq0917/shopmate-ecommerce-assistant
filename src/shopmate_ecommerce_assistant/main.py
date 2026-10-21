@@ -21,6 +21,7 @@ from shopmate_ecommerce_assistant.api import (
     handoff,
     orders,
     returns,
+    support,
     system,
 )
 from shopmate_ecommerce_assistant.api.envelope import ErrorEnvelope
@@ -52,11 +53,14 @@ _OPENAPI_TAGS = [
     {"name": "orders", "description": "订单列表、详情与物流。"},
     {"name": "returns", "description": "退货资格检查与退货申请。"},
     {"name": "handoff", "description": "人工工单（消费者侧）。"},
-    {"name": "admin", "description": "管理端知识库、文档、chunk 与评测骨架。"},
+    {"name": "admin", "description": "管理端知识库、文档上传、chunk 编辑与评测。"},
+    {"name": "support", "description": "客服工作台：工单队列、会话取证、状态流转与质量标记。"},
 ]
 
 
-def _build_policy_factory(settings: Settings) -> tuple[Callable[[Any], Any], Any] | None:
+def _build_policy_factory(
+    settings: Settings,
+) -> tuple[Callable[[Any], Any], Any, Any] | None:
     """Wire the stage-7 retriever into a per-request ``PolicyQAService`` factory.
 
     The expensive singletons (BGE-M3 provider, Milvus client, answer model) are built once
@@ -67,7 +71,9 @@ def _build_policy_factory(settings: Settings) -> tuple[Callable[[Any], Any], Any
     and degrades the chat path to its fixed "知识库暂不可用" answer instead of crashing.
 
     Returns:
-        ``(build_policy, milvus_store)`` or ``None`` when wiring failed.
+        ``(build_policy, milvus_store, embedder)`` or ``None`` when wiring failed. The
+        embedder is returned so the admin ingestion runner reuses one BGE-M3 instance
+        instead of loading a second copy of the weights.
     """
     # Imported lazily so importing the app never pulls torch / FlagEmbedding / pymilvus.
     from shopmate_ecommerce_assistant.rag.embeddings import get_bge_m3_provider
@@ -95,7 +101,45 @@ def _build_policy_factory(settings: Settings) -> tuple[Callable[[Any], Any], Any
         )
         return PolicyQAService(retriever=retriever, answer_model=answer_model, settings=settings)
 
-    return build, store
+    return build, store, provider
+
+
+def _build_ingestion_runner(
+    *,
+    settings: Settings,
+    embedder: Any,
+    store: Any,
+    session_factory: Any,
+) -> Callable[[Any], Any]:
+    """Return a background task that re-parses one queued knowledge version.
+
+    Only built when the RAG wiring succeeded, i.e. when this process can actually load
+    BGE-M3. Without it the admin upload/reindex endpoints leave the job ``queued`` — the
+    durable record that a worker still has to pick it up — instead of claiming success.
+    """
+
+    async def run(version_id: Any) -> None:
+        from shopmate_ecommerce_assistant.rag.ingest.worker import run_ingestion_job
+
+        try:
+            outcome = await run_ingestion_job(
+                session_factory=session_factory,
+                settings=settings,
+                embedder=embedder,
+                store=store,
+                version_id=version_id,
+            )
+        except Exception:
+            logger.exception("knowledge ingestion job failed for version %s", version_id)
+            return
+        if outcome is not None:
+            logger.info(
+                "knowledge version %s ingestion finished with status %s",
+                version_id,
+                outcome.status,
+            )
+
+    return run
 
 
 def _install_contract_openapi(app: FastAPI) -> None:
@@ -197,8 +241,15 @@ def create_app(
         app.state.policy = None
         app.state.policy_store = None
         wiring = _build_policy_factory(resolved_settings)
+        app.state.ingestion_runner = None
         if wiring is not None:
-            app.state.policy_factory, app.state.policy_store = wiring
+            app.state.policy_factory, app.state.policy_store, embedder = wiring
+            app.state.ingestion_runner = _build_ingestion_runner(
+                settings=resolved_settings,
+                embedder=embedder,
+                store=app.state.policy_store,
+                session_factory=app.state.session_factory,
+            )
         else:
             app.state.policy_factory = None
         app.state.readiness_checker = readiness_checker or InfrastructureReadinessChecker(
@@ -261,6 +312,7 @@ def create_app(
     app.include_router(returns.router)
     app.include_router(handoff.router)
     app.include_router(admin.router)
+    app.include_router(support.router)
     return app
 
 

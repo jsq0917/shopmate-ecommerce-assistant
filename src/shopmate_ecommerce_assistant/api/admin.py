@@ -7,10 +7,25 @@ pipeline remains the stage 5/7 ingestion path.
 
 from __future__ import annotations
 
+import hashlib
+import logging
+import re
+from datetime import UTC, datetime
+from pathlib import Path, PurePosixPath
 from typing import Annotated
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    Query,
+    Request,
+    UploadFile,
+    status,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shopmate_ecommerce_assistant.api.deps import get_request_ids, get_session, require_role
@@ -18,6 +33,8 @@ from shopmate_ecommerce_assistant.api.envelope import Envelope
 from shopmate_ecommerce_assistant.api.schemas import (
     ChunkListData,
     ChunkListItem,
+    ChunkPatchData,
+    ChunkPatchRequest,
     CreateEvalRunData,
     CreateEvalRunRequest,
     CreateKnowledgeBaseRequest,
@@ -29,14 +46,133 @@ from shopmate_ecommerce_assistant.api.schemas import (
     KnowledgeBaseListData,
     ModelProfileItem,
     ModelProfileListData,
+    ReindexData,
+    UploadDocumentData,
 )
+from shopmate_ecommerce_assistant.core import paths
+from shopmate_ecommerce_assistant.core.errors import ErrorCode, ToolError
 from shopmate_ecommerce_assistant.core.security import AccessContext
-from shopmate_ecommerce_assistant.db.models.enums import UserRole
+from shopmate_ecommerce_assistant.db.models.enums import KnowledgeDocType, UserRole
+from shopmate_ecommerce_assistant.db.repositories.audit import AuditRepository
 from shopmate_ecommerce_assistant.db.repositories.knowledge_admin import KnowledgeAdminRepository
+from shopmate_ecommerce_assistant.domain.audit.models import AuditEventRecord
+from shopmate_ecommerce_assistant.rag.ingest.loaders import SUPPORTED_SUFFIXES
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
 Admin = Annotated[AccessContext, Depends(require_role(UserRole.ADMIN))]
+
+_LOCALE = re.compile(r"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$")
+_REGION = re.compile(r"^[A-Z]{2}$")
+_UNSAFE_NAME = re.compile(r"[\\/]|\.\.")
+
+
+def _read_upload_limit() -> int:
+    from shopmate_ecommerce_assistant.core.config import get_settings
+
+    return get_settings().knowledge_upload_max_bytes
+
+
+def _magic_ok(suffix: str, head: bytes) -> bool:
+    """Return True when the first bytes match the declared container format."""
+    if suffix == ".pdf":
+        return head.startswith(b"%PDF-")
+    if suffix in {".docx", ".pptx"}:
+        return head.startswith(b"PK\x03\x04")
+    return True  # markdown/plain text is validated by decoding, not by magic
+
+
+async def _read_limited(upload: UploadFile, *, limit: int, suffix: str) -> bytes:
+    """Read at most ``limit`` bytes, rejecting oversize or non-text payloads."""
+    chunks: list[bytes] = []
+    total = 0
+    head = b""
+    while True:
+        chunk = await upload.read(64 * 1024)
+        if not chunk:
+            break
+        if not head:
+            head = chunk[:8]
+            if not _magic_ok(suffix, head):
+                raise ToolError(
+                    ErrorCode.UNSUPPORTED_FILE_TYPE, "文件实际格式与扩展名不符，已拒绝上传。"
+                )
+        total += len(chunk)
+        if total > limit:
+            raise ToolError(
+                ErrorCode.FILE_TOO_LARGE,
+                f"文件超过 {limit // (1024 * 1024)} MiB 上限。",
+            )
+        chunks.append(chunk)
+    payload = b"".join(chunks)
+    if not payload:
+        raise ToolError(ErrorCode.VALIDATION_ERROR, "上传文件为空。")
+    if suffix in {".md", ".markdown", ".txt"}:
+        if b"\x00" in payload:
+            raise ToolError(ErrorCode.UNSUPPORTED_FILE_TYPE, "文本文件包含二进制内容。")
+        try:
+            payload.decode("utf-8-sig")
+        except UnicodeDecodeError as exc:
+            raise ToolError(
+                ErrorCode.UNSUPPORTED_FILE_TYPE, "文本文件不是 UTF-8 编码。"
+            ) from exc
+    return payload
+
+
+def _safe_suffix(filename: str) -> str:
+    if not filename or _UNSAFE_NAME.search(filename):
+        raise ToolError(ErrorCode.UNSAFE_FILE, "文件名不安全，已拒绝上传。")
+    suffix = PurePosixPath(filename).suffix.lower()
+    if suffix not in SUPPORTED_SUFFIXES:
+        raise ToolError(
+            ErrorCode.UNSUPPORTED_FILE_TYPE,
+            "仅支持 PDF、DOCX、PPTX、Markdown、TXT。",
+        )
+    return suffix
+
+
+async def _audit(
+    session: AsyncSession,
+    *,
+    context: AccessContext,
+    action: str,
+    resource_type: str,
+    resource_id: UUID,
+    request_id: UUID,
+    trace_id: UUID,
+    metadata: dict[str, object],
+) -> None:
+    await AuditRepository(session).record_event(
+        AuditEventRecord(
+            id=uuid4(),
+            shop_id=context.shop_id,
+            actor_user_id=context.user_id,
+            actor_role=context.role.value,
+            action=action,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            request_id=request_id,
+            trace_id=trace_id,
+            outcome="succeeded",
+            metadata=metadata,
+        )
+    )
+
+
+async def _invalidate_faq_cache(request: Request, shop_id: UUID) -> None:
+    """Best-effort FAQ cache invalidation after a chunk edit (contract §13)."""
+    redis = getattr(request.app.state, "redis", None)
+    if redis is None:
+        return
+    from shopmate_ecommerce_assistant.rag.faq import FaqAnswerCache, RedisCacheBackend
+
+    try:
+        await FaqAnswerCache(RedisCacheBackend(redis)).invalidate_shop(str(shop_id))
+    except Exception:
+        logger.warning("FAQ cache invalidation failed after chunk edit")
+
 
 
 @router.get("/knowledge-bases", response_model=Envelope[KnowledgeBaseListData])
@@ -248,8 +384,262 @@ async def model_profiles(
     )
 
 
-def _doc_item(row) -> DocumentListItem:
-    return DocumentListItem(
+def _parse_datetime(value: str, field: str) -> datetime:
+    """Parse a UTC ISO 8601 form field, tolerating a trailing ``Z``."""
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ToolError(ErrorCode.VALIDATION_ERROR, f"{field} 不是合法的 ISO 8601 时间。") from exc
+    return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
+
+
+def _schedule_ingestion(request: Request, background: BackgroundTasks, version_id: UUID) -> bool:
+    """Queue the ingestion worker when this process can load BGE-M3.
+
+    A process whose RAG wiring failed (CI, unit tests, a machine without the weights)
+    leaves the job ``queued`` rather than pretending to parse it; the job row is the
+    durable record that a worker still has to pick up.
+    """
+    runner = getattr(request.app.state, "ingestion_runner", None)
+    if runner is None:
+        return False
+    background.add_task(runner, version_id)
+    return True
+
+
+@router.post(
+    "/documents",
+    response_model=Envelope[UploadDocumentData],
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def upload_document(
+    request: Request,
+    context: Admin,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    background: BackgroundTasks,
+    knowledge_base_id: Annotated[UUID, Form()],
+    title: Annotated[str, Form(min_length=1, max_length=240)],
+    doc_type: Annotated[str, Form()],
+    locale: Annotated[str, Form()],
+    region: Annotated[str, Form()],
+    effective_from: Annotated[str, Form()],
+    file: Annotated[UploadFile, File()],
+    effective_to: Annotated[str | None, Form()] = None,
+) -> Envelope[UploadDocumentData]:
+    """Validate an upload, store it under the controlled directory and queue a version."""
+    repo = KnowledgeAdminRepository(session)
+    knowledge_base = await repo.get_knowledge_base(
+        shop_id=context.shop_id, kb_id=knowledge_base_id
+    )
+    if knowledge_base is None:
+        raise ToolError(ErrorCode.VALIDATION_ERROR, "知识库不存在或不属于当前店铺。")
+    if doc_type not in {item.value for item in KnowledgeDocType}:
+        raise ToolError(ErrorCode.VALIDATION_ERROR, "doc_type 不在允许的取值内。")
+    if not _LOCALE.match(locale) or not _REGION.match(region):
+        raise ToolError(ErrorCode.VALIDATION_ERROR, "locale 或 region 格式不合法。")
+
+    start = _parse_datetime(effective_from, "effective_from")
+    end = None if not effective_to else _parse_datetime(effective_to, "effective_to")
+    if end is not None and end <= start:
+        raise ToolError(ErrorCode.VALIDATION_ERROR, "effective_to 必须晚于 effective_from。")
+
+    suffix = _safe_suffix(file.filename or "")
+    payload = await _read_limited(file, limit=_read_upload_limit(), suffix=suffix)
+
+    unique = uuid4().hex
+    relative = f"uploads/{context.shop_id}/{unique}{suffix}"
+    target = Path(paths.KNOWLEDGE_DIR) / relative
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(payload)
+
+    try:
+        row = await repo.create_uploaded_document(
+            shop_id=context.shop_id,
+            knowledge_base=knowledge_base,
+            document_key=f"upload-{unique}",
+            title=title.strip(),
+            doc_type=doc_type,
+            locale=locale,
+            region=region,
+            effective_from=start,
+            effective_to=end,
+            source_uri=relative,
+            filename=f"{unique}{suffix}",
+            mime_type=SUPPORTED_SUFFIXES[suffix],
+            content_hash=hashlib.sha256(payload).digest(),
+            created_by=context.user_id,
+        )
+    except Exception:
+        target.unlink(missing_ok=True)
+        raise
+
+    scheduled = _schedule_ingestion(request, background, row.version_id)
+    request_id, trace_id = get_request_ids(request)
+    await _audit(
+        session,
+        context=context,
+        action="admin.document.upload",
+        resource_type="knowledge_document",
+        resource_id=row.document_id,
+        request_id=request_id,
+        trace_id=trace_id,
+        metadata={
+            "version_id": str(row.version_id),
+            "doc_type": doc_type,
+            "size_bytes": len(payload),
+            "ingestion_scheduled": scheduled,
+        },
+    )
+    return Envelope(
+        data=UploadDocumentData(
+            document_id=row.document_id,
+            version_id=row.version_id,
+            ingestion_job_id=row.ingestion_job_id,
+            parse_status=row.parse_status,
+        ),
+        request_id=request_id,
+        trace_id=trace_id,
+    )
+
+
+@router.patch("/chunks/{chunk_id}", response_model=Envelope[ChunkPatchData])
+async def patch_chunk(
+    chunk_id: UUID,
+    body: ChunkPatchRequest,
+    request: Request,
+    context: Admin,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> Envelope[ChunkPatchData]:
+    """Edit a chunk, recompute its hash, invalidate cache and demand a reindex."""
+    repo = KnowledgeAdminRepository(session)
+    row = await repo.edit_chunk(
+        shop_id=context.shop_id,
+        chunk_id=chunk_id,
+        text=body.text,
+        is_enabled=body.is_enabled,
+        change_reason=body.change_reason,
+    )
+    if row is None:
+        raise ToolError(ErrorCode.VALIDATION_ERROR, "未找到可编辑的知识单元。")
+    await _invalidate_faq_cache(request, context.shop_id)
+    request_id, trace_id = get_request_ids(request)
+    await _audit(
+        session,
+        context=context,
+        action="admin.chunk.update",
+        resource_type="knowledge_chunk",
+        resource_id=row.chunk_id,
+        request_id=request_id,
+        trace_id=trace_id,
+        metadata={
+            "version_id": str(row.version_id),
+            "text_changed": body.text is not None,
+            "is_enabled": row.is_enabled,
+            "reindex_required": row.reindex_required,
+        },
+    )
+    return Envelope(
+        data=ChunkPatchData(
+            chunk_id=row.chunk_id,
+            version_id=row.version_id,
+            text=row.text,
+            is_enabled=row.is_enabled,
+            content_hash=row.content_hash,
+            reindex_required=row.reindex_required,
+            updated_at=row.updated_at,
+        ),
+        request_id=request_id,
+        trace_id=trace_id,
+    )
+
+
+@router.delete("/chunks/{chunk_id}", response_model=Envelope[ChunkPatchData])
+async def disable_chunk(
+    chunk_id: UUID,
+    request: Request,
+    context: Admin,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> Envelope[ChunkPatchData]:
+    """Stop a chunk from being retrieved (soft delete) and demand a reindex."""
+    repo = KnowledgeAdminRepository(session)
+    row = await repo.soft_delete_chunk(shop_id=context.shop_id, chunk_id=chunk_id)
+    if row is None:
+        raise ToolError(ErrorCode.VALIDATION_ERROR, "未找到可停用的知识单元。")
+    await _invalidate_faq_cache(request, context.shop_id)
+    request_id, trace_id = get_request_ids(request)
+    await _audit(
+        session,
+        context=context,
+        action="admin.chunk.disable",
+        resource_type="knowledge_chunk",
+        resource_id=row.chunk_id,
+        request_id=request_id,
+        trace_id=trace_id,
+        metadata={"version_id": str(row.version_id)},
+    )
+    return Envelope(
+        data=ChunkPatchData(
+            chunk_id=row.chunk_id,
+            version_id=row.version_id,
+            text=row.text,
+            is_enabled=row.is_enabled,
+            content_hash=row.content_hash,
+            reindex_required=row.reindex_required,
+            updated_at=row.updated_at,
+        ),
+        request_id=request_id,
+        trace_id=trace_id,
+    )
+
+
+@router.post(
+    "/documents/{document_id}/reindex",
+    response_model=Envelope[ReindexData],
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def reindex_document(
+    document_id: UUID,
+    request: Request,
+    context: Admin,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    background: BackgroundTasks,
+) -> Envelope[ReindexData]:
+    """Queue a fresh ingestion attempt for the document's current version."""
+    repo = KnowledgeAdminRepository(session)
+    document = await repo.get_document(shop_id=context.shop_id, document_id=document_id)
+    if document is None:
+        raise ToolError(ErrorCode.VALIDATION_ERROR, "未找到该文档。")
+    if document.current_version_id is None:
+        raise ToolError(ErrorCode.INVALID_STATE, "该文档还没有可重建的版本。")
+    job_id = await repo.create_ingestion_job(
+        shop_id=context.shop_id, version_id=document.current_version_id
+    )
+    if job_id is None:
+        raise ToolError(ErrorCode.VALIDATION_ERROR, "未找到该文档的版本记录。")
+    scheduled = _schedule_ingestion(request, background, document.current_version_id)
+    request_id, trace_id = get_request_ids(request)
+    await _audit(
+        session,
+        context=context,
+        action="admin.document.reindex",
+        resource_type="knowledge_document",
+        resource_id=document_id,
+        request_id=request_id,
+        trace_id=trace_id,
+        metadata={
+            "version_id": str(document.current_version_id),
+            "ingestion_job_id": str(job_id),
+            "ingestion_scheduled": scheduled,
+        },
+    )
+    return Envelope(
+        data=ReindexData(ingestion_job_id=job_id, status="queued"),
+        request_id=request_id,
+        trace_id=trace_id,
+    )
+
+
+def _doc_item(row) -> DocumentListItem:    return DocumentListItem(
         document_id=row.document_id,
         title=row.title,
         doc_type=row.doc_type,

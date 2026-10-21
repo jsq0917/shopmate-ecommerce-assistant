@@ -36,6 +36,10 @@ class ErrorCode(StrEnum):
     UPSTREAM_UNAVAILABLE = "UPSTREAM_UNAVAILABLE"
     RATE_LIMITED = "RATE_LIMITED"
     INTERNAL_ERROR = "INTERNAL_ERROR"
+    # Upload protocol codes (docs/06-api.md §14, stage 16 admin upload).
+    FILE_TOO_LARGE = "FILE_TOO_LARGE"
+    UNSUPPORTED_FILE_TYPE = "UNSUPPORTED_FILE_TYPE"
+    UNSAFE_FILE = "UNSAFE_FILE"
 
 
 #: Error codes the contract (``docs/05-tool-contract.md`` §4) marks retryable.

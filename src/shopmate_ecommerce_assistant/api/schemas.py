@@ -434,9 +434,141 @@ class CreateHandoffData(BaseModel):
     idempotent_replay: bool = False
 
 
+# -- support workbench (docs/06-api.md §12) -----------------------------
+
+
+class SupportTicketItem(BaseModel):
+    ticket_id: UUID
+    status: str
+    risk_level: str
+    primary_reason_code: str
+    reason_codes: list[str]
+    priority: int
+    queue: str
+    conversation_id: UUID
+    user_reference_masked: str
+    assigned_to_masked: str | None
+    created_at: datetime
+    waiting_seconds: int
+
+
+class SupportTicketListData(BaseModel):
+    items: list[SupportTicketItem]
+    next_offset: int | None = None
+
+
+class SupportTicketDetail(BaseModel):
+    ticket_id: UUID
+    status: str
+    risk_level: str
+    primary_reason_code: str
+    reason_codes: list[str]
+    priority: int
+    queue: str
+    conversation_id: UUID
+    user_reference_masked: str
+    assigned_to_masked: str | None
+    created_at: datetime
+    updated_at: datetime
+    waiting_seconds: int
+    summary_redacted: str
+    expected_response: str
+
+
+class SupportTicketPatchRequest(_Strict):
+    """``assign`` / ``resolve`` / ``close`` with action-matched optional fields."""
+
+    action: Literal["assign", "resolve", "close"]
+    assignee_user_id: UUID | None = None
+    resolution_summary: str | None = Field(default=None, max_length=500)
+    close_reason: str | None = Field(default=None, max_length=240)
+
+    @model_validator(mode="after")
+    def _match_action(self) -> SupportTicketPatchRequest:
+        if self.action == "assign":
+            if self.resolution_summary is not None or self.close_reason is not None:
+                raise ValueError("assign 不允许携带 resolution_summary/close_reason")
+            return self
+        if self.assignee_user_id is not None:
+            raise ValueError("只有 assign 可以指定 assignee_user_id")
+        if self.action == "resolve":
+            summary = (self.resolution_summary or "").strip()
+            if not summary:
+                raise ValueError("resolve 必须提供 resolution_summary")
+            if self.close_reason is not None:
+                raise ValueError("resolve 不允许携带 close_reason")
+            self.resolution_summary = summary
+            return self
+        if self.action == "close":
+            if self.resolution_summary is not None:
+                raise ValueError("close 不允许携带 resolution_summary")
+            if self.close_reason is not None:
+                self.close_reason = self.close_reason.strip() or None
+        return self
+
+
+class SupportTicketPatchData(BaseModel):
+    ticket_id: UUID
+    status: str
+    assigned_to_masked: str | None
+    updated_at: datetime
+    request_id: UUID
+
+
+class SupportConversationMessageItem(BaseModel):
+    message_id: UUID
+    role: str
+    content: str
+    is_complete: bool
+    citations: list[Any]
+    risk: dict[str, Any]
+    created_at: datetime
+
+
+class SupportToolCallItem(BaseModel):
+    tool_call_id: UUID
+    tool_name: str
+    status: str
+    latency_ms: int
+    result_summary: dict[str, Any]
+
+
+class SupportHandoffSummary(BaseModel):
+    ticket_id: UUID
+    status: str
+    primary_reason_code: str
+
+
+class SupportConversationData(BaseModel):
+    conversation_id: UUID
+    title: str
+    owner_reference_masked: str
+    target_user_id: UUID
+    ticket_id: UUID
+    messages: list[SupportConversationMessageItem]
+    tool_calls: list[SupportToolCallItem]
+    handoff: SupportHandoffSummary | None = None
+
+
+class QualityLabelRequest(_Strict):
+    label: Literal["correct", "incorrect", "needs_knowledge"]
+    reason_summary: str | None = Field(default=None, max_length=240)
+
+    @field_validator("reason_summary")
+    @classmethod
+    def _reason(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        return stripped or None
+
+
+class QualityLabelData(BaseModel):
+    message_id: UUID
+    label: str
+
+
 # -- admin --------------------------------------------------------------
-
-
 class KnowledgeBaseItem(BaseModel):
     id: UUID
     name: str
@@ -545,6 +677,45 @@ class ModelProfileItem(BaseModel):
 
 class ModelProfileListData(BaseModel):
     items: list[ModelProfileItem]
+
+
+class UploadDocumentData(BaseModel):
+    document_id: UUID
+    version_id: UUID
+    ingestion_job_id: UUID
+    parse_status: str
+
+
+class ChunkPatchRequest(_Strict):
+    text: str | None = Field(default=None, min_length=1, max_length=20000)
+    is_enabled: bool | None = None
+    change_reason: str | None = Field(default=None, max_length=240)
+
+    @model_validator(mode="after")
+    def _at_least_one(self) -> ChunkPatchRequest:
+        if self.text is None and self.is_enabled is None:
+            raise ValueError("至少提供 text 或 is_enabled 之一")
+        if self.text is not None:
+            stripped = self.text.strip()
+            if not stripped:
+                raise ValueError("片段文本不能为空")
+            self.text = stripped
+        return self
+
+
+class ChunkPatchData(BaseModel):
+    chunk_id: UUID
+    version_id: UUID
+    text: str
+    is_enabled: bool
+    content_hash: str
+    reindex_required: bool
+    updated_at: datetime
+
+
+class ReindexData(BaseModel):
+    ingestion_job_id: UUID
+    status: str
 
 
 # -- system -------------------------------------------------------------

@@ -128,12 +128,13 @@ where id = '<上一步查到的 id>' and is_synthetic = true;"
 - [ ] **政策问答的期望值已按 7B 模型的实际能力校准**：本地 `qwen2.5:7b` 的可答用例应答率只有 **5/29（0.1724）**。
       现场若返回“证据不足”，按**已知的模型保守**解释（不是检索失败），并改为展示
       “检索命中 + 引用字段（文档/章节/版本/生效期/片段 ID）”，不要对同一问题反复追问。
-- [ ] **已知 fail-open 已记住**：若出现 `NO_EVIDENCE [c1]…` 被当作答案返回，属**已知缺陷**
-      （`rag/policy_qa.py` 的哨兵用精确相等判定，见 `docs/eval-report.md` §2.9.0），
-      现场**不要**把它解释成“系统会正确拒答”；如实说明这是已记录缺陷、修法与优先级已写进报告。
+- [ ] **fail-open 已在阶段 16 修复**：`rag/policy_qa.py` 的 `sentinel_of()` 会先剥离引用标签、
+      空白与句末标点再判定，`NO_EVIDENCE [c1]…` 现在走拒答。若仍看到哨兵被当答案返回，
+      说明跑的是旧进程，先重启 API；回归用例见 `tests/unit/test_policy_sentinel.py`。
+      （历史评测数字对应修复前行为，见 `docs/eval-report.md` §2.9.0。）
 - [ ] 已准备两个浏览器窗口：消费者（shopper）与后台（admin）。
 - [ ] 屏幕共享已关闭通知；终端字号 ≥ 16px。
-- [ ] 已知缺口已记住：客服工作台接口未实现（见 §5.6），不要现场点“工单队列”。
+- [ ] 客服工作台已可用（阶段 16）：用 `support01` 登录后再点“工单队列”；`admin01` 会 403（预期，admin 默认无 support 权限）。
 
 ---
 
@@ -215,19 +216,18 @@ docker exec -it shopmate-postgres-1 psql -U shopmate -d shopmate -c \
 
 1. 输入“我要投诉并起诉，要求立刻赔偿” → 风险标签 + 工单 ID。
 2. 说明工单是**幂等**创建的：相同请求不会产生第二条。
-3. **如实说明当前缺口**：客服工作台接口（`GET/PATCH /api/v1/support/*`）尚未注册，页面显示错误态；工单数据本身已入库，可用下列命令查看：
-
-```bash
-docker exec -it shopmate-postgres-1 psql -U shopmate -d shopmate -c \
-  "select id, status, risk_level, created_at from handoff_tickets order by created_at desc limit 3;"
-```
-
-4. 说明设计意图：客服端应看到引用、工具摘要与风险原因，但**不改变**当前知识版本；该能力已在契约（`docs/06-api.md` §12）中定义，属后续阶段实现。
+3. **切到客服视角**：用 `support01` 打开客服工作台 → 工单队列按风险与等待时长排序，
+   列表字段与 `docs/06-api.md` §12 一致（`risk_level` / `reason_codes` / `waiting_seconds` / 脱敏用户引用）。
+   打开详情可看到对话摘要、引用、工具调用摘要与风险标签；接手 → 解决 → 关闭的状态流转会写审计。
+4. 说明设计意图：客服端可以看到引用、工具摘要与风险原因，但**不改变**当前知识版本；
+   `admin` 默认没有 `support:conversation:read`，不能浏览消费者会话（实测 403）。
 
 ### 5.7 7:40–8:40 运营知识管理（只读 + 脚本入库）
 
-1. 用 `admin01` 打开管理端知识库页 → 知识库列表、文档版本、片段预览可加载（只读接口已实现）。
-2. 说明上传/重建索引按钮当前不可用（管理端写接口未实现），真实入库走 CLI：
+1. 用 `admin01` 打开管理端知识库页 → 知识库列表、文档版本、片段预览可加载。
+2. 上传一个小 `.md`（≤20 MiB）→ 返回 `202` + `parse_status=pending`；片段编辑返回
+   `reindex_required=true`（阶段 16 已实现）。解析需要 BGE-M3：演示机若未装配，job 会停在
+   `queued`，此时说明"入库由有权重的进程执行"，并仍可走 CLI：
 
 ```bash
 uv run python scripts/ingest.py --only return-policy-cn

@@ -8,7 +8,8 @@
 ## 阶段状态
 - 阶段 1–10：后端完成。阶段 11（前端）、12（测试/安全）、13（评测）、14（部署）、15（简历/面试材料）：均 PASS。
 - **阶段 16（收尾）：完成**（2026-10-20）。
-  - Git 基线 `f81159b` + `1bae45d`；**阶段 16 的 30 个文件未提交**（需所有者确认）。
+  - Git `f81159b` + `1bae45d` + `a7b9632`（阶段 16 的 43 个改动已提交，2026-10-21 经所有者确认）。
+  - **已推送 GitHub**：`origin` = `git@github.com:jsq0917/shopmate-ecommerce-assistant.git`，`main` 跟踪 `origin/main`，远程共 374 个文件。
   - 迁移 head `20261020_0005`（handoff 加 `resolution_summary`/`close_reason`；新表 `support_quality_labels`）。
   - 新增 `api/support.py`、`db/repositories/support.py`、`rag/ingest/worker.py`；admin 补上传 / chunk PATCH+DELETE / reindex。
   - 权限：客服端点用 `support:ticket:read|write` 等；**admin 默认无 `support:*` → 403**（契约要求）；会话取证须有授权工单，否则 404。

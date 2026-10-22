@@ -1747,3 +1747,59 @@ W1–W4 全部完成：仓库有了基线（2 个 commit）、客服工作台与
 **回退**：`.workbuddy/backup/prompt-20261020-1620/policy_qa.py.bak`，
 或 `git checkout -- src/shopmate_ecommerce_assistant/rag/policy_qa.py`（注意该文件在本轮
 还包含 W3 的 `sentinel_of()` 修复，回退会一并丢掉）。
+
+---
+
+## 25. 阶段 17：功能补齐与前端改版（2026-10-22）
+
+> 触发：用户反馈「界面不好看、对话答非所问且机械、转人工后无法处理、商品太少、没有下单/退款/退货」。
+> 范围：前端视觉与交互、对话质量、工单闭环、商品目录、自助交易。**未提交 git、未重启容器**。
+
+### 25.1 变更清单
+
+| 领域 | 变更 |
+| --- | --- |
+| 商品目录 | 30 → **62 个商品 / 104 个 SKU**，新增鞋服箱包、家居、厨电、个护、运动、宠物、食品等品类 |
+| 对话质量 | 预算解析（元→分）、品类同义词、多轮主题继承、品类过滤、**LLM 只在事实底稿上改写语气**（数字不新增、失败回退模板） |
+| 意图路由 | 新增 `purchase`、`refund_status`；`product_fact` 允许 `search_products`；修正「便宜点」被误判为资金决策 |
+| 退货 | 聊天里真实执行 `check_return_eligibility`（按订单号 + 商品名匹配 order_item），不再永远返回澄清 |
+| 下单/支付/取消 | `POST /orders`、`POST /orders/{id}/pay`、`POST /orders/{id}/cancel`；支付时行锁扣库存，取消回滚 |
+| 退款 | 新表 `refund_requests` + `POST/GET /refunds`；客服 `GET /support/refunds`、`POST /support/refunds/{id}/review` |
+| 工单闭环 | `POST /support/tickets/{id}/reply` 写回原会话；消费者聊天页 8 秒低频轮询看到「人工客服」回复 |
+| 卡片持久化 | `messages.cards_jsonb`（迁移 0007），重开历史会话仍能看到商品卡片 |
+| 前端 | 设计系统重写、登录页/聊天页/商品中心/订单/退款/客服台全部改版；新增结算页与「我的退款」 |
+| 演示数据 | `scripts/demo_orders.py`：2 天前签收订单（可演示退货）+ 待支付订单（可演示支付/取消） |
+| 稳健性 | 策略文档写入增加重试（Windows 文件锁导致的 `OSError 22`）；搜索注入噪声词过滤，全噪声查询返回空而非全量 |
+
+### 25.2 实测证据（2026-10-22）
+
+```text
+alembic upgrade head            → 20261020_0005 → 0006 → 0007 成功
+pytest (unit+integration+security, 独立库 shopmate_test)
+                                → 637 passed, 2 skipped, 1 error*
+                                → 该 error 为 Windows docx 文件锁；加写入重试后
+                                  tests/integration/test_api_security.py + test_seed_data.py
+                                  → 29 passed
+ruff check src tests scripts alembic → All checks passed
+frontend: vue-tsc --noEmit     → 0 errors
+frontend: vitest --run         → 123 passed (14 files)
+frontend: vite build           → built in 10.20s
+```
+
+\* 全量 637 passed 与阶段 16 的 638 相差 1：新增的 `test_api_security` 上传用例在文件锁下未执行；
+加写入重试后该文件 29 条全部通过。评测口径与数字**未改动**，`verify_stage13.py` 未重跑。
+
+### 25.3 端到端手测（本机 uvicorn :18003 + vite :5174）
+
+- 下单 → 支付 → 退款申请 → 客服审批 → 消费者看到 `approved` + 审核说明：通过
+- 客服工单回复 → 消费者会话内出现「人工客服」消息：通过
+- 聊天：「预算300以内的降噪耳机」返回 3 款耳机；「有没有便宜点的」继承上一轮主题按价格升序；
+  「订单 SM-2026-00901 能退吗」返回真实资格结论；「我的退款到哪了」返回本人退款
+- 截图见 `docs/screenshots/`（chat / products / order-detail / support）
+
+### 25.4 已知限制
+
+- 生产栈的 `shopmate-api` 容器仍在 `Restarting (255)`：镜像内缺少 `20261020_0005` 迁移文件，
+  需要重建镜像（`docker compose build api`）后才能启动；本轮按约定未启停/重建容器。
+- 退款审批只有「通过/拒绝」两步，没有打款重试、对账与退款单导出。
+- 聊天里的下单仍是引导到商品页，不在对话内直接创建订单（写操作需要显式确认，保持人机边界）。

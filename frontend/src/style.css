@@ -1,17 +1,55 @@
-/* ShopMate 全局样式：浅色主题、中文排版、移动端优先的响应式基础。 */
+/* ShopMate 全局样式：统一的浅色设计系统（电商蓝 + 珊瑚强调色）。 */
 
 :root {
-  --sm-primary: #1f7a5c;
-  --sm-primary-dark: #175f47;
-  --sm-bg: #f4f7f5;
+  /* 品牌 */
+  --sm-primary: #3b5bfd;
+  --sm-primary-dark: #2843d6;
+  --sm-primary-soft: #eef1ff;
+  --sm-accent: #ff6a3d;
+  --sm-accent-soft: #fff1ec;
+
+  /* 背景与表面 */
+  --sm-bg: #f5f6fb;
   --sm-surface: #ffffff;
-  --sm-border: #d9e2dc;
-  --sm-text: #1c2b25;
-  --sm-text-secondary: #5c6f66;
-  --sm-danger: #c0392b;
+  --sm-surface-2: #fafbff;
+  --sm-border: #e5e8f2;
+  --sm-border-strong: #d3d8e8;
+
+  /* 文本 */
+  --sm-text: #131a2b;
+  --sm-text-secondary: #5f6b85;
+  --sm-text-tertiary: #8b95ab;
+
+  /* 状态 */
+  --sm-danger: #e5484d;
+  --sm-danger-soft: #fdeeee;
   --sm-warning: #b26a00;
   --sm-warning-bg: #fdf3e3;
-  --sm-radius: 10px;
+  --sm-success: #12805c;
+  --sm-success-soft: #e8f6f0;
+
+  /* 形状与阴影 */
+  --sm-radius-sm: 8px;
+  --sm-radius: 14px;
+  --sm-radius-lg: 20px;
+  --sm-radius-pill: 999px;
+  --sm-shadow-xs: 0 1px 2px rgb(19 26 43 / 5%);
+  --sm-shadow-sm: 0 2px 8px rgb(19 26 43 / 6%);
+  --sm-shadow-md: 0 10px 28px rgb(19 26 43 / 8%);
+  --sm-shadow-lg: 0 20px 48px rgb(19 26 43 / 12%);
+  --sm-gradient: linear-gradient(135deg, #3b5bfd 0%, #6d5efc 55%, #9a6bff 100%);
+
+  /* Element Plus 主题覆盖 */
+  --el-color-primary: #3b5bfd;
+  --el-color-primary-light-3: #7489fe;
+  --el-color-primary-light-5: #9dacfe;
+  --el-color-primary-light-7: #c5ceff;
+  --el-color-primary-light-8: #d8deff;
+  --el-color-primary-light-9: #eef1ff;
+  --el-color-primary-dark-2: #2843d6;
+  --el-border-radius-base: 10px;
+  --el-font-family: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', system-ui, sans-serif;
+
   color-scheme: light;
 }
 
@@ -31,12 +69,17 @@ body {
   color: var(--sm-text);
   font-family: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', system-ui, sans-serif;
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
 }
 
 a {
   color: var(--sm-primary);
   text-decoration: none;
+}
+
+a:hover {
+  color: var(--sm-primary-dark);
 }
 
 button {
@@ -45,21 +88,86 @@ button {
 
 :focus-visible {
   outline: 2px solid var(--sm-primary);
-  outline-offset: 1px;
+  outline-offset: 2px;
+  border-radius: 6px;
 }
 
-.sm-page {
-  max-width: 1080px;
-  margin: 0 auto;
-  padding: 16px;
+/* 滚动条 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
+
+::-webkit-scrollbar-thumb {
+  background: #d7dcea;
+  border-radius: 8px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #c2c9dc;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---- 布局 ---------------------------------------------------------- */
+
+.sm-page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px 20px 56px;
+}
+
+.sm-page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.sm-page-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.sm-page-subtitle {
+  margin: 4px 0 0;
+  color: var(--sm-text-secondary);
+  font-size: 13px;
+}
+
+.sm-section-title {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+/* ---- 卡片 ---------------------------------------------------------- */
 
 .sm-card {
   background: var(--sm-surface);
   border: 1px solid var(--sm-border);
   border-radius: var(--sm-radius);
-  padding: 16px;
+  padding: 18px;
+  box-shadow: var(--sm-shadow-xs);
 }
+
+.sm-card-hover {
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+
+.sm-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--sm-shadow-md);
+  border-color: var(--sm-border-strong);
+}
+
+/* ---- 文本工具 ------------------------------------------------------ */
 
 .sm-muted {
   color: var(--sm-text-secondary);
@@ -71,7 +179,14 @@ button {
   font-size: 12px;
 }
 
-/* 通用布局工具类 */
+.sm-price {
+  color: var(--sm-accent);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- 布局工具类 ---------------------------------------------------- */
+
 .sm-row {
   display: flex;
   align-items: center;
@@ -104,12 +219,88 @@ button {
   min-width: 0;
 }
 
+.sm-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ---- 通用小元素 ---------------------------------------------------- */
+
+.sm-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: var(--sm-radius-pill);
+  background: var(--sm-primary-soft);
+  color: var(--sm-primary-dark);
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid transparent;
+  cursor: default;
+}
+
+.sm-chip-clickable {
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.sm-chip-clickable:hover {
+  background: #e3e8ff;
+  border-color: #c5ceff;
+}
+
+.sm-divider {
+  height: 1px;
+  background: var(--sm-border);
+  border: 0;
+  margin: 14px 0;
+}
+
+.sm-empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--sm-text-secondary);
+}
+
+/* ---- Element Plus 细节微调 ----------------------------------------- */
+
+.el-button {
+  font-weight: 500;
+}
+
+.el-button--primary {
+  box-shadow: 0 4px 12px rgb(59 91 253 / 22%);
+}
+
+.el-card,
+.el-dialog {
+  border-radius: var(--sm-radius) !important;
+}
+
+.el-dialog__header {
+  font-weight: 650;
+}
+
+.el-message {
+  border-radius: var(--sm-radius-sm);
+}
+
+.el-tag {
+  border-radius: 6px;
+}
+
 @media (max-width: 768px) {
   .sm-page {
-    padding: 12px;
+    padding: 16px 12px 48px;
   }
 
   .sm-card {
-    padding: 12px;
+    padding: 14px;
+  }
+
+  .sm-page-title {
+    font-size: 19px;
   }
 }

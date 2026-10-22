@@ -123,6 +123,9 @@ const ROUTE_LABELS: Record<string, string> = {
   shipment: '物流查询',
   return_eligibility: '退货资格',
   return_request: '退货申请',
+  refund_status: '退款进度',
+  purchase: '购买引导',
+  support_agent: '人工客服',
   complaint_handoff: '投诉转人工',
   smalltalk_or_unknown: '其他',
 }
@@ -130,6 +133,27 @@ const ROUTE_LABELS: Record<string, string> = {
 export function routeLabel(route: string | null | undefined): string {
   if (!route) return '--'
   return ROUTE_LABELS[route] ?? route
+}
+
+const REFUND_STATUS_LABELS: Record<string, string> = {
+  requested: '等待审核',
+  approved: '审核通过',
+  rejected: '未通过',
+  completed: '已完成',
+}
+
+export function refundStatusLabel(status: string | null | undefined): string {
+  if (!status) return '--'
+  return REFUND_STATUS_LABELS[status] ?? status
+}
+
+export function refundStatusTagType(
+  status: string | null | undefined,
+): 'warning' | 'success' | 'danger' | 'info' {
+  if (status === 'approved' || status === 'completed') return 'success'
+  if (status === 'rejected') return 'danger'
+  if (status === 'requested') return 'warning'
+  return 'info'
 }
 
 const DECISION_LABELS: Record<string, string> = {

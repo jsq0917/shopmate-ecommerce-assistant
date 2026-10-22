@@ -121,7 +121,7 @@ describe('ChatView 集成', () => {
     expect(conversationsApi.messages).toHaveBeenCalledTimes(2)
     // 断线后回到历史视图，不残留流式气泡
     expect(wrapper.text()).toContain('有没有降噪耳机')
-    expect(wrapper.text()).not.toContain('正在回复')
+    expect(wrapper.text()).not.toContain('正在思考')
   })
 
   it('重复提交（REQUEST_IN_PROGRESS）按历史 reload 处理', async () => {
@@ -165,7 +165,7 @@ describe('ChatView 集成', () => {
     expect(wrapper.text()).toContain('有没有降噪耳机')
   })
 
-  it('用户停止生成后回到历史视图', async () => {
+  it('用户停止后回到历史视图', async () => {
     vi.mocked(chatApi.stream).mockImplementation(async (params, consumer) => {
       consumer.onEvent(sseEvent('delta', { message_id: MESSAGE_ID, index: 0, text: '半句' }, 1))
       // 模拟流进行中：直到 abort 才以 AbortError 结束
@@ -186,16 +186,16 @@ describe('ChatView 集成', () => {
     await textarea.trigger('keydown.enter')
     await flushPromises()
 
-    // 流进行中：展示“正在回复”
-    expect(wrapper.text()).toContain('正在回复')
+    // 流进行中：展示“正在思考”
+    expect(wrapper.text()).toContain('正在思考')
 
-    const stopButton = wrapper.findAll('button').find((btn) => btn.text() === '停止生成')
+    const stopButton = wrapper.findAll('button').find((btn) => btn.text() === '停止')
     await stopButton!.trigger('click')
     await flushPromises()
     await flushPromises()
 
     expect(conversationsApi.messages).toHaveBeenCalledTimes(2)
-    expect(wrapper.text()).not.toContain('正在回复')
+    expect(wrapper.text()).not.toContain('正在思考')
   })
 
   it('会话列表为空时自动创建新会话', async () => {
@@ -223,6 +223,6 @@ describe('ChatView 集成', () => {
     await textarea.trigger('keydown.enter')
     await flushPromises()
     expect((wrapper.find('textarea').element as HTMLTextAreaElement).disabled).toBe(true)
-    expect(wrapper.text()).toContain('停止生成')
+    expect(wrapper.text()).toContain('停止')
   })
 })

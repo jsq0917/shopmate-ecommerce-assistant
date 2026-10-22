@@ -5,10 +5,11 @@
  * 约束：
  * - 会话/消息只经 REST 与 SSE 获取，不直连任何存储；
  * - 断线/失败有明确提示，半截回答标记“未完成”；
- * - 不展示 token、trace_id 或任何内部字段。
+ * - 不展示 token、trace_id 或任何内部字段；
+ * - 人工客服回复写入同一会话，页面用低频轮询把新消息并进线程（不打断正在生成的回答）。
  */
 
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ElButton, ElDrawer } from 'element-plus'
 
 import ChatComposer from '@/components/chat/ChatComposer.vue'
@@ -27,6 +28,8 @@ import { useChatStream } from '@/composables/useChatStream'
 import { routeLabel } from '@/utils/format'
 
 defineOptions({ name: 'ChatView' })
+
+const POLL_INTERVAL_MS = 8000
 
 const { turn, send, stop, resetTurn } = useChatStream()
 
@@ -48,6 +51,40 @@ const handoffVisible = ref(false)
 
 const lastUserText = ref('')
 const busy = computed(() => turn.value.active)
+const activeTitle = computed(
+  () => conversations.value.find((item) => item.id === activeId.value)?.title ?? '智能客服',
+)
+const showWelcome = computed(() => !messages.value.length && !busy.value)
+
+const SUGGESTIONS: Array<{ icon: string; title: string; text: string }> = [
+  {
+    icon: '🎧',
+    title: '按预算挑耳机',
+    text: '预算 300 元以内，推荐一款适合通勤的降噪耳机',
+  },
+  {
+    icon: '📦',
+    title: '查订单物流',
+    text: '订单 SM-2026-00025 的物流到哪了',
+  },
+  {
+    icon: '↩️',
+    title: '退货规则',
+    text: '七天无理由退货是怎么规定的？',
+  },
+  {
+    icon: '🧑‍💻',
+    title: '转人工客服',
+    text: '我要转人工',
+  },
+]
+
+const CAPABILITIES = [
+  { icon: '🛍️', text: '按预算和场景推荐商品，价格库存实时来自商品系统' },
+  { icon: '📦', text: '查订单状态与物流节点，只返回你自己的订单' },
+  { icon: '📄', text: '政策问答附文档、章节与生效日期，可溯源' },
+  { icon: '🤝', text: '售后与投诉可一键转人工，保留完整上下文' },
+]
 
 function toView(item: MessageItem): ChatMessageView {
   return {
@@ -60,6 +97,7 @@ function toView(item: MessageItem): ChatMessageView {
     finishReason: item.finish_reason,
     isComplete: item.is_complete,
     createdAt: item.created_at,
+    productCards: item.product_cards ?? [],
   }
 }
 
@@ -106,6 +144,12 @@ async function selectConversation(id: string): Promise<void> {
 
 async function createConversation(): Promise<void> {
   if (turn.value.active) return
+  // 连点「新对话」不应堆出一串空会话：当前会话本来就空时直接复用它。
+  if (activeId.value && messages.value.length === 0) {
+    sidebarOpen.value = false
+    resetTurn()
+    return
+  }
   try {
     const created = await conversationsApi.create()
     conversations.value = [created, ...conversations.value]
@@ -157,8 +201,6 @@ async function onSend(text: string): Promise<void> {
     return
   }
   await loadMessages(conversationId)
-  // 网络断线：必须把错误留在界面上（含“重试”入口），否则用户只看到消息消失、
-  // 无法判断是发送失败还是正在处理。重试会通过 send() 清空本轮的 turn。
   if (result.outcome === 'network') return
   resetTurn()
 }
@@ -177,15 +219,44 @@ function onOpenProduct(card: ProductCardData): void {
   detailVisible.value = true
 }
 
+/** 人工客服回复没有推送通道，用低频轮询把新消息并进线程。 */
+async function pollNewMessages(): Promise<void> {
+  if (!activeId.value || turn.value.active || document.hidden) return
+  try {
+    const data = await conversationsApi.messages(activeId.value, { limit: 100 })
+    if (data.items.length !== messages.value.length) {
+      messages.value = data.items.map(toView)
+    }
+  } catch {
+    // 轮询失败不打扰用户，下一轮会重试。
+  }
+}
+
+let pollTimer: number | undefined
+
 onMounted(() => {
   void loadConversations()
+  pollTimer = window.setInterval(() => void pollNewMessages(), POLL_INTERVAL_MS)
+})
+
+onUnmounted(() => {
+  if (pollTimer) window.clearInterval(pollTimer)
 })
 </script>
 
 <template>
   <div class="sm-chat">
-    <div class="sm-chat-sidebar" :class="{ 'sm-chat-sidebar-open': sidebarOpen }">
-      <StateBlock :loading="listLoading" :error="listError" :empty="!listLoading && !listError && !conversations.length" empty-text="暂无会话">
+    <aside class="sm-chat-sidebar" :class="{ 'sm-chat-sidebar-open': sidebarOpen }">
+      <div class="sm-sidebar-head">
+        <span class="sm-sidebar-title">对话</span>
+        <ElButton size="small" type="primary" plain @click="createConversation">+ 新对话</ElButton>
+      </div>
+      <StateBlock
+        :loading="listLoading"
+        :error="listError"
+        :empty="!listLoading && !listError && !conversations.length"
+        empty-text="暂无会话"
+      >
         <ConversationSidebar
           :conversations="conversations"
           :active-id="activeId"
@@ -197,21 +268,57 @@ onMounted(() => {
           @remove="removeConversation"
         />
       </StateBlock>
-    </div>
+    </aside>
 
     <section class="sm-chat-main">
       <header class="sm-chat-toolbar">
         <ElButton class="sm-chat-sidebar-toggle" size="small" @click="sidebarOpen = !sidebarOpen">
-          会话列表
+          会话
         </ElButton>
-        <h2 class="sm-chat-title">{{ conversations.find((item) => item.id === activeId)?.title ?? '智能客服' }}</h2>
-        <span v-if="busy" class="sm-chat-streaming">
-          <span class="sm-dot" aria-hidden="true" />
-          正在回复（{{ turn.route ? routeLabel(turn.route) : '处理中' }}）…
-        </span>
+        <div class="sm-chat-heading">
+          <h2 class="sm-chat-title">{{ activeTitle }}</h2>
+          <span v-if="busy" class="sm-chat-streaming">
+            <span class="sm-dot" aria-hidden="true" />
+            {{ turn.route ? routeLabel(turn.route) : '正在思考' }}…
+          </span>
+          <span v-else class="sm-chat-status">在线 · 平均 1 秒内响应</span>
+        </div>
+        <ElButton size="small" text type="primary" @click="handoffVisible = true">转人工</ElButton>
       </header>
 
-      <StateBlock :loading="messagesLoading && !busy" :error="messagesError">
+      <div v-if="showWelcome" class="sm-welcome">
+        <div class="sm-welcome-head">
+          <span class="sm-welcome-mark">SM</span>
+          <div>
+            <h1 class="sm-welcome-title">你好，我是 ShopMate</h1>
+            <p class="sm-welcome-sub">挑商品、查订单、问售后，都可以直接问我。价格和库存来自实时数据。</p>
+          </div>
+        </div>
+
+        <div class="sm-suggestions">
+          <button
+            v-for="item in SUGGESTIONS"
+            :key="item.title"
+            type="button"
+            class="sm-suggestion"
+            @click="onSend(item.text)"
+          >
+            <span class="sm-suggestion-icon">{{ item.icon }}</span>
+            <span class="sm-suggestion-body">
+              <strong>{{ item.title }}</strong>
+              <small>{{ item.text }}</small>
+            </span>
+          </button>
+        </div>
+
+        <ul class="sm-capabilities">
+          <li v-for="item in CAPABILITIES" :key="item.text">
+            <span aria-hidden="true">{{ item.icon }}</span>{{ item.text }}
+          </li>
+        </ul>
+      </div>
+
+      <StateBlock v-else :loading="messagesLoading && !busy" :error="messagesError">
         <ChatThread
           v-if="activeId"
           :messages="messages"
@@ -222,7 +329,13 @@ onMounted(() => {
         />
       </StateBlock>
 
-      <ChatComposer :streaming="busy" :disabled="!activeId" @send="onSend" @stop="stop" @handoff="handoffVisible = true" />
+      <ChatComposer
+        :streaming="busy"
+        :disabled="!activeId"
+        @send="onSend"
+        @stop="stop"
+        @handoff="handoffVisible = true"
+      />
     </section>
 
     <ElDrawer v-model="citationDrawerVisible" title="政策引用" direction="rtl" size="min(28rem, 100%)">
@@ -238,17 +351,34 @@ onMounted(() => {
 <style scoped>
 .sm-chat {
   display: flex;
-  height: calc(100vh - 49px);
+  flex: 1;
+  min-height: 0;
   background: var(--sm-bg);
 }
 
 .sm-chat-sidebar {
   flex: none;
+  width: 264px;
   background: var(--sm-surface);
+  border-right: 1px solid var(--sm-border);
   display: flex;
   flex-direction: column;
   min-height: 0;
   overflow-y: auto;
+}
+
+.sm-sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 14px 8px;
+}
+
+.sm-sidebar-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--sm-text-tertiary);
 }
 
 .sm-chat-main {
@@ -263,27 +393,43 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px 16px;
+  padding: 12px 20px;
   border-bottom: 1px solid var(--sm-border);
+  background: rgb(255 255 255 / 90%);
+  backdrop-filter: blur(10px);
+}
+
+.sm-chat-heading {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .sm-chat-title {
   margin: 0;
   font-size: 15px;
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sm-chat-status {
+  font-size: 11px;
+  color: var(--sm-text-tertiary);
 }
 
 .sm-chat-streaming {
-  margin-left: auto;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--sm-primary-dark);
 }
 
 .sm-dot {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--sm-primary);
   animation: sm-pulse 1s infinite ease-in-out;
@@ -292,11 +438,134 @@ onMounted(() => {
 @keyframes sm-pulse {
   0%,
   100% {
-    opacity: 0.3;
+    opacity: 0.25;
+    transform: scale(0.85);
   }
   50% {
     opacity: 1;
+    transform: scale(1);
   }
+}
+
+.sm-chat-toolbar > :last-child {
+  margin-left: auto;
+}
+
+/* ---- 欢迎屏 -------------------------------------------------------- */
+
+.sm-welcome {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 36px 32px 20px;
+  background:
+    radial-gradient(760px 320px at 18% -10%, rgb(59 91 253 / 8%), transparent 70%),
+    radial-gradient(620px 260px at 88% 4%, rgb(154 107 255 / 7%), transparent 70%),
+    var(--sm-surface);
+}
+
+.sm-welcome-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: 720px;
+}
+
+.sm-welcome-mark {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 15px;
+  background: var(--sm-gradient);
+  color: #fff;
+  font-weight: 800;
+  font-size: 15px;
+  box-shadow: 0 8px 22px rgb(59 91 253 / 28%);
+  flex: none;
+}
+
+.sm-welcome-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+
+.sm-welcome-sub {
+  margin: 4px 0 0;
+  color: var(--sm-text-secondary);
+  font-size: 13px;
+}
+
+.sm-suggestions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  max-width: 720px;
+  margin: 22px 0 18px;
+}
+
+.sm-suggestion {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--sm-radius);
+  border: 1px solid var(--sm-border);
+  background: var(--sm-surface);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sm-suggestion:hover {
+  border-color: #c5ceff;
+  transform: translateY(-1px);
+  box-shadow: var(--sm-shadow-md);
+}
+
+.sm-suggestion-icon {
+  font-size: 18px;
+  line-height: 1.3;
+}
+
+.sm-suggestion-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.sm-suggestion-body strong {
+  font-size: 13px;
+}
+
+.sm-suggestion-body small {
+  font-size: 11px;
+  color: var(--sm-text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sm-capabilities {
+  list-style: none;
+  margin: 0;
+  padding: 14px 0 0;
+  border-top: 1px dashed var(--sm-border);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 20px;
+  max-width: 720px;
+  color: var(--sm-text-secondary);
+  font-size: 12px;
+}
+
+.sm-capabilities li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
 }
 
 .sm-chat-sidebar-toggle {
@@ -305,7 +574,7 @@ onMounted(() => {
 
 @media (max-width: 768px) {
   .sm-chat {
-    height: calc(100vh - 45px);
+    min-height: 0;
   }
 
   .sm-chat-sidebar {
@@ -315,14 +584,27 @@ onMounted(() => {
   .sm-chat-sidebar-open {
     display: flex;
     position: fixed;
-    inset: 45px auto 0 0;
+    inset: 52px auto 0 0;
     z-index: 30;
     width: min(20rem, 86vw);
-    box-shadow: 0 0 24px rgb(0 0 0 / 18%);
+    box-shadow: var(--sm-shadow-lg);
   }
 
   .sm-chat-sidebar-toggle {
     display: inline-flex;
+  }
+
+  .sm-welcome {
+    padding: 22px 16px 16px;
+  }
+
+  .sm-suggestions,
+  .sm-capabilities {
+    grid-template-columns: 1fr;
+  }
+
+  .sm-welcome-title {
+    font-size: 20px;
   }
 }
 </style>

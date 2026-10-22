@@ -19,6 +19,7 @@ const items: OrderItemSummary[] = [
     quantity: 1,
     unit_price_cents: 29900,
     status: 'delivered',
+    is_returnable: true,
   },
 ]
 

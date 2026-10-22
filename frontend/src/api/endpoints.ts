@@ -20,6 +20,8 @@ import type {
   CreateEvalRunRequest,
   CreateHandoffData,
   CreateHandoffRequest,
+  CreateOrderRequest,
+  CreateRefundRequest,
   CreateKnowledgeBaseRequest,
   CreateReturnData,
   CreateReturnRequest,
@@ -40,11 +42,16 @@ import type {
   ProductSearchData,
   ProductSearchParams,
   QualityLabelRequest,
+  RefundItem,
+  RefundListData,
+  RefundReviewRequest,
   RegisterRequest,
   ReturnEligibilityData,
   ReturnEligibilityRequest,
   ShipmentData,
   SupportConversation,
+  SupportReplyData,
+  SupportReplyRequest,
   SupportTicketDetail,
   SupportTicketListData,
   SupportTicketPatch,
@@ -131,6 +138,10 @@ export const productsApi = {
   search: (params: ProductSearchParams = {}) =>
     json<ProductSearchData>('/products/search', { query: params }),
 
+  /** 无关键词的在售商品列表（商品中心首页）。 */
+  featured: (params: { category?: string; limit?: number } = {}) =>
+    json<ProductSearchData>('/products/featured', { query: params }),
+
   detail: (productId: string, variantId?: string) =>
     json<ProductDetailData>(`/products/${productId}`, { query: { variant_id: variantId } }),
 
@@ -154,6 +165,28 @@ export const ordersApi = {
   detail: (orderId: string) => json<OrderDetailData>(`/orders/${orderId}`),
 
   shipment: (orderId: string) => json<ShipmentData>(`/orders/${orderId}/shipment`),
+
+  /** 下单：只创建 created 订单，库存与金额由后端按 SKU 重新计算。 */
+  create: (body: CreateOrderRequest) =>
+    json<OrderDetailData>('/orders', { method: 'POST', body }),
+
+  /** 模拟支付：created → paid，扣减库存。 */
+  pay: (orderId: string) =>
+    json<OrderDetailData>(`/orders/${orderId}/pay`, { method: 'POST', body: {} }),
+
+  /** 取消未发货订单；已支付会回滚库存。 */
+  cancel: (orderId: string) =>
+    json<OrderDetailData>(`/orders/${orderId}/cancel`, { method: 'POST', body: {} }),
+}
+
+// ---- 退款 ---------------------------------------------------------------
+
+export const refundsApi = {
+  list: (params: { order_id?: string; limit?: number } = {}) =>
+    json<RefundListData>('/refunds', { query: params }),
+
+  create: (body: CreateRefundRequest) =>
+    json<RefundItem>('/refunds', { method: 'POST', body }),
 }
 
 // ---- 退货 ---------------------------------------------------------------
@@ -191,6 +224,15 @@ export const supportApi = {
 
   conversation: (conversationId: string) =>
     json<SupportConversation>(`/support/conversations/${conversationId}`),
+
+  reply: (ticketId: string, body: SupportReplyRequest) =>
+    json<SupportReplyData>(`/support/tickets/${ticketId}/reply`, { method: 'POST', body }),
+
+  refunds: (params: { status?: string; limit?: number } = {}) =>
+    json<RefundListData>('/support/refunds', { query: params }),
+
+  reviewRefund: (refundId: string, body: RefundReviewRequest) =>
+    json<RefundItem>(`/support/refunds/${refundId}/review`, { method: 'POST', body }),
 
   qualityLabel: (assistantMessageId: string, body: QualityLabelRequest) =>
     json<{ message_id: string; label: string }>(

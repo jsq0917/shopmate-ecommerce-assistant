@@ -30,6 +30,9 @@ const actionLoading = ref(false)
 const actionError = ref<ApiError | null>(null)
 const actionNotice = ref('')
 
+const replyDraft = ref('')
+const replySending = ref(false)
+
 const resolveDialog = ref(false)
 const resolutionSummary = ref('')
 const closeDialog = ref(false)
@@ -64,6 +67,23 @@ async function runAction(action: 'assign' | 'resolve' | 'close', extra: Record<s
     actionError.value = toApiError(caught)
   } finally {
     actionLoading.value = false
+  }
+}
+
+async function sendReply(): Promise<void> {
+  const content = replyDraft.value.trim()
+  if (!content || replySending.value) return
+  replySending.value = true
+  actionError.value = null
+  try {
+    await supportApi.reply(ticketId, { content })
+    replyDraft.value = ''
+    actionNotice.value = '回复已发送，用户会在原会话中看到'
+    await load()
+  } catch (caught) {
+    actionError.value = toApiError(caught)
+  } finally {
+    replySending.value = false
   }
 }
 
@@ -163,6 +183,27 @@ onMounted(load)
         </div>
 
         <div class="sm-card">
+          <h3 class="sm-section-title">回复用户</h3>
+          <p class="sm-muted">
+            回复会写入同一会话，用户在聊天页可直接看到；内容会经过 PII 脱敏检查，不展示内部字段。
+          </p>
+          <ElInput
+            v-model="replyDraft"
+            type="textarea"
+            :rows="3"
+            maxlength="2000"
+            show-word-limit
+            placeholder="例如：你好，我是人工客服，已收到你的退款申请，正在核实订单状态，预计今天内回复你。"
+          />
+          <div class="sm-row sm-reply-actions">
+            <ElButton type="primary" :loading="replySending" :disabled="!replyDraft.trim()" @click="sendReply">
+              发送回复
+            </ElButton>
+            <span class="sm-muted">回复不会触发退款或赔偿，只作为沟通记录。</span>
+          </div>
+        </div>
+
+        <div class="sm-card">
           <h3 class="sm-section-title">对 AI 回答打分</h3>
           <p class="sm-muted">仅可标记授权会话内的助手消息；标记进入评测样本，不直接修改知识或模型。</p>
           <QualityLabelForm
@@ -230,5 +271,11 @@ onMounted(load)
 
 .sm-actions {
   flex: none;
+}
+
+.sm-reply-actions {
+  margin-top: 10px;
+  justify-content: space-between;
+  flex-wrap: wrap;
 }
 </style>

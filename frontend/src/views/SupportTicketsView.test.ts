@@ -11,7 +11,7 @@ vi.mock('vue-router', () => ({
 }))
 
 vi.mock('@/api/endpoints', () => ({
-  supportApi: { tickets: vi.fn() },
+  supportApi: { tickets: vi.fn(), refunds: vi.fn() },
 }))
 
 const { supportApi } = await import('@/api/endpoints')
@@ -29,6 +29,7 @@ describe('SupportTicketsView（工单队列）', () => {
       items: [supportTicketFixture()],
       next_offset: null,
     })
+    vi.mocked(supportApi.refunds).mockResolvedValue({ items: [], next_offset: null } as never)
   })
 
   it('加载并展示工单（脱敏用户、风险、等待时间）', async () => {
@@ -65,10 +66,10 @@ describe('SupportTicketsView（工单队列）', () => {
     expect(supportApi.tickets).toHaveBeenCalledTimes(2)
   })
 
-  it('点击行跳转工单详情', async () => {
+  it('点击卡片跳转工单详情', async () => {
     const wrapper = await mountView()
-    const row = wrapper.find('.el-table__row')
-    await row.trigger('click')
+    const card = wrapper.find('.sm-ticket-card')
+    await card.trigger('click')
     expect(push).toHaveBeenCalledWith('/support/tickets/ticket-1')
   })
 })

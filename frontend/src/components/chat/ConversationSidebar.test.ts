@@ -27,17 +27,10 @@ describe('ConversationSidebar', () => {
     vi.mocked(ElMessageBox.confirm).mockReset()
   })
 
-  it('渲染会话列表与新建按钮', () => {
+  it('渲染会话列表', () => {
     const wrapper = mountSidebar()
     expect(wrapper.text()).toContain('耳机咨询')
     expect(wrapper.text()).toContain('订单查询')
-    expect(wrapper.text()).toContain('新建')
-  })
-
-  it('点击新建触发 create', async () => {
-    const wrapper = mountSidebar()
-    await wrapper.find('button').trigger('click')
-    expect(wrapper.emitted('create')).toHaveLength(1)
   })
 
   it('点击会话触发 select', async () => {

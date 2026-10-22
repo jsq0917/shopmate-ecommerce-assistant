@@ -4,10 +4,11 @@
  * 前端不推断资源是否存在（业务铁律 4）。
  */
 
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElButton, ElOption, ElSelect, ElTable, ElTableColumn, ElTag } from 'element-plus'
+import { ElButton, ElTag } from 'element-plus'
 
+import ProductThumb from '@/components/common/ProductThumb.vue'
 import StateBlock from '@/components/common/StateBlock.vue'
 import { ordersApi } from '@/api/endpoints'
 import { toApiError } from '@/api/errors'
@@ -24,15 +25,17 @@ const offset = ref(0)
 const limit = 20
 
 const statusOptions = [
-  { value: '', label: '全部状态' },
-  { value: 'created', label: '已下单' },
-  { value: 'paid', label: '已付款' },
-  { value: 'processing', label: '处理中' },
+  { value: '', label: '全部' },
+  { value: 'created', label: '待付款' },
+  { value: 'paid', label: '待发货' },
+  { value: 'processing', label: '备货中' },
   { value: 'shipped', label: '已发货' },
-  { value: 'delivered', label: '已送达' },
+  { value: 'delivered', label: '已签收' },
   { value: 'completed', label: '已完成' },
   { value: 'cancelled', label: '已取消' },
 ]
+
+const items = computed(() => data.value?.items ?? [])
 
 async function load(): Promise<void> {
   loading.value = true
@@ -51,6 +54,12 @@ async function load(): Promise<void> {
   }
 }
 
+function switchStatus(value: string): void {
+  statusFilter.value = value
+  offset.value = 0
+  void load()
+}
+
 function statusTagType(status: string): 'success' | 'warning' | 'info' | 'danger' {
   if (status === 'completed' || status === 'delivered') return 'success'
   if (status === 'cancelled') return 'danger'
@@ -58,76 +67,209 @@ function statusTagType(status: string): 'success' | 'warning' | 'info' | 'danger
   return 'info'
 }
 
+function open(row: OrderListItem): void {
+  void router.push(`/orders/${row.id}`)
+}
+
 onMounted(load)
 </script>
 
 <template>
   <div class="sm-page">
-    <div class="sm-between">
-      <h2 class="sm-page-title">我的订单</h2>
-      <ElSelect v-model="statusFilter" style="width: 10rem" @change="offset = 0; load()">
-        <ElOption v-for="option in statusOptions" :key="option.value" :label="option.label" :value="option.value" />
-      </ElSelect>
+    <div class="sm-page-header">
+      <div>
+        <h2 class="sm-page-title">我的订单</h2>
+        <p class="sm-page-subtitle">价格、状态与物流均来自订单系统；未支付的订单可以取消。</p>
+      </div>
+      <ElButton @click="router.push('/products')">继续购物</ElButton>
+    </div>
+
+    <div class="sm-status-tabs">
+      <button
+        v-for="option in statusOptions"
+        :key="option.value"
+        type="button"
+        class="sm-status-tab"
+        :class="{ 'sm-status-tab-active': statusFilter === option.value }"
+        @click="switchStatus(option.value)"
+      >
+        {{ option.label }}
+      </button>
     </div>
 
     <StateBlock
       :loading="loading && !data"
       :error="error"
-      :empty="!loading && !error && (data?.items.length ?? 0) === 0"
-      empty-text="当前账号下没有订单。"
+      :empty="!loading && !error && items.length === 0"
+      empty-text="当前账号下没有订单。去商品中心挑一件吧。"
       @retry="load"
     >
-      <ElTable :data="data?.items ?? []" style="margin-top: 12px" @row-click="(row: OrderListItem) => router.push(`/orders/${row.id}`)">
-        <ElTableColumn prop="order_no" label="订单号" min-width="130" />
-        <ElTableColumn label="状态" min-width="100">
-          <template #default="{ row }">
-            <ElTag size="small" :type="statusTagType(row.status)">{{ orderStatusLabel(row.status) }}</ElTag>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="金额" min-width="110">
-          <template #default="{ row }">{{ formatMoney(row.total_cents, row.currency) }}</template>
-        </ElTableColumn>
-        <ElTableColumn label="下单时间" min-width="150">
-          <template #default="{ row }">{{ formatDateTime(row.placed_at) }}</template>
-        </ElTableColumn>
-        <ElTableColumn label="状态更新时间" min-width="150">
-          <template #default="{ row }">{{ formatDateTime(row.status_updated_at) }}</template>
-        </ElTableColumn>
-        <ElTableColumn label="数据" min-width="80">
-          <template #default="{ row }">
+      <div class="sm-order-list">
+        <article
+          v-for="row in items"
+          :key="row.id"
+          class="sm-order-card sm-card-hover"
+          @click="open(row)"
+        >
+          <header class="sm-order-head">
+            <span class="sm-order-no sm-mono">{{ row.order_no }}</span>
+            <ElTag size="small" :type="statusTagType(row.status)" effect="light">
+              {{ orderStatusLabel(row.status) }}
+            </ElTag>
             <span v-if="row.is_synthetic" class="sm-synthetic-tag">合成</span>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="操作" width="90">
-          <template #default="{ row }">
-            <ElButton size="small" text type="primary" @click.stop="router.push(`/orders/${row.id}`)">详情</ElButton>
-          </template>
-        </ElTableColumn>
-      </ElTable>
+            <span class="sm-order-time">{{ formatDateTime(row.placed_at) }}</span>
+          </header>
 
-      <div v-if="data?.next_offset != null" class="sm-between sm-pager">
-        <ElButton size="small" :disabled="offset === 0" @click="offset = Math.max(0, offset - limit); load()">上一页</ElButton>
-        <ElButton size="small" @click="offset = data.next_offset; load()">下一页</ElButton>
+          <div class="sm-order-body">
+            <ProductThumb size="sm" :title="row.first_item_title ?? row.order_no" />
+            <div class="sm-order-main">
+              <p class="sm-order-title">{{ row.first_item_title ?? '订单商品' }}</p>
+              <p class="sm-muted">共 {{ row.item_count }} 件商品</p>
+            </div>
+            <div class="sm-order-amount">
+              <span class="sm-muted">实付</span>
+              <strong class="sm-price">{{ formatMoney(row.total_cents, row.currency) }}</strong>
+            </div>
+          </div>
+
+          <footer class="sm-order-foot">
+            <span class="sm-muted">状态更新 {{ formatDateTime(row.status_updated_at) }}</span>
+            <ElButton size="small" @click.stop="open(row)">
+              {{ row.status === 'created' ? '去支付' : '查看详情' }}
+            </ElButton>
+          </footer>
+        </article>
+      </div>
+
+      <div v-if="data?.next_offset != null || offset > 0" class="sm-between sm-pager">
+        <ElButton size="small" :disabled="offset === 0" @click="offset = Math.max(0, offset - limit); load()">
+          上一页
+        </ElButton>
+        <ElButton size="small" :disabled="data?.next_offset == null" @click="offset = data?.next_offset ?? offset; load()">
+          下一页
+        </ElButton>
       </div>
     </StateBlock>
   </div>
 </template>
 
 <style scoped>
-.sm-page-title {
-  margin: 0;
-  font-size: 18px;
+.sm-status-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
-.sm-pager {
-  margin-top: 12px;
+.sm-status-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.sm-status-tab {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--sm-border);
+  background: var(--sm-surface);
+  color: var(--sm-text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.sm-status-tab:hover {
+  border-color: #c5ceff;
+  color: var(--sm-primary-dark);
+}
+
+.sm-status-tab-active {
+  background: var(--sm-primary);
+  border-color: var(--sm-primary);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 6px 16px rgb(59 91 253 / 22%);
+}
+
+.sm-order-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sm-order-card {
+  padding: 16px 18px;
+  cursor: pointer;
+}
+
+.sm-order-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sm-order-no {
+  font-weight: 650;
+  color: var(--sm-text);
+}
+
+.sm-order-time {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--sm-text-tertiary);
 }
 
 .sm-synthetic-tag {
-  padding: 0 6px;
+  padding: 0 7px;
   border-radius: 999px;
   background: var(--sm-warning-bg);
   color: var(--sm-warning);
-  font-size: 11px;
+  font-size: 10px;
+}
+
+.sm-order-body {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.sm-order-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.sm-order-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sm-order-amount {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+.sm-order-amount strong {
+  font-size: 18px;
+}
+
+.sm-order-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--sm-border);
+}
+
+.sm-pager {
+  margin-top: 16px;
 }
 </style>

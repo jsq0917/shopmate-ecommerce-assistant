@@ -72,7 +72,7 @@ watch(
 <template>
   <div ref="scroller" class="sm-thread" aria-live="polite">
     <p v-if="!messages.length && !streamingMessage" class="sm-thread-empty sm-muted">
-      还没有消息。输入问题开始对话，例如“预算 300 元以内、适合通勤的降噪耳机”。
+      还没有消息，输入问题就开始对话。
     </p>
 
     <MessageBubble
@@ -99,7 +99,11 @@ watch(
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 12px 16px;
+  padding: 20px 24px 8px;
+  background:
+    radial-gradient(900px 320px at 15% -10%, rgb(59 91 253 / 6%), transparent 70%),
+    radial-gradient(700px 280px at 90% 0%, rgb(154 107 255 / 5%), transparent 70%),
+    var(--sm-surface);
 }
 
 .sm-thread-empty {

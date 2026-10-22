@@ -19,6 +19,16 @@ defineProps<{ conversation: SupportConversation }>()
 
 const expandedCitation = ref<string | null>(null)
 
+/** 客服回复以 assistant + route=support_agent 落库，这里据此改称呼。 */
+function roleLabel(message: { role: string; risk?: Record<string, unknown> }): string {
+  if (message.risk && message.risk.author === 'support_agent') return '人工客服'
+  return message.role === 'assistant' ? 'AI 助手' : '用户'
+}
+
+function isAgent(message: { risk?: Record<string, unknown> }): boolean {
+  return Boolean(message.risk && message.risk.author === 'support_agent')
+}
+
 function riskType(level: string | undefined): 'danger' | 'warning' | 'info' {
   if (level === 'critical' || level === 'high') return 'danger'
   if (level === 'medium') return 'warning'
@@ -36,7 +46,9 @@ function riskType(level: string | undefined): 'danger' | 'warning' | 'info' {
     <ol class="sm-support-messages">
       <li v-for="message in conversation.messages" :key="message.message_id" class="sm-support-message">
         <header class="sm-support-message-head">
-          <span class="sm-support-role">{{ message.role === 'assistant' ? 'AI 助手' : '用户' }}</span>
+          <span class="sm-support-role" :class="{ 'sm-support-role-agent': isAgent(message) }">
+            {{ roleLabel(message) }}
+          </span>
           <span v-if="message.role === 'assistant' && !message.is_complete" class="sm-muted">（未完成）</span>
           <ElTag
             v-if="message.risk && message.risk.risk_level && message.risk.risk_level !== 'low'"
@@ -131,6 +143,10 @@ function riskType(level: string | undefined): 'danger' | 'warning' | 'info' {
 
 .sm-support-role {
   font-weight: 700;
+}
+
+.sm-support-role-agent {
+  color: var(--sm-accent);
 }
 
 .sm-support-text {

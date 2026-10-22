@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 应用外壳：顶部导航 + Synthetic 横幅 + 用户信息 + 移动端抽屉导航。
+ * 应用外壳：顶部导航 + 合成数据横幅 + 购物车入口 + 用户信息 + 移动端抽屉。
  * 导航按角色展示仅为体验层，权限校验以后端为准。
  */
 
@@ -8,6 +8,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElAlert, ElButton, ElDrawer, ElMessageBox } from 'element-plus'
 
+import { useCart } from '@/composables/useCart'
 import { useAuthStore } from '@/stores/auth'
 import { useSystemStore } from '@/stores/system'
 
@@ -15,6 +16,7 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const system = useSystemStore()
+const cart = useCart()
 
 const drawerVisible = ref(false)
 const forbidden = ref(false)
@@ -34,13 +36,13 @@ const roleLabel = computed(() => {
   return '--'
 })
 
-  const navItems = computed(() => {
-    const items = [
-      { path: '/', label: '智能客服' },
-      { path: '/products', label: '商品中心' },
-      { path: '/orders', label: '我的订单' },
-      { path: '/handoff', label: '我的工单' },
-    ]
+const navItems = computed(() => {
+  const items = [
+    { path: '/', label: '智能客服' },
+    { path: '/products', label: '商品中心' },
+    { path: '/orders', label: '我的订单' },
+    { path: '/handoff', label: '我的工单' },
+  ]
   if (auth.role === 'support' || auth.role === 'admin') {
     items.push({ path: '/support', label: '客服工作台' })
   }
@@ -49,6 +51,11 @@ const roleLabel = computed(() => {
   }
   return items
 })
+
+const isAuthPage = computed(() => route.name === 'login')
+
+const displayName = computed(() => auth.user?.display_name_masked ?? auth.user?.email ?? '未登录')
+const avatarText = computed(() => displayName.value.trim().slice(0, 1) || 'S')
 
 async function onLogout(): Promise<void> {
   try {
@@ -67,13 +74,16 @@ async function onLogout(): Promise<void> {
 
 <template>
   <div class="sm-shell">
-    <header class="sm-shell-header">
+    <header v-if="!isAuthPage" class="sm-shell-header">
       <button class="sm-menu-button" type="button" aria-label="打开导航菜单" @click="drawerVisible = true">
         ☰
       </button>
       <router-link class="sm-brand" to="/">
         <span class="sm-brand-mark">SM</span>
-        <span class="sm-brand-name">ShopMate 智能客服</span>
+        <span class="sm-brand-text">
+          <strong>ShopMate</strong>
+          <small>智能导购与客服</small>
+        </span>
       </router-link>
 
       <nav class="sm-nav" aria-label="主导航">
@@ -89,14 +99,23 @@ async function onLogout(): Promise<void> {
       </nav>
 
       <div class="sm-shell-user">
-        <span v-if="auth.user" class="sm-user-name">{{ auth.user.display_name_masked ?? auth.user.email }}</span>
-        <span class="sm-user-role">{{ roleLabel }}</span>
-        <ElButton size="small" text type="danger" @click="onLogout">退出</ElButton>
+        <router-link to="/checkout" class="sm-cart" aria-label="购物车">
+          <span class="sm-cart-icon">🛒</span>
+          <span v-if="cart.count.value" class="sm-cart-badge">{{ cart.count.value }}</span>
+        </router-link>
+        <div class="sm-user">
+          <span class="sm-avatar">{{ avatarText }}</span>
+          <span class="sm-user-meta">
+            <strong>{{ displayName }}</strong>
+            <small>{{ roleLabel }}</small>
+          </span>
+        </div>
+        <ElButton size="small" text @click="onLogout">退出</ElButton>
       </div>
     </header>
 
     <ElAlert
-      v-if="system.meta?.is_synthetic"
+      v-if="!isAuthPage && system.meta?.is_synthetic"
       class="sm-synthetic-banner"
       type="warning"
       :closable="false"
@@ -107,7 +126,7 @@ async function onLogout(): Promise<void> {
     </ElAlert>
 
     <ElAlert
-      v-if="forbidden"
+      v-if="!isAuthPage && forbidden"
       class="sm-synthetic-banner"
       type="error"
       :closable="false"
@@ -136,9 +155,12 @@ async function onLogout(): Promise<void> {
         >
           {{ item.label }}
         </router-link>
+        <router-link to="/checkout" class="sm-drawer-link" @click="drawerVisible = false">
+          购物车<span v-if="cart.count.value" class="sm-drawer-badge">{{ cart.count.value }}</span>
+        </router-link>
       </nav>
       <div class="sm-drawer-user">
-        <p class="sm-muted">当前账号：{{ auth.user?.display_name_masked ?? '--' }}（{{ roleLabel }}）</p>
+        <p class="sm-muted">当前账号：{{ displayName }}（{{ roleLabel }}）</p>
         <p class="sm-muted">数据分类：{{ system.meta?.data_classification ?? '--' }}</p>
       </div>
     </ElDrawer>
@@ -147,6 +169,7 @@ async function onLogout(): Promise<void> {
 
 <style scoped>
 .sm-shell {
+  height: 100%;
   min-height: 100%;
   display: flex;
   flex-direction: column;
@@ -158,41 +181,71 @@ async function onLogout(): Promise<void> {
   z-index: 20;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 16px;
-  background: var(--sm-surface);
+  gap: 18px;
+  padding: 10px 22px;
+  background: rgb(255 255 255 / 88%);
+  backdrop-filter: saturate(180%) blur(14px);
   border-bottom: 1px solid var(--sm-border);
 }
 
 .sm-brand {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   color: var(--sm-text);
-  font-weight: 700;
+  flex: none;
 }
 
 .sm-brand-mark {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  background: var(--sm-primary);
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  background: var(--sm-gradient);
   color: #fff;
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  box-shadow: 0 6px 16px rgb(59 91 253 / 30%);
+}
+
+.sm-brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.sm-brand-text strong {
+  font-size: 15px;
+  letter-spacing: -0.01em;
+}
+
+.sm-brand-text small {
+  font-size: 10px;
+  color: var(--sm-text-tertiary);
+  letter-spacing: 0.06em;
 }
 
 .sm-nav {
   display: flex;
   gap: 4px;
-  margin-left: 12px;
+  margin-left: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.sm-nav::-webkit-scrollbar {
+  display: none;
 }
 
 .sm-nav-link {
-  padding: 6px 12px;
-  border-radius: 8px;
+  padding: 7px 13px;
+  border-radius: var(--sm-radius-pill);
   color: var(--sm-text-secondary);
+  font-size: 13px;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .sm-nav-link:hover {
@@ -201,7 +254,7 @@ async function onLogout(): Promise<void> {
 }
 
 .sm-nav-link-active {
-  background: rgb(31 122 92 / 10%);
+  background: var(--sm-primary-soft);
   color: var(--sm-primary-dark);
   font-weight: 600;
 }
@@ -210,25 +263,87 @@ async function onLogout(): Promise<void> {
   margin-left: auto;
   display: flex;
   align-items: center;
+  gap: 12px;
+  flex: none;
+}
+
+.sm-cart {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: var(--sm-bg);
+  border: 1px solid var(--sm-border);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.sm-cart:hover {
+  background: var(--sm-primary-soft);
+  transform: translateY(-1px);
+}
+
+.sm-cart-icon {
+  font-size: 16px;
+}
+
+.sm-cart-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--sm-accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  border: 2px solid #fff;
+}
+
+.sm-user {
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
 
-.sm-user-name {
+.sm-avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #dbe2ff, #eef1ff);
+  color: var(--sm-primary-dark);
+  font-weight: 700;
   font-size: 13px;
 }
 
-.sm-user-role {
-  padding: 1px 8px;
-  border-radius: 999px;
-  background: var(--sm-bg);
-  border: 1px solid var(--sm-border);
+.sm-user-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.sm-user-meta strong {
   font-size: 12px;
-  color: var(--sm-text-secondary);
+  font-weight: 600;
+}
+
+.sm-user-meta small {
+  font-size: 11px;
+  color: var(--sm-text-tertiary);
 }
 
 .sm-synthetic-banner {
   margin: 0;
   border-radius: 0;
+  border-left: none;
+  border-right: none;
 }
 
 .sm-synthetic-text {
@@ -238,13 +353,16 @@ async function onLogout(): Promise<void> {
 .sm-shell-main {
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
 }
 
 .sm-menu-button {
   display: none;
   border: 1px solid var(--sm-border);
   background: var(--sm-surface);
-  border-radius: 8px;
+  border-radius: 9px;
   padding: 4px 10px;
   font-size: 16px;
   cursor: pointer;
@@ -257,13 +375,26 @@ async function onLogout(): Promise<void> {
 }
 
 .sm-drawer-link {
-  padding: 10px 12px;
-  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 12px;
+  border-radius: 10px;
   color: var(--sm-text);
 }
 
-.sm-drawer-link:hover {
-  background: var(--sm-bg);
+.sm-drawer-link:hover,
+.sm-drawer-link.router-link-active {
+  background: var(--sm-primary-soft);
+  color: var(--sm-primary-dark);
+}
+
+.sm-drawer-badge {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--sm-accent);
+  color: #fff;
+  font-size: 11px;
 }
 
 .sm-drawer-user {
@@ -272,16 +403,24 @@ async function onLogout(): Promise<void> {
   padding-top: 12px;
 }
 
+@media (max-width: 900px) {
+  .sm-brand-text,
+  .sm-user-meta {
+    display: none;
+  }
+}
+
 @media (max-width: 768px) {
+  .sm-shell-header {
+    gap: 10px;
+    padding: 8px 12px;
+  }
+
   .sm-menu-button {
     display: block;
   }
 
   .sm-nav {
-    display: none;
-  }
-
-  .sm-brand-name {
     display: none;
   }
 }

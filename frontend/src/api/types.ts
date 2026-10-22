@@ -134,6 +134,8 @@ export interface MessageItem {
   finish_reason: string | null
   citations: MessageCitation[]
   risk: MessageRisk
+  /** 本轮商品卡片快照（用于重开历史会话时还原卡片）。 */
+  product_cards?: ProductCardBase[]
   is_complete: boolean
   created_at: string
   client_message_id: Uuid | null
@@ -198,6 +200,8 @@ export interface ProductCardBase {
   product_id: Uuid
   variant_id: Uuid
   title: string
+  /** 品类：用于前端生成稳定的占位封面。 */
+  category?: string | null
   image_url: string | null
   price_cents: number
   currency: string
@@ -365,6 +369,7 @@ export interface OrderItemSummary {
   quantity: number
   unit_price_cents: number
   status: string
+  is_returnable: boolean
 }
 
 export interface OrderListItem {
@@ -376,6 +381,8 @@ export interface OrderListItem {
   is_synthetic: boolean
   placed_at: string
   status_updated_at: string
+  item_count: number
+  first_item_title: string | null
 }
 
 export interface OrderListData extends Pagination {
@@ -390,8 +397,56 @@ export interface OrderDetailData {
   currency: string
   is_synthetic: boolean
   placed_at: string
+  paid_at: string | null
   status_updated_at: string
   items: OrderItemSummary[]
+}
+
+export interface CreateOrderItemRequest {
+  variant_id: Uuid
+  quantity: number
+}
+
+export interface CreateOrderRequest {
+  items: CreateOrderItemRequest[]
+  shipping_address_masked?: string | null
+}
+
+// ---- 退款 ---------------------------------------------------------------
+
+export type RefundStatus = 'requested' | 'approved' | 'rejected' | 'completed'
+
+export interface RefundItem {
+  id: Uuid
+  refund_no: string
+  order_id: Uuid
+  order_no: string
+  order_item_id: Uuid | null
+  scope: 'order' | 'item' | string
+  status: RefundStatus
+  reason_code: string
+  amount_cents: number
+  note: string | null
+  review_note: string | null
+  created_at: string
+  updated_at: string
+  reviewed_at: string | null
+}
+
+export interface RefundListData extends Pagination {
+  items: RefundItem[]
+}
+
+export interface CreateRefundRequest {
+  order_id: Uuid
+  reason_code: ReturnReasonCode
+  order_item_id?: Uuid | null
+  note?: string | null
+}
+
+export interface RefundReviewRequest {
+  approve: boolean
+  review_note?: string | null
 }
 
 export interface ShipmentEventItem {
@@ -585,6 +640,16 @@ export interface SupportConversation {
     status: string
     primary_reason_code: string
   } | null
+}
+
+export interface SupportReplyRequest {
+  content: string
+}
+
+export interface SupportReplyData {
+  message_id: Uuid
+  conversation_id: Uuid
+  created_at: string
 }
 
 export interface SupportTicketPatch {

@@ -41,6 +41,18 @@ const routes: RouteRecordRaw[] = [
     meta: { auth: true, title: '我的订单' },
   },
   {
+    path: '/checkout',
+    name: 'checkout',
+    component: () => import('@/views/CheckoutView.vue'),
+    meta: { auth: true, title: '确认订单' },
+  },
+  {
+    path: '/refunds',
+    name: 'refunds',
+    component: () => import('@/views/RefundsView.vue'),
+    meta: { auth: true, title: '我的退款' },
+  },
+  {
     path: '/orders/:orderId',
     name: 'order-detail',
     component: () => import('@/views/OrderDetailView.vue'),

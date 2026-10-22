@@ -46,7 +46,7 @@ CLARIFICATION_TEXT = (
 
 
 class Intent(StrEnum):
-    """The ten intents fixed by AGENTS.md §10.7."""
+    """The twelve ShopMate intents (AGENTS.md §10.7 plus self-service purchase/refund)."""
 
     PRODUCT_DISCOVERY = "product_discovery"
     PRODUCT_COMPARE = "product_compare"
@@ -56,6 +56,8 @@ class Intent(StrEnum):
     SHIPMENT = "shipment"
     RETURN_ELIGIBILITY = "return_eligibility"
     RETURN_REQUEST = "return_request"
+    REFUND_STATUS = "refund_status"
+    PURCHASE = "purchase"
     COMPLAINT_HANDOFF = "complaint_handoff"
     SMALLTALK_OR_UNKNOWN = "smalltalk_or_unknown"
 
@@ -78,6 +80,8 @@ PATH_BY_INTENT: dict[Intent, RoutePath] = {
     Intent.SHIPMENT: RoutePath.STRUCTURED,
     Intent.RETURN_ELIGIBILITY: RoutePath.DETERMINISTIC,
     Intent.RETURN_REQUEST: RoutePath.DETERMINISTIC,
+    Intent.REFUND_STATUS: RoutePath.DETERMINISTIC,
+    Intent.PURCHASE: RoutePath.STRUCTURED,
     Intent.COMPLAINT_HANDOFF: RoutePath.DETERMINISTIC,
     Intent.SMALLTALK_OR_UNKNOWN: RoutePath.SAFE_FALLBACK,
 }
@@ -85,13 +89,21 @@ PATH_BY_INTENT: dict[Intent, RoutePath] = {
 ALLOWED_TOOLS: dict[Intent, tuple[str, ...]] = {
     Intent.PRODUCT_DISCOVERY: ("search_products",),
     Intent.PRODUCT_COMPARE: ("compare_products",),
-    Intent.PRODUCT_FACT: ("get_product_detail", "check_stock", "get_promotion"),
+    Intent.PRODUCT_FACT: (
+        "search_products",
+        "get_product_detail",
+        "check_stock",
+        "get_promotion",
+    ),
     Intent.POLICY_FAQ: (),
     Intent.ORDER_STATUS: ("get_order_status",),
     Intent.SHIPMENT: ("get_order_status", "get_shipment"),
     Intent.RETURN_ELIGIBILITY: ("check_return_eligibility",),
     # ``create_return_request`` is stage 9 and requires a server-side confirmation grant.
     Intent.RETURN_REQUEST: ("check_return_eligibility",),
+    # Refund progress is read from the caller's own rows; no tool is exposed.
+    Intent.REFUND_STATUS: (),
+    Intent.PURCHASE: ("search_products",),
     Intent.COMPLAINT_HANDOFF: (),
     Intent.SMALLTALK_OR_UNKNOWN: (),
 }
@@ -99,6 +111,8 @@ ALLOWED_TOOLS: dict[Intent, tuple[str, ...]] = {
 #: Higher specificity first; used only to break exact ties.
 PRIORITY: tuple[Intent, ...] = (
     Intent.COMPLAINT_HANDOFF,
+    Intent.REFUND_STATUS,
+    Intent.PURCHASE,
     Intent.RETURN_REQUEST,
     Intent.RETURN_ELIGIBILITY,
     Intent.SHIPMENT,
@@ -147,6 +161,12 @@ RULES: tuple[IntentRule, ...] = (
     _rule("discover.want", Intent.PRODUCT_DISCOVERY, 4, r"想买|想找|想选|想入手|打算买"),
     _rule("discover.budget", Intent.PRODUCT_DISCOVERY, 3, r"预算"),
     _rule("discover.fit", Intent.PRODUCT_DISCOVERY, 3, r"适合|用来|通勤|入门|性价比|平替"),
+    _rule(
+        "discover.cheaper",
+        Intent.PRODUCT_DISCOVERY,
+        2,
+        r"便宜|实惠|省钱|便宜点|低一点",
+    ),
     _rule("discover.any", Intent.PRODUCT_DISCOVERY, 2, r"有没有|有什么"),
     _rule(
         "discover.category",
@@ -231,6 +251,26 @@ RULES: tuple[IntentRule, ...] = (
         r"我要退货|我想退货|要退货|申请退货|提交退货|发起退货|办理退货|帮我退货|退货申请",
     ),
     _rule("request.submit", Intent.RETURN_REQUEST, 3, r"申请退款|退掉这个|直接退|我要退掉"),
+    # -- refund progress / purchase ---------------------------------------
+    _rule(
+        "refund.progress",
+        Intent.REFUND_STATUS,
+        4,
+        r"退款进度|退款到哪|退款状态|退款到账|我的退款|已退款|退款申请(?:记录|状态|进度)?",
+    ),
+    _rule(
+        "refund.apply",
+        Intent.REFUND_STATUS,
+        4,
+        r"(?:我要|我想|申请|想申请|要申请|帮我)\s*(?:退款|退钱)|退钱",
+    ),
+    _rule(
+        "purchase.how",
+        Intent.PURCHASE,
+        4,
+        r"怎么(?:买|下单)|在哪(?:买|下单)|如何(?:买|下单)|下单流程|购买流程|怎么购买",
+    ),
+    _rule("purchase.checkout", Intent.PURCHASE, 3, r"下单|结算|去支付|加入购物车|立即购买"),
     # -- complaint / handoff ---------------------------------------------
     _rule("handoff.complaint", Intent.COMPLAINT_HANDOFF, 4, r"投诉|举报|维权|差评|曝光你们"),
     _rule("handoff.human", Intent.COMPLAINT_HANDOFF, 3, r"转人工|找人工|要人工|真人客服|客服主管"),

@@ -160,12 +160,24 @@ def _ticket_row(
 
 
 def _risk_payload(payload: Any) -> dict[str, Any]:
+    """Project the stored risk blob onto the fields the workbench UI reads.
+
+    ``messages.risk_jsonb`` mixes two shapes: the chat output guard writes
+    ``risk_level``/``primary_reason_code``, older rows carry ``level``/``rule_codes``, and a
+    human reply carries ``author="support_agent"``. Returning all of them (instead of only
+    ``level``) keeps the risk badge and the "人工客服" attribution working.
+    """
     if not isinstance(payload, dict):
         return {}
-    level = payload.get("level")
+    level = payload.get("risk_level") or payload.get("level")
     codes = payload.get("rule_codes")
     return {
-        "level": str(level) if level is not None else None,
+        "risk_level": str(level) if level else None,
+        "level": str(level) if level else None,
+        "primary_reason_code": payload.get("primary_reason_code"),
+        "handoff_required": payload.get("handoff_required"),
+        "author": payload.get("author"),
+        "agent_reference_masked": payload.get("agent_reference_masked"),
         "rule_codes": [str(code) for code in codes] if isinstance(codes, list) else [],
     }
 

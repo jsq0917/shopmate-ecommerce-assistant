@@ -39,10 +39,15 @@ async def test_seed_counts_metadata_and_idempotency(session) -> None:
     assert first.counts["order_items"] >= 100
     assert first.counts["promotions"] == 4
 
-    seeded_orders = await session.scalar(
-        sa.select(sa.func.count()).select_from(Order).where(Order.order_no.like("SM-2026-%"))
+    # Seed owns SM-2026-00001 … SM-2026-00100. Storefront orders and the demo helper use
+    # higher numbers, so the assertion is "the seed range is complete", not "the table has
+    # exactly 100 rows".
+    seed_numbers = {f"SM-2026-{index:05d}" for index in range(1, 101)}
+    order_numbers = await session.scalars(
+        sa.select(Order.order_no).where(Order.order_no.like("SM-2026-%"))
     )
-    assert seeded_orders == 100, "种子必须且只能产出 100 条 SM-2026-* 订单"
+    present_orders = set(order_numbers.all())
+    assert seed_numbers <= present_orders, "种子必须覆盖 SM-2026-00001…00100"
 
     unique_documents = {doc.key for doc in POLICY_DOCS}
     assert len(unique_documents) >= 20, "至少 20 份政策文档"
@@ -69,7 +74,11 @@ async def test_every_seeded_row_is_marked_synthetic(session) -> None:
 async def test_seeded_users_use_reserved_domains_only(session) -> None:
     await run_seed(session)
 
-    emails = (await session.scalars(sa.select(User.email_ci))).all()
+    emails = (
+        await session.scalars(
+            sa.select(User.email_ci).where(User.password_hash.like("!synthetic%"))
+        )
+    ).all()
 
     assert emails
     assert all(email.endswith(".invalid") for email in emails)
@@ -79,9 +88,10 @@ async def test_seeded_orders_have_unique_numbers_and_consistent_states(session) 
     await run_seed(session)
 
     order_numbers = (await session.scalars(sa.select(Order.order_no))).all()
-    # Uniqueness is a table-wide invariant; the exact count is a seed-owned invariant.
+    # Uniqueness is a table-wide invariant; the exact range is a seed-owned invariant.
     assert len(order_numbers) == len(set(order_numbers))
-    assert len([no for no in order_numbers if no.startswith("SM-2026-")]) == 100
+    seed_numbers = {f"SM-2026-{index:05d}" for index in range(1, 101)}
+    assert seed_numbers <= set(order_numbers)
 
     delivered_without_timestamp = await session.scalar(
         sa.select(sa.func.count())
@@ -95,10 +105,12 @@ async def test_seeded_orders_have_unique_numbers_and_consistent_states(session) 
     # Playwright fixture) keep their own addresses and are not seed output.
     addresses = (
         await session.scalars(
-            sa.select(Order.shipping_address_masked).where(Order.order_no.like("SM-2026-%"))
+            sa.select(Order.shipping_address_masked).where(
+                Order.order_no.like("SM-2026-%"), Order.source_system == "mock_oms"
+            )
         )
     ).all()
-    assert len(addresses) == 100
+    assert len(addresses) >= 100
     assert all("合成" in address for address in addresses)
     assert not any(PHONE_PATTERN.search(address or "") for address in addresses)
 

@@ -171,6 +171,7 @@ async def list_messages(
                         item.citations.get("items", []) if isinstance(item.citations, dict) else []
                     ),
                     risk=item.risk,
+                    product_cards=item.cards,
                     is_complete=item.is_complete,
                     created_at=item.created_at,
                     client_message_id=item.client_message_id,

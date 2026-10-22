@@ -38,6 +38,22 @@ STOPWORD_TOKENS = frozenset(
         "多少",
         "有没有",
         "一个",
+        # SQL/注入噪声：这些词一旦成为 token 会去命中 attributes 里的英文键
+        # （例如 "or" 命中 "color"），既降低检索质量，也让注入样例看起来"有结果"。
+        "or",
+        "and",
+        "not",
+        "select",
+        "drop",
+        "table",
+        "from",
+        "where",
+        "insert",
+        "update",
+        "delete",
+        "union",
+        "sleep",
+        "products",
     }
 )
 

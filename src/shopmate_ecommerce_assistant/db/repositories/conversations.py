@@ -44,6 +44,7 @@ class MessageRow:
     finish_reason: str | None
     citations: dict[str, Any]
     risk: dict[str, Any]
+    cards: list[Any]
     is_complete: bool
     created_at: datetime
     client_message_id: UUID | None
@@ -232,6 +233,7 @@ class MessageRepository:
         citations: dict[str, Any],
         risk: dict[str, Any],
         is_complete: bool,
+        cards: list[Any] | None = None,
     ) -> MessageRow:
         """Insert the final assistant message once, at stream termination."""
         row = Message(
@@ -245,6 +247,7 @@ class MessageRepository:
             finish_reason=finish_reason,
             citations_jsonb=citations,
             risk_jsonb=risk,
+            cards_jsonb=list(cards or []),
             is_complete=is_complete,
         )
         self._session.add(row)
@@ -294,6 +297,7 @@ class MessageRepository:
             finish_reason=row.finish_reason,
             citations=row.citations_jsonb if isinstance(row.citations_jsonb, dict) else {},
             risk=row.risk_jsonb if isinstance(row.risk_jsonb, dict) else {},
+            cards=list(row.cards_jsonb) if isinstance(row.cards_jsonb, list) else [],
             is_complete=bool(row.is_complete),
             created_at=row.created_at,
             client_message_id=row.client_message_id,

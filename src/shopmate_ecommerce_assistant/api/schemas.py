@@ -138,6 +138,8 @@ class MessageItem(BaseModel):
     finish_reason: str | None = None
     citations: list[dict[str, Any]] = Field(default_factory=list)
     risk: dict[str, Any] = Field(default_factory=dict)
+    #: 本轮商品卡片快照；重开历史会话时前端据此还原卡片。
+    product_cards: list[dict[str, Any]] = Field(default_factory=list)
     is_complete: bool
     created_at: datetime
     client_message_id: UUID | None = None
@@ -276,6 +278,8 @@ class OrderItemSummary(BaseModel):
     quantity: int
     unit_price_cents: int
     status: str
+    #: Snapshot taken when the order was placed; decides self-service return eligibility.
+    is_returnable: bool = True
 
 
 class OrderListItem(BaseModel):
@@ -287,6 +291,8 @@ class OrderListItem(BaseModel):
     is_synthetic: bool
     placed_at: datetime
     status_updated_at: datetime
+    item_count: int = 0
+    first_item_title: str | None = None
 
 
 class OrderListData(BaseModel):
@@ -302,8 +308,62 @@ class OrderDetailData(BaseModel):
     currency: str
     is_synthetic: bool
     placed_at: datetime
+    paid_at: datetime | None = None
     status_updated_at: datetime
     items: list[OrderItemSummary]
+
+
+class CreateOrderItemRequest(_Strict):
+    variant_id: UUID
+    quantity: int = Field(ge=1, le=99)
+
+
+class CreateOrderRequest(_Strict):
+    items: list[CreateOrderItemRequest] = Field(min_length=1, max_length=20)
+    shipping_address_masked: str | None = Field(default=None, max_length=240)
+
+
+class RefundItem(BaseModel):
+    id: UUID
+    refund_no: str
+    order_id: UUID
+    order_no: str
+    order_item_id: UUID | None
+    scope: str
+    status: str
+    reason_code: str
+    amount_cents: int
+    note: str | None
+    review_note: str | None
+    created_at: datetime
+    updated_at: datetime
+    reviewed_at: datetime | None
+
+
+class RefundListData(BaseModel):
+    items: list[RefundItem]
+
+
+class CreateRefundRequest(_Strict):
+    order_id: UUID
+    reason_code: ReturnReasonCode
+    order_item_id: UUID | None = None
+    note: str | None = Field(default=None, max_length=500)
+
+
+class RefundReviewRequest(_Strict):
+    approve: bool
+    review_note: str | None = Field(default=None, max_length=500)
+
+
+class SupportReplyRequest(_Strict):
+    content: str = Field(min_length=1, max_length=2000)
+
+
+class SupportReplyData(BaseModel):
+    message_id: UUID
+    conversation_id: UUID
+    created_at: datetime
 
 
 class ShipmentEventItem(BaseModel):

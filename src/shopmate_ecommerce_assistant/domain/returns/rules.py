@@ -29,6 +29,28 @@ from shopmate_ecommerce_assistant.safety.risk import HIGH_VALUE_ORDER_CENTS
 RULE_VERSION = "demo-return-v1"
 RETURN_WINDOW_DAYS = 7
 
+#: Categories the policy corpus declares non-returnable (``七天无理由`` 例外):
+#: food, drinks, opened personal-care items and hygiene products. A newly created order
+#: line snapshots this decision into ``order_items.is_returnable_snapshot`` so later
+#: catalog edits cannot change an existing order's eligibility.
+NON_RETURNABLE_CATEGORIES: frozenset[str] = frozenset(
+    {
+        "咖啡",
+        "坚果",
+        "猫粮",
+        "猫砂",
+        "面膜",
+        "护手霜",
+        "洗发水",
+        "电动牙刷",
+    }
+)
+
+
+def is_category_returnable(category: str) -> bool:
+    """Return ``False`` for categories the return policy excludes from self-service."""
+    return category not in NON_RETURNABLE_CATEGORIES
+
 #: Reasons a shopper can submit without human review.
 SELF_SERVICE_REASONS: frozenset[ReturnReasonCode] = frozenset(
     {ReturnReasonCode.SIZE_OR_FIT, ReturnReasonCode.NO_LONGER_NEEDED}
@@ -285,6 +307,7 @@ def evaluate_return(check: ReturnCheck) -> ReturnEvaluation:
 
 __all__ = [
     "MANUAL_REVIEW_REASONS",
+    "NON_RETURNABLE_CATEGORIES",
     "RETURN_WINDOW_DAYS",
     "RULE_VERSION",
     "SELF_SERVICE_REASONS",
@@ -292,6 +315,7 @@ __all__ = [
     "ReturnDecision",
     "ReturnEvaluation",
     "evaluate_return",
+    "is_category_returnable",
     "materials_for",
     "return_deadline",
 ]

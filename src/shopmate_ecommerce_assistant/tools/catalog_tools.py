@@ -104,6 +104,12 @@ class CatalogTools:
             context.ensure_catalog_read()
             params = _validate(SearchProductsInput, payload)
             tokens = tokenize_query(params.query)
+            if params.query.strip() and not tokens:
+                # Every token was filler or injection noise: an honest "no match" beats
+                # falling back to an unfiltered catalog listing.
+                return self._success(
+                    context, SearchProductsData(items=[], truncated=False), self._clock()
+                )
             product_attributes, variant_attributes = split_search_attributes(
                 params.attributes or {}
             )

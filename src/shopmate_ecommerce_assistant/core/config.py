@@ -72,6 +72,12 @@ class Settings(BaseSettings):
     query_rewrite_max_keywords: int = Field(default=6, ge=0, le=20)
     query_rewrite_max_subqueries: int = Field(default=3, ge=1, le=3)
 
+    # Conversational rephrasing (stage 17). Deterministic answers stay the source of truth;
+    # the LLM only rewrites the wording and its output is rejected unless every digit it
+    # contains already exists in the draft. Disabled automatically when no model is set.
+    chat_persona_enabled: bool = True
+    chat_persona_timeout_seconds: float = Field(default=8.0, gt=0, le=30)
+
     # FAQ high-confidence cache (stage 8). Only grounded, low-risk policy answers are
     # stored; the key embeds shop/region/locale/knowledge-base/knowledge-version.
     faq_cache_enabled: bool = True

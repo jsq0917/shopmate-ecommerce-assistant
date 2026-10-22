@@ -20,6 +20,7 @@ from shopmate_ecommerce_assistant.api import (
     conversations,
     handoff,
     orders,
+    refunds,
     returns,
     support,
     system,
@@ -50,7 +51,11 @@ _OPENAPI_TAGS = [
         "description": "SSE 流式聊天（meta/tool_status/product_card/citation/delta/done/error）。",
     },
     {"name": "products", "description": "商品搜索、详情与对比。"},
-    {"name": "orders", "description": "订单列表、详情与物流。"},
+    {
+        "name": "orders",
+        "description": "订单列表、详情、物流，以及下单/支付/取消（模拟结算，不接真实资金）。",
+    },
+    {"name": "refunds", "description": "退款申请（提交后由客服审核，不自动打款）。"},
     {"name": "returns", "description": "退货资格检查与退货申请。"},
     {"name": "handoff", "description": "人工工单（消费者侧）。"},
     {"name": "admin", "description": "管理端知识库、文档上传、chunk 编辑与评测。"},
@@ -309,6 +314,7 @@ def create_app(
     app.include_router(chat.router)
     app.include_router(catalog.router)
     app.include_router(orders.router)
+    app.include_router(refunds.router)
     app.include_router(returns.router)
     app.include_router(handoff.router)
     app.include_router(admin.router)

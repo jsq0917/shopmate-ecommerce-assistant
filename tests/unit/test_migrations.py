@@ -13,4 +13,4 @@ def test_alembic_has_a_single_baseline_head() -> None:
 
     script = ScriptDirectory.from_config(config)
 
-    assert script.get_heads() == ["20261020_0005"]
+    assert script.get_heads() == ["20261022_0007"]

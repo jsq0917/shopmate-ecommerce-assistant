@@ -14,6 +14,7 @@ are answered with an honest clarification instead of guessing.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -24,8 +25,18 @@ from shopmate_ecommerce_assistant.agents.answer_composer import (
     compose_compare,
     compose_order_status,
     compose_product_discovery,
+    compose_purchase_intro,
+    compose_return_eligibility,
     compose_shipment,
     compose_smalltalk,
+)
+from shopmate_ecommerce_assistant.agents.persona import naturalize_async
+from shopmate_ecommerce_assistant.agents.query_understanding import (
+    category_terms,
+    expand_query,
+    extract_budget_cents,
+    infer_return_reason,
+    match_line,
 )
 from shopmate_ecommerce_assistant.agents.router import Intent, IntentRoute, route_intent
 from shopmate_ecommerce_assistant.agents.sse import (
@@ -41,10 +52,13 @@ from shopmate_ecommerce_assistant.agents.sse import (
 from shopmate_ecommerce_assistant.core.config import Settings
 from shopmate_ecommerce_assistant.core.errors import ErrorCode, ToolError
 from shopmate_ecommerce_assistant.core.security import AccessContext
+from shopmate_ecommerce_assistant.db.models.enums import ReturnReasonCode
+from shopmate_ecommerce_assistant.db.repositories.checkout import CheckoutRepository
 from shopmate_ecommerce_assistant.db.repositories.conversations import (
     ConversationRepository,
     MessageRepository,
 )
+from shopmate_ecommerce_assistant.db.repositories.orders import OrderRepository
 from shopmate_ecommerce_assistant.rag.policy_qa import AnswerModelError, PolicyQAService
 from shopmate_ecommerce_assistant.rag.query_rewrite import plan_query
 from shopmate_ecommerce_assistant.rag.retrieval import RetrievalError, RetrievalScope
@@ -52,13 +66,19 @@ from shopmate_ecommerce_assistant.safety.input_guard import guard_input
 from shopmate_ecommerce_assistant.safety.output_guard import guard_output
 from shopmate_ecommerce_assistant.tools.context import RiskContext, ToolContext
 from shopmate_ecommerce_assistant.tools.dispatcher import ToolDispatcher
-from shopmate_ecommerce_assistant.tools.order_schemas import GetOrderStatusInput, GetShipmentInput
+from shopmate_ecommerce_assistant.tools.order_schemas import (
+    CheckReturnEligibilityInput,
+    GetOrderStatusInput,
+    GetShipmentInput,
+)
 from shopmate_ecommerce_assistant.tools.schemas import (
     CompareProductsInput,
     SearchProductsInput,
     ToolFailure,
     ToolSuccess,
 )
+
+logger = logging.getLogger(__name__)
 
 DELTA_CHUNK_CHARS = 40
 UPSTREAM_TEXT = "当前无法确认最新信息，请稍后重试或转人工协助。"
@@ -81,6 +101,8 @@ class ChatOutcome:
     citation_labels: list[str] = field(default_factory=list)
     structured_facts_verified: bool = False
     risk: dict[str, Any] = field(default_factory=dict)
+    #: 商品卡片，既要随 SSE 发出，也要随助手消息落库。
+    product_cards: list[dict[str, Any]] = field(default_factory=list)
     finish_reason: str = "stop"
 
 
@@ -179,10 +201,25 @@ class ChatService:
             conversation_id=conversation_id,
             risk_context=RiskContext(level=route.risk.level, codes=route.risk.codes),
             route_confidence=route.confidence,
+            # Server-owned idempotency key for the write tools this turn may reach. It is
+            # derived from the already-persisted user message id, so retrying the same
+            # message cannot create a second handoff ticket, and the model never sees it.
+            idempotency_key=f"chat-turn-{user_message_id}",
         )
 
         try:
-            outcome = await self._run(route, guard.sanitized_text or message, tool_context)
+            outcome = await self._run(
+                route, guard.sanitized_text or message, tool_context, history=history
+            )
+            if route.intent is not Intent.POLICY_FAQ:
+                persona = await naturalize_async(
+                    outcome.answer_text,
+                    user_text=guard.sanitized_text or message,
+                    settings=self._settings,
+                    history=history,
+                )
+                if persona.rewritten:
+                    outcome.answer_text = persona.text
         except ToolError as exc:
             # The error text is persisted once as an incomplete assistant snapshot so the
             # history can show "未完成" after a reconnect (contract 7.9 / 7.10).
@@ -232,6 +269,7 @@ class ChatService:
             finish_reason=finish_reason,
             citations=outcome.citations,
             risk={**route.risk.as_dict(), **guarded.as_dict()},
+            cards=outcome.product_cards,
             is_complete=finish_reason != "cancelled",
         )
 
@@ -250,14 +288,18 @@ class ChatService:
         )
 
     # -- execution ---------------------------------------------------------
-    async def _run(self, route: IntentRoute, text: str, tctx: ToolContext) -> ChatOutcome:
+    async def _run(
+        self, route: IntentRoute, text: str, tctx: ToolContext, history: list[str] | None = None
+    ) -> ChatOutcome:
         intent = route.intent
         if route.handoff_required or intent is Intent.COMPLAINT_HANDOFF:
             return await self._handoff_outcome(route, tctx)
         if intent is Intent.POLICY_FAQ:
             return await self._policy_outcome(route, text, tctx)
+        if intent is Intent.PURCHASE:
+            return await self._search_outcome(route, text, tctx, history=history, purchase=True)
         if intent in {Intent.PRODUCT_DISCOVERY, Intent.PRODUCT_FACT}:
-            return await self._search_outcome(route, text, tctx)
+            return await self._search_outcome(route, text, tctx, history=history)
         if intent is Intent.PRODUCT_COMPARE:
             return await self._compare_outcome(route, tctx)
         if intent is Intent.ORDER_STATUS:
@@ -265,9 +307,11 @@ class ChatService:
         if intent is Intent.SHIPMENT:
             return await self._shipment_outcome(route, tctx)
         if intent in {Intent.RETURN_ELIGIBILITY, Intent.RETURN_REQUEST}:
-            return await self._return_outcome(route, tctx)
+            return await self._return_outcome(route, text, tctx)
+        if intent is Intent.REFUND_STATUS:
+            return await self._refund_outcome(route, tctx)
         return ChatOutcome(
-            answer_text=compose_smalltalk(intent, route.clarification_text),
+            answer_text=compose_smalltalk(intent, route.clarification_text, text=text),
             structured_facts_verified=True,
             risk=route.risk.as_dict(),
         )
@@ -309,24 +353,68 @@ class ChatService:
         return result
 
     async def _search_outcome(
-        self, route: IntentRoute, text: str, tctx: ToolContext
+        self,
+        route: IntentRoute,
+        text: str,
+        tctx: ToolContext,
+        *,
+        history: list[str] | None = None,
+        purchase: bool = False,
     ) -> ChatOutcome:
         events: list[StreamEvent] = []
-        payload = SearchProductsInput(query=text)
+        # A short follow-up ("那有没有便宜点的") carries no product words of its own; fold the
+        # previous user turn in so the search still has a topic.
+        query = text
+        if history and len(text.strip()) < 12:
+            # ``history`` already contains this turn, so the previous topic is the most
+            # recent *different* user message.
+            previous = next(
+                (
+                    turn.strip()
+                    for turn in reversed(history)
+                    if turn.strip() and turn.strip() != text.strip()
+                ),
+                "",
+            )
+            if previous:
+                # Prefer the previous turn's catalog words over its whole sentence: a long
+                # sentence would eat the 20-token budget and drop the actual product term.
+                topic = category_terms(previous)
+                query = f"{' '.join(topic)} {text}" if topic else f"{previous} {text}"
+        payload = SearchProductsInput(
+            query=expand_query(query),
+            budget_max_cents=extract_budget_cents(text),
+            limit=8,
+        )
+        logger.debug("search payload query=%r budget=%r", query, payload.budget_max_cents)
         result = await self._invoke("search_products", payload, tctx, "正在搜索商品", events)
         if isinstance(result, ToolFailure):
             raise _as_tool_error(result)
         items = (result.data or {}).get("items", []) or []
-        cards: list[dict[str, Any]] = []
-        for item in items:
-            card = _product_card(item)
-            cards.append(card)
+        cards: list[dict[str, Any]] = [_product_card(item) for item in items]
+        # Keep the catalog on-topic: a scenario word ("通勤") can match a backpack's
+        # description even though the shopper asked for headphones.
+        if any(word in text for word in ("便宜", "实惠", "省钱", "低一点")):
+            cards.sort(key=lambda card: int(card["price_cents"]))
+        terms = category_terms(text)
+        if terms:
+            on_topic = [
+                card for card in cards if any(term in card["title"] for term in terms)
+            ]
+            if on_topic:
+                cards = on_topic
+        for card in cards:
             events.append(product_card_event(card))
+        if purchase:
+            answer = compose_purchase_intro(cards)
+        else:
+            answer = compose_product_discovery(cards, question=text)
         return ChatOutcome(
-            answer_text=compose_product_discovery(cards),
+            answer_text=answer,
             pre_events=events,
             structured_facts_verified=True,
             risk=route.risk.as_dict(),
+            product_cards=cards,
         )
 
     async def _compare_outcome(self, route: IntentRoute, tctx: ToolContext) -> ChatOutcome:
@@ -423,25 +511,125 @@ class ChatService:
             risk=route.risk.as_dict(),
         )
 
-    async def _return_outcome(self, route: IntentRoute, tctx: ToolContext) -> ChatOutcome:
+    async def _return_outcome(
+        self, route: IntentRoute, text: str, tctx: ToolContext
+    ) -> ChatOutcome:
         events: list[StreamEvent] = []
         order_nos = route.entities.order_nos
         if not order_nos:
             return ChatOutcome(
-                answer_text="请提供订单号和要退货的商品，我帮你检查是否符合退货条件。",
+                answer_text=(
+                    "我可以帮你核对退货资格。把订单号发给我（例如 SM-2026-00101），"
+                    "并说一句想退哪件商品就行。"
+                ),
                 structured_facts_verified=True,
                 risk=route.risk.as_dict(),
             )
-        await self._invoke(
+        status = await self._invoke(
             "get_order_status",
             GetOrderStatusInput(order_no=order_nos[0]),
             tctx,
             "正在查询订单",
             events,
         )
+        if isinstance(status, ToolFailure):
+            raise _as_tool_error(status)
+        order_id = (status.data or {}).get("order_id")
+        if order_id is None:
+            return ChatOutcome(
+                answer_text=compose_order_status(status.data or {}),
+                pre_events=events,
+                structured_facts_verified=True,
+                risk=route.risk.as_dict(),
+            )
+
+        items = await OrderRepository(self._session).list_order_items(
+            shop_id=tctx.shop_id, order_id=UUID(str(order_id))
+        )
+        if not items:
+            return ChatOutcome(
+                answer_text="这个订单里没有可退货的商品。你可以查看退货政策，或转人工核实。",
+                pre_events=events,
+                structured_facts_verified=True,
+                risk=route.risk.as_dict(),
+            )
+
+        chosen = match_line(
+            text, [(item.id, item.sku, item.title) for item in items]
+        )
+        if chosen is None:
+            names = "、".join(f"「{item.title}」" for item in items[:4])
+            more = "等" if len(items) > 4 else ""
+            return ChatOutcome(
+                answer_text=(
+                    f"订单 {order_nos[0]} 里有 {names}{more}，你想退哪一件？"
+                    "告诉我商品名或规格，我再帮你核对退货条件。"
+                ),
+                pre_events=events,
+                structured_facts_verified=True,
+                risk=route.risk.as_dict(),
+            )
+
+        reason = infer_return_reason(text) or ReturnReasonCode.NO_LONGER_NEEDED
+        decision = await self._invoke(
+            "check_return_eligibility",
+            CheckReturnEligibilityInput(
+                order_id=UUID(str(order_id)), order_item_id=chosen, reason_code=reason
+            ),
+            tctx,
+            "正在核对退货条件",
+            events,
+        )
+        if isinstance(decision, ToolFailure):
+            return ChatOutcome(
+                answer_text=decision.user_message,
+                pre_events=events,
+                structured_facts_verified=True,
+                risk=route.risk.as_dict(),
+            )
         return ChatOutcome(
-            answer_text=RETURN_CLARIFY_TEXT,
+            answer_text=compose_return_eligibility(decision.data or {}),
             pre_events=events,
+            structured_facts_verified=True,
+            risk=route.risk.as_dict(),
+        )
+
+    async def _refund_outcome(self, route: IntentRoute, tctx: ToolContext) -> ChatOutcome:
+        """Report the caller's own refund applications (never shop-wide)."""
+        rows = await CheckoutRepository(self._session).list_refunds(
+            shop_id=tctx.shop_id, user_id=tctx.actor_user_id, limit=5
+        )
+        if not rows:
+            return ChatOutcome(
+                answer_text=(
+                    "你目前还没有提交过退款申请。可以在「我的订单」里打开对应订单，"
+                    "点「申请退款」提交；如果商品已经收到，也可以直接申请退货。"
+                    "需要我帮你查某个订单的状态吗？"
+                ),
+                structured_facts_verified=True,
+                risk=route.risk.as_dict(),
+            )
+        status_labels = {
+            "requested": "等待客服审核",
+            "approved": "已通过，退款处理中",
+            "rejected": "未通过",
+            "completed": "已完成",
+        }
+        lines = [f"我查到你有 {len(rows)} 笔退款申请："]
+        for row in rows[:3]:
+            amount = (
+                row.amount_cents // 100
+                if row.amount_cents % 100 == 0
+                else row.amount_cents / 100
+            )
+            label = status_labels.get(row.status, row.status)
+            lines.append(
+                f"· {row.refund_no}：订单 {row.order_no}，¥{amount}，{label}"
+                + (f"（{row.review_note}）" if row.review_note else "")
+            )
+        lines.append("退款审核通过后会原路退回，具体到账时间以银行或支付渠道为准。")
+        return ChatOutcome(
+            answer_text="\n".join(lines),
             structured_facts_verified=True,
             risk=route.risk.as_dict(),
         )
@@ -523,6 +711,7 @@ class ChatService:
         citations: list[dict[str, Any]],
         risk: dict[str, Any],
         is_complete: bool,
+        cards: list[dict[str, Any]] | None = None,
     ) -> UUID:
         row = await self._messages.insert_assistant_message(
             shop_id=ctx.shop_id,
@@ -533,6 +722,7 @@ class ChatService:
             finish_reason=finish_reason,
             citations={"items": citations},
             risk=risk,
+            cards=cards or [],
             is_complete=is_complete,
         )
         return row.id
@@ -559,6 +749,8 @@ def _product_card(item: Mapping[str, Any]) -> dict[str, Any]:
         "product_id": item["product_id"],
         "variant_id": item["variant_id"],
         "title": item["title"],
+        # Cards carry the category so the client can render a stable placeholder cover.
+        "category": item.get("category"),
         "image_url": item.get("image_url"),
         "price_cents": item["price_cents"],
         "currency": item["currency"],

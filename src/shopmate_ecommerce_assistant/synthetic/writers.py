@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import os
+import time
+from collections.abc import Callable
 from pathlib import Path
 
 from docx import Document as DocxDocument
@@ -173,6 +175,25 @@ def _pptx(doc: PolicyDoc, target: Path) -> None:
     presentation.save(str(target))
 
 
+def _retry_write(action: Callable[[], None], *, attempts: int = 4) -> None:
+    """Run a binary document write, retrying transient Windows sharing violations.
+
+    Windows antivirus/indexers briefly lock freshly written ``.docx``/``.pdf``/``.pptx``
+    files, which surfaces as ``OSError: [Errno 22] Invalid argument`` from ``zipfile``.
+    The content is deterministic, so retrying the same write is safe.
+    """
+    last: OSError | None = None
+    for attempt in range(attempts):
+        try:
+            action()
+            return
+        except OSError as exc:  # pragma: no cover - depends on the host filesystem
+            last = exc
+            time.sleep(0.05 * (attempt + 1))
+    assert last is not None
+    raise last
+
+
 def render_policy(doc: PolicyDoc, directory: Path) -> Path:
     """Write one policy document in its declared format and return the path."""
     directory.mkdir(parents=True, exist_ok=True)
@@ -182,13 +203,13 @@ def render_policy(doc: PolicyDoc, directory: Path) -> Path:
     elif doc.file_format == "txt":
         target.write_text(_plain_text(doc), encoding="utf-8")
     elif doc.file_format == "pdf":
-        _pdf(doc, target)
+        _retry_write(lambda: _pdf(doc, target))
     elif doc.file_format == "docx":
-        _docx(doc, target)
+        _retry_write(lambda: _docx(doc, target))
     elif doc.file_format == "pptx":
-        _pptx(doc, target)
+        _retry_write(lambda: _pptx(doc, target))
     else:  # pragma: no cover - guarded by the corpus definition
-        raise ValueError(f"unsupported format: {doc.file_format}")
+        raise ValueError(f"unsupported file format: {doc.file_format}")
     return target
 
 

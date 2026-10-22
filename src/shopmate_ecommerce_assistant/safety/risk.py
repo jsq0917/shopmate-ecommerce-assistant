@@ -105,7 +105,10 @@ RISK_RULES: tuple[RiskRule, ...] = (
             r"(?:要求|必须|马上)\s*(?:全额)?\s*(?:退款|退钱|赔偿|赔钱)",
             r"赔我|赔偿我|退一赔三|假一赔十|免单|白送",
             r"(?:发|送|给)\s*(?:我|一张|一个)?\s*(?:优惠券|代金券|红包)",
-            r"改价|改价格|修改价格|便宜点|打个折|少收点",
+            # Bargaining asks the agent to *change* a price ("便宜点吧", "改价"). Asking for
+            # cheaper *products* ("有没有便宜点的") is ordinary shopping, not a money decision:
+            # the negative lookahead keeps that phrasing on the catalog path.
+            r"改价|改价格|修改价格|便宜点(?!的)|打个折|少收点",
             r"(?:全额|双倍|三倍)\s*(?:退款|赔偿)",
         ),
     ),

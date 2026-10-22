@@ -75,7 +75,7 @@ def test_intent_routing(text: str, expected: Intent) -> None:
     assert route.intent is expected, route.as_dict()
 
 
-def test_all_ten_intents_are_reachable() -> None:
+def test_all_intents_are_reachable() -> None:
     assert {intent.value for intent in Intent} == {
         "product_discovery",
         "product_compare",
@@ -85,6 +85,8 @@ def test_all_ten_intents_are_reachable() -> None:
         "shipment",
         "return_eligibility",
         "return_request",
+        "refund_status",
+        "purchase",
         "complaint_handoff",
         "smalltalk_or_unknown",
     }

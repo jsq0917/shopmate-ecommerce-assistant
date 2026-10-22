@@ -18,7 +18,8 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, Query, Request
+import sqlalchemy as sa
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shopmate_ecommerce_assistant.api.deps import (
@@ -30,9 +31,14 @@ from shopmate_ecommerce_assistant.api.envelope import Envelope
 from shopmate_ecommerce_assistant.api.schemas import (
     QualityLabelData,
     QualityLabelRequest,
+    RefundItem,
+    RefundListData,
+    RefundReviewRequest,
     SupportConversationData,
     SupportConversationMessageItem,
     SupportHandoffSummary,
+    SupportReplyData,
+    SupportReplyRequest,
     SupportTicketDetail,
     SupportTicketItem,
     SupportTicketListData,
@@ -42,7 +48,10 @@ from shopmate_ecommerce_assistant.api.schemas import (
 )
 from shopmate_ecommerce_assistant.core.errors import ErrorCode, ToolError
 from shopmate_ecommerce_assistant.core.security import AccessContext
+from shopmate_ecommerce_assistant.db.models import Conversation
 from shopmate_ecommerce_assistant.db.repositories.audit import AuditRepository
+from shopmate_ecommerce_assistant.db.repositories.checkout import CheckoutRepository, RefundRow
+from shopmate_ecommerce_assistant.db.repositories.conversations import MessageRepository
 from shopmate_ecommerce_assistant.db.repositories.support import (
     InvalidTicketTransition,
     SupportRepository,
@@ -352,6 +361,158 @@ async def label_message(
         data=QualityLabelData(message_id=row.message_id, label=row.label),
         request_id=request_id,
         trace_id=trace_id,
+    )
+
+
+@router.post(
+    "/tickets/{ticket_id}/reply",
+    response_model=Envelope[SupportReplyData],
+    status_code=status.HTTP_201_CREATED,
+)
+async def reply_to_ticket(
+    ticket_id: UUID,
+    body: SupportReplyRequest,
+    request: Request,
+    context: TicketWriter,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> Envelope[SupportReplyData]:
+    """Append one human-agent reply to the ticket's conversation.
+
+    The reply is stored as an ``assistant`` message with ``route='support_agent'`` so the
+    shopper sees it in the same thread, and it is labelled in ``risk_jsonb`` so the UI can
+    render it as "人工客服" rather than as an AI answer. The conversation owner is looked up
+    from the conversation row (never from the body) and the message keeps the owner's
+    ``user_id`` so the shopper's transcript query still finds it.
+    """
+    repo = SupportRepository(session)
+    ticket = await repo.get_ticket(shop_id=context.shop_id, ticket_id=ticket_id)
+    if ticket is None:
+        raise ToolError(ErrorCode.CONVERSATION_NOT_FOUND, _TICKET_NOT_FOUND)
+    owner_id = (
+        await session.execute(
+            sa.select(Conversation.user_id).where(
+                Conversation.shop_id == context.shop_id,
+                Conversation.id == ticket.conversation_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if owner_id is None:
+        raise ToolError(ErrorCode.CONVERSATION_NOT_FOUND, "未找到该工单对应的会话。")
+
+    agent_label = context.user_id.hex[:6]
+    message = await MessageRepository(session).insert_assistant_message(
+        shop_id=context.shop_id,
+        conversation_id=ticket.conversation_id,
+        user_id=owner_id,
+        content=body.content.strip(),
+        route="support_agent",
+        finish_reason="human_reply",
+        citations={},
+        risk={
+            "author": "support_agent",
+            "agent_reference_masked": f"客服{agent_label}",
+            "risk_level": "low",
+            "ticket_id": str(ticket_id),
+        },
+        is_complete=True,
+    )
+    await session.execute(
+        sa.update(Conversation)
+        .where(Conversation.shop_id == context.shop_id, Conversation.id == ticket.conversation_id)
+        .values(updated_at=sa.func.now())
+    )
+    await session.commit()
+
+    request_id, trace_id = get_request_ids(request)
+    await _audit(
+        session,
+        context=context,
+        action="support.ticket.reply",
+        resource_type="handoff_ticket",
+        resource_id=ticket_id,
+        request_id=request_id,
+        trace_id=trace_id,
+        metadata={"message_id": str(message.id), "length": len(message.content)},
+    )
+    return Envelope(
+        data=SupportReplyData(
+            message_id=message.id,
+            conversation_id=ticket.conversation_id,
+            created_at=message.created_at,
+        ),
+        request_id=request_id,
+        trace_id=trace_id,
+    )
+
+
+@router.get("/refunds", response_model=Envelope[RefundListData])
+async def list_refunds(
+    request: Request,
+    context: TicketReader,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    refund_status: Annotated[str | None, Query(alias="status")] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> Envelope[RefundListData]:
+    """Return refund applications waiting for a human decision (shop-wide)."""
+    repo = CheckoutRepository(session)
+    rows = await repo.list_shop_refunds(
+        shop_id=context.shop_id, status=refund_status, limit=limit
+    )
+    request_id, trace_id = get_request_ids(request)
+    return Envelope(
+        data=RefundListData(items=[_refund_item(row) for row in rows]),
+        request_id=request_id,
+        trace_id=trace_id,
+    )
+
+
+@router.post("/refunds/{refund_id}/review", response_model=Envelope[RefundItem])
+async def review_refund(
+    refund_id: UUID,
+    body: RefundReviewRequest,
+    request: Request,
+    context: TicketWriter,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> Envelope[RefundItem]:
+    """Approve or reject one refund application. Money never moves (simulated)."""
+    repo = CheckoutRepository(session)
+    row = await repo.review_refund(
+        shop_id=context.shop_id,
+        refund_id=refund_id,
+        reviewer_id=context.user_id,
+        approve=body.approve,
+        review_note=body.review_note,
+    )
+    request_id, trace_id = get_request_ids(request)
+    await _audit(
+        session,
+        context=context,
+        action="support.refund.approve" if body.approve else "support.refund.reject",
+        resource_type="refund_request",
+        resource_id=refund_id,
+        request_id=request_id,
+        trace_id=trace_id,
+        metadata={"status": row.status, "amount_cents": row.amount_cents},
+    )
+    return Envelope(data=_refund_item(row), request_id=request_id, trace_id=trace_id)
+
+
+def _refund_item(row: RefundRow) -> RefundItem:
+    return RefundItem(
+        id=row.id,
+        refund_no=row.refund_no,
+        order_id=row.order_id,
+        order_no=row.order_no,
+        order_item_id=row.order_item_id,
+        scope=row.scope,
+        status=row.status,
+        reason_code=row.reason_code,
+        amount_cents=row.amount_cents,
+        note=row.note,
+        review_note=row.review_note,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+        reviewed_at=row.reviewed_at,
     )
 
 

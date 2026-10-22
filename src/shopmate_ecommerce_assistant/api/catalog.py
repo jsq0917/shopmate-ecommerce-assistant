@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -32,6 +33,9 @@ from shopmate_ecommerce_assistant.core.config import Settings
 from shopmate_ecommerce_assistant.core.errors import ErrorCode, ToolError
 from shopmate_ecommerce_assistant.core.security import AccessContext
 from shopmate_ecommerce_assistant.db.repositories.catalog import CatalogRepository
+from shopmate_ecommerce_assistant.domain.catalog.models import SearchCriteria
+from shopmate_ecommerce_assistant.domain.catalog.search import merged_attributes
+from shopmate_ecommerce_assistant.domain.catalog.stock import stock_status
 from shopmate_ecommerce_assistant.tools.catalog_tools import CatalogTools
 from shopmate_ecommerce_assistant.tools.schemas import (
     CompareProductsInput,
@@ -97,6 +101,70 @@ async def search_products(
     return Envelope(
         data=ProductSearchData(
             items=cards, as_of=as_of, is_synthetic=is_synthetic, next_cursor=None
+        ),
+        request_id=request_id,
+        trace_id=trace_id,
+    )
+
+
+@router.get("/featured", response_model=Envelope[ProductSearchData])
+async def featured_products(
+    request: Request,
+    context: Annotated[AccessContext, Depends(get_access_context)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    category: Annotated[str | None, Query(max_length=80)] = None,
+    limit: Annotated[int, Query(ge=1, le=24)] = 12,
+) -> Envelope[ProductSearchData]:
+    """Return on-sale products without a keyword (the catalog home page).
+
+    The chat path always has a query; a storefront needs a browsable landing list, so this
+    endpoint reads the same ``CatalogRepository`` with no keyword tokens and simply orders
+    by price. Every price/stock value still comes from PostgreSQL.
+    """
+    repo = CatalogRepository(session)
+    candidates = await repo.search(
+        shop_id=context.shop_id,
+        criteria=SearchCriteria(category=category),
+        # Read a wider, price-ordered window, then interleave categories: a raw price sort
+        # would make the storefront start with data cables and cat litter.
+        limit=min(limit * 5, 100),
+    )
+    buckets: dict[str, list[Any]] = {}
+    for hit in candidates:
+        buckets.setdefault(hit.product.category, []).append(hit)
+    hits: list[Any] = []
+    while len(hits) < limit and any(buckets.values()):
+        for bucket in buckets.values():
+            if bucket and len(hits) < limit:
+                hits.append(bucket.pop(0))
+    now = datetime.now(UTC)
+    cards = [
+        ProductCardItem(
+            product_id=hit.product.id,
+            variant_id=hit.variant.id,
+            title=hit.product.title,
+            brand=hit.product.brand,
+            category=hit.product.category,
+            sku=hit.variant.sku,
+            price_cents=hit.variant.price_cents,
+            currency=hit.variant.currency,
+            stock_status=stock_status(hit.variant.available_qty),
+            available_qty=hit.variant.available_qty,
+            attributes=merged_attributes(hit.product.attributes, hit.variant.attributes),
+            matched_reasons=["在售商品"],
+            image_url=None,
+            is_synthetic=hit.product.is_synthetic,
+            as_of=hit.variant.stock_updated_at or now,
+        )
+        for hit in hits
+    ]
+    request_id, trace_id = get_request_ids(request)
+    return Envelope(
+        data=ProductSearchData(
+            items=cards,
+            as_of=max((card.as_of for card in cards), default=now),
+            is_synthetic=all(card.is_synthetic for card in cards),
+            next_cursor=None,
         ),
         request_id=request_id,
         trace_id=trace_id,

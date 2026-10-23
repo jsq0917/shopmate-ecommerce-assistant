@@ -4,17 +4,17 @@
 > 每条提示词前可以加一句："先完整读取 `AGENTS.md` 与 `docs/project-status.md`，再执行本条任务。"
 > 顺序不要跳：0 是止血，1-4 是硬伤（影响简历数字），5-7 是课程任务书符合度，8 是文档收尾。
 
-| 序号 | 任务 | 预计产出 | 是否阻塞其他任务 |
-|---|---|---|---|
-| 0 | 止血：API 崩溃 + 工作区提交 | 容器 healthy、代码进 git | **是**，必须最先做 |
-| 1 | 意图路由知识型兜底 | 严格拒答率 0/7 改善 | 是（4 依赖它） |
-| 2 | 三个工具契约缺陷 | 任务成功率 0.63 → 0.85+ | 是（4 依赖它） |
-| 3 | 扩充语料 + 重建索引 + 重跑评测 | 语料 400-800 chunk，指标有意义 | 是（4 依赖它） |
-| 4 | LLM 统一 DeepSeek 档 + 阈值口径 | DeepSeek 上的生成指标、去掉本地小模型基线 | 否（但建议在 1-3 之后） |
-| 5 | 知识库多选（任务书要求） | 对话页可勾选 1..N 个 KB | 否 |
-| 6 | 推理参数面板（任务书要求） | 温度/topP/max_tokens/历史轮数 | 否 |
-| 7 | 图片解析（可选） | 图片文档可入库 | 否 |
-| 8 | 文档同步 | 三份过期文档对齐实际 | 建议最后做 |
+| 序号 | 任务 | 预计产出 | 是否阻塞其他任务 | 实际状态（2026-10-23 16:0x） |
+|---|---|---|---|---|
+| 0 | 止血：API 崩溃 + 工作区提交 | 容器 healthy、代码进 git | **是**，必须最先做 | ✅ 已完成（api healthy、10 提交全部推送） |
+| 1 | 意图路由知识型兜底 | 严格拒答率 0/7 改善 | 是（4 依赖它） | ✅ 已完成（意图 0.7059→0.8235） |
+| 2 | 三个工具契约缺陷 | 任务成功率 0.63 → 0.85+ | 是（4 依赖它） | ⚠️ 完成 2/3（项3 退货链 `order_item_id` 经确认不做） |
+| 3 | 扩充语料 + 重建索引 + 重跑评测 | 语料 400-800 chunk，指标有意义 | 是（4 依赖它） | ✅ 已完成（89 版本/431 chunk、金标 143、孤儿 0） |
+| 4 | LLM 统一 DeepSeek 档 + 阈值口径 | DeepSeek 上的生成指标、去掉本地小模型基线 | 否（但建议在 1-3 之后） | ✅ 已完成（可答率 5/29→20/29） |
+| 5 | 知识库多选（任务书要求） | 对话页可勾选 1..N 个 KB | 否 | ✅ 已完成（阶段 18，`4a3b93a`） |
+| 6 | 推理参数面板（任务书要求） | 温度/topP/max_tokens/历史轮数 | 否 | ✅ 已完成（阶段 19，`96c37d7`） |
+| 7 | 图片解析（可选） | 图片文档可入库 | 否 | ✅ 已完成（阶段 20，RapidOCR，`8c61da7`） |
+| 8 | 文档同步 | 三份过期文档对齐实际 | 建议最后做 | ✅ 已完成（数字均标注出处命令） |
 
 ---
 
@@ -279,17 +279,21 @@ docs/resume-evidence.md 已注明"不可外推到万级知识库"。这导致简
 
 ---
 
-## 附：验收总清单（全部做完后逐项打勾）
+## 附：验收总清单（2026-10-23 16:0x 实测打勾）
 
-- [ ] `docker compose ps`：api / web / postgres / redis / milvus / etcd / minio 全部 healthy
-- [ ] `curl -s localhost:8000/ready` 返回 200
-- [ ] `uv run ruff check .` 通过
-- [ ] `uv run pytest -q` 全绿（≥ 600 passed）
-- [ ] `uv run pytest tests/security -q` 全绿（≥ 86）
-- [ ] `cd frontend && npm run typecheck && npx vitest --run` 全绿（≥ 124）
+- [x] `docker compose ps`：api / web / postgres / redis / milvus / etcd / minio 全部 healthy
+- [x] `curl -s localhost:18000/ready` 返回 200（`postgres`/`redis`/`milvus` 均 ok）
+  — 注：本机 8000 被系统进程占用，compose 把 api 映射到 **18000**
+- [x] `uv run ruff check .` 通过（All checks passed）
+- [x] `uv run pytest -q` 全绿 —— **804 passed, 2 skipped**
+- [x] `uv run pytest tests/security -q` 全绿 —— **86 passed**
+- [x] `cd frontend && npm run typecheck && npx vitest --run` 全绿 —— **149 passed（16 files）**
 - [ ] `uv run python scripts/verify_stage13.py` 0 不一致项
-- [ ] `uv run python scripts/check_deploy_security.py` 34 PASS
-- [ ] 检索语料 ≥ 400 chunk，孤儿 chunk = 0
-- [ ] 业务评测任务成功率显著高于 0.6324，严格拒答率不再是 0/7
-- [ ] 对话页可多选知识库、可调温度/topP/max_tokens/历史轮数
-- [ ] `git status` 干净，README/docs 数字与实际一致
+  —— 检索段 2 项差异（金标 140 → 143 导致 sha/条数不匹配），业务/政策/索引段 OK；
+  处理方案待所有者二选一：按 143 条重跑 或 把指纹检查限定为同一数据集
+- [x] `uv run python scripts/check_deploy_security.py` —— **34 PASS / 0 WARN / 0 FAIL**
+- [x] 检索语料 ≥ 400 chunk，孤儿 chunk = 0 —— **431 chunk / 89 ready 版本 / 孤儿 0**
+- [x] 业务评测任务成功率显著高于 0.6324，严格拒答率不再是 0/7 —— **0.8897（121/136）、7/7**
+- [x] 对话页可多选知识库、可调温度/topP/max_tokens/历史轮数 —— 阶段 18 / 19 均已实现
+- [x] `git status` 干净，README/docs 数字与实际一致 —— 10 个提交全部推送，
+  工作区仅剩 `.workbuddy/memory/`、一次性脚本与 1 个备份文件（按约定不入库）

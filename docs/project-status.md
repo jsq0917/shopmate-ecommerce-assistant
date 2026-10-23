@@ -1,10 +1,11 @@
 # ShopMate 项目状态
 
-> 最后更新：2026-10-23 15:10（Asia/Shanghai；阶段 18–20 收尾，文档与代码/git 对齐）
-> 当前阶段：**阶段 0–16 已完成并推送 GitHub；阶段 17 已提交待推送；阶段 18–20 已实现未提交**
+> 最后更新：2026-10-23 16:06（Asia/Shanghai；阶段 18–20 已提交并推送，容器已恢复 healthy）
+> 当前阶段：**阶段 0–20 全部完成并推送 GitHub（10 个提交，本地无积压）**
 > 阶段状态：阶段 13 已 PASS（D1–D4 全部关闭，见 §21、`docs/eval-report.md` 2.14）；
 > 阶段 14／15／16 已完成（§22／§23／§24）；阶段 17 补齐结算、退款与客服回复并改版前端（§25）；
-> 阶段 18／19／20 见 §26。**阶段 14 早已完成**；16 阶段计划之外的工作（18–20）属课程任务书补齐，
+> 阶段 18／19／20 见 §26，三者已于 2026-10-23 提交并推送（`4a3b93a`／`96c37d7`／`8c61da7`）。
+> **阶段 14 早已完成**；16 阶段计划之外的工作（18–20）属课程任务书补齐，
 > 是否继续扩展由所有者决定。
 
 ## 0. 当前状态速览（2026-10-23，先读这一节）
@@ -21,27 +22,29 @@
 | 15 | 简历证据与面试材料 | 完成 | §23、`docs/resume-evidence.md` |
 | 16 | 最终收尾（客服工单、上传、质检标签） | 完成 | §24 |
 | 17 | 结算/支付/取消、退款审核、客服回复、前端设计系统 | 完成（已提交，待推送） | §25 |
-| 18 | 对话页知识库多选 | 完成（未提交） | §26.1、`docs/06-api.md` §6.1 |
-| 19 | 对话页推理参数面板 | 完成（未提交） | §26.2、`docs/06-api.md` §6.1 |
-| 20 | 图片文档 OCR 入库与原图回源（可选扩展） | 完成（未提交） | §26.3、`docs/06-api.md` §6.3 |
+| 18 | 对话页知识库多选 | 完成（已提交并推送） | §26.1、`docs/06-api.md` §6.1 |
+| 19 | 对话页推理参数面板 | 完成（已提交并推送） | §26.2、`docs/06-api.md` §6.1 |
+| 20 | 图片文档 OCR 入库与原图回源（可选扩展） | 完成（已提交并推送） | §26.3、`docs/06-api.md` §6.3 |
 
 ### 0.2 Git 与远端（命令可复算）
 
 ```bash
 cd E:/project/shopmate-ecommerce-assistant
-git log --oneline                 # 7 个提交
-git rev-list --count HEAD         # 7
-git status -sb                    # ## main...origin/main [ahead 3]
+git log --oneline                 # 10 个提交
+git rev-list --count HEAD         # 10
+git status -sb                    # ## main...origin/main（无 ahead/behind）
 git remote -v                     # origin git@github.com:jsq0917/shopmate-ecommerce-assistant.git
 ```
 
-- **已推送**（`origin/main` 有 4 个提交）：`f81159b` 仓库基线 → `1bae45d` 阶段 0–15 文档
-  → `a7b9632` 阶段 16 收尾 → `5978d82` 推送记录。
-- **已在本地提交、尚未推送**（3 个）：`28ef24a` 阶段 17 下单支付退款与商品卡片 →
-  `23c3516` 结算页/退款页与前端设计系统 → `a19d053` 阶段 17 文档、验收截图与演示脚本。
-- **未提交的工作区改动**：阶段 18–20 的全部代码与文档（`git status --short` 可列出，
-  含 `api/knowledge_assets.py`、`synthetic/image_render.py`、图片语料与 3 条图片金标）。
-- 默认不自行 `git commit` / `git push`（`AGENTS.md` §0.6），提交时机由所有者决定。
+- **全部 10 个提交均已推送 `origin/main`**（2026-10-23 16:0x 推送 `5978d82..8c61da7`）：
+  `f81159b` 仓库基线 → `1bae45d` 阶段 0–15 文档 → `a7b9632` 阶段 16 收尾 → `5978d82` 推送记录
+  → `28ef24a` / `23c3516` / `a19d053` 阶段 17 → `4a3b93a` 阶段 18 → `96c37d7` 阶段 19
+  → `8c61da7` 阶段 20 与语料、文档同步。
+- **工作区剩余未提交项（按约定不提交）**：`.workbuddy/memory/` 本地记忆目录、
+  `append_retrieval_cases.py` 一次性脚本（依赖已删除的 `corpus_dump.json`）、
+  `data/eval/retrieval_cases.jsonl.bak-58` 备份文件。
+- 默认不自行 `git commit` / `git push`（`AGENTS.md` §0.6）；本轮 3 个提交与推送由所有者
+  于 2026-10-23 明确授权后执行。
 
 ### 0.3 读法说明：历史段落里的"仓库无 commit"
 
@@ -68,7 +71,22 @@ uv run python scripts/verify_stage13.py --raw data/eval/results/stage13-deepseek
 #   retrieval.cases : recomputed=143       claimed=140
 uv run python reconcile_index.py
 # → PG 577 chunk 行 / 89 ready 版本 / enabled 431；Milvus 431；交集 431；孤儿 0
+docker compose ps            # 7 个服务全部 healthy（含 api）
+curl -s localhost:18000/ready  # 200，postgres/redis/milvus 均 ok
+# 注意：本机 8000 端口被系统进程占用，compose 把 api 映射到 18000（0.0.0.0:18000->8000/tcp）
 ```
+
+### 0.6 容器与镜像（2026-10-23 16:0x）
+
+阶段 18／19 的迁移（0008／0009）在宿主机执行后，`shopmate-api:0.1.0` 镜像未重建，
+api 容器再次进入 `Exited (255)` 重启循环（`Can't locate revision identified by '20261023_0009'`，
+与 2026-10-22 那次同源）。已执行 `docker compose build api && docker compose up -d api`
+（不动数据卷、不 down、不 prune、不改 `.env` 口令），构建耗时约 28 分钟（新增 RapidOCR /
+onnxruntime 与 `fonts-noto-cjk`）。此后 api healthy，`/health` 与 `/ready` 均 200，
+登录 `shopper01@example.invalid` 后发一条消息可正常收到 `meta` + `citation` 等 SSE 事件。
+
+**后续约定**：凡改动 `alembic/`、`src/`、`pyproject.toml`、`Dockerfile`，重启 api 前必须
+`docker compose build api`，只 `restart` 无效（api 无源码 bind mount）。
 
 那 2 项差异来自金标 140 → 143 条（新增 3 条图片用例，见 §26.3），**不是数字造假**；
 历史阶段记录里"verify 输出 0 不一致"是各自当时的真实输出。处理方案二选一（重跑 143 条 /
@@ -1528,7 +1546,7 @@ uv run python scripts/verify_stage13.py          -> 全部一致（独立复算 
 uv run python scripts/check_deploy_security.py   -> 34 PASS / 0 WARN / 0 FAIL
 wc -l / sha256sum 数据集                          -> 136 / 7606cfce…；58 / 856f3338…
 grep Aggregated locust u20 / u40                 -> 1350 请求 0 失败 23.0833 req/s；1762 请求 2 失败 29.6058 req/s
-git log --oneline                                -> 阶段 15 当时仓库 0 commit（现状见 §0.2：7 个提交）
+git log --oneline                                -> 阶段 15 当时仓库 0 commit（现状见 §0.2：10 个提交、全部已推送）
 ```
 
 前端 E2E（16 用例）与本机容器启动**本轮未复跑**，台账中已标注"引用阶段 11/12 记录、本轮未复跑"，
@@ -1545,7 +1563,7 @@ git log --oneline                                -> 阶段 15 当时仓库 0 com
 
 ### 23.4 已知问题与风险
 
-- 阶段 15 当时仓库 0 commit（**现状已不同**：2026-10-21 起共 7 个提交、4 个已推送，见 §0.2）；即便如此，证据仍以文件 + 可复算命令为准，commit SHA 只是追加的可追溯项。
+- 阶段 15 当时仓库 0 commit（**现状已不同**：2026-10-23 共 10 个提交、全部已推送，见 §0.2）；即便如此，证据仍以文件 + 可复算命令为准，commit SHA 只是追加的可追溯项。
 - 用户侧若把 `R@1=1.00` 单独引用会被误读（语料仅 27 条有效向量，Milvus `count(*)` 28 含 1 条孤儿、已饱和），台账已在同一行写死限制。
 - `NO_EVIDENCE` fail-open（`rag/policy_qa.py`）仍未修，属安全相关缺陷，**已作为"已知缺陷"写进台账与面试提纲**，
   未在简历里隐瞒。
@@ -1875,7 +1893,7 @@ frontend: vite build           → built in 10.20s
 - 退款审批只有「通过/拒绝」两步，没有打款重试、对账与退款单导出。
 - 聊天里的下单仍是引导到商品页，不在对话内直接创建订单（写操作需要显式确认，保持人机边界）。
 
-## 26. 阶段 18–20：课程任务书补齐与图片扩展（2026-10-23，未提交）
+## 26. 阶段 18–20：课程任务书补齐与图片扩展（2026-10-23，已提交并推送）
 
 > 这三项都不在原始 16 阶段计划里，来自课程任务书与可选扩展。代码已在工作区，**未提交 git**；
 > 详细契约在 `docs/06-api.md`，评测口径在 `docs/eval-report.md` §3.8 与新增 §5。

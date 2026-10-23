@@ -6,20 +6,23 @@
 
 ## 0. 先说三条硬约束
 
-1. **Git 状态（2026-10-23 核对）**：仓库共 **7 个提交**，`main` 跟踪 `origin/main`
-   （`git@github.com:jsq0917/shopmate-ecommerce-assistant.git`），其中 **4 个已推送**：
-   `f81159b` 基线 → `1bae45d` 阶段 0–15 文档 → `a7b9632` 阶段 16 收尾 → `5978d82` 推送记录；
-   **3 个已提交未推送**：`28ef24a` 阶段 17 下单支付退款 → `23c3516` 结算/退款页与设计系统 →
-   `a19d053` 阶段 17 文档与截图。阶段 18–20 的改动**尚未提交**（工作区）。
+1. **Git 状态（2026-10-23 16:0x 核对）**：仓库共 **10 个提交**，**全部已推送** `origin/main`
+   （`git@github.com:jsq0917/shopmate-ecommerce-assistant.git`，本地无积压）：
+   `f81159b` 基线 → `1bae45d` 阶段 0–15 文档 → `a7b9632` 阶段 16 收尾 → `5978d82` 推送记录
+   → `28ef24a` 阶段 17 下单支付退款 → `23c3516` 结算/退款页与设计系统 → `a19d053` 阶段 17 文档与截图
+   → `4a3b93a` 阶段 18 知识库多选 → `96c37d7` 阶段 19 推理参数面板 → `8c61da7` 阶段 20 图片 OCR
+   与文档同步。
 
    ```bash
-   git rev-list --count HEAD   # 7
-   git log --oneline           # 上面 7 个 SHA
-   git status -sb              # ## main...origin/main [ahead 3]
+   git rev-list --count HEAD   # 10
+   git log --oneline           # 上面 10 个 SHA
+   git status -sb              # ## main...origin/main（无 ahead/behind）
    ```
 
-   简历/面试可引用 SHA，但**证据主体仍是文件 + 可复现命令**：未推送的 3 个提交只有本地才有，
-   面试方 clone 不到；阶段 18–20 连提交都还没有。**不得**把"已提交/已推送"写成"已发布"。
+   简历/面试可放心引用 SHA：远端 `clone` 即可复现全部 10 个提交。工作区仅剩
+   `.workbuddy/memory/`（本地记忆）、`append_retrieval_cases.py`（一次性脚本）与
+   `data/eval/retrieval_cases.jsonl.bak-58`（备份）三项按约定不入库。
+   **不得**把"已提交/已推送"写成"已发布/线上可用"——仓库是私有作业仓库，未部署公网。
 2. **本文件只记录本仓库实测结果**。课程场景里的 82% / 42% / 70% / 18% 是示例宣传值
    （`AGENTS.md` §2.3），四个 GitHub 参考仓库的工作也不属于本项目（§19），两者**都不得**出现在简历里。
 3. **没有量化数据的一律写定性**。本文件第 4 节每一行都带"限制与口径"，第 5 节明确区分

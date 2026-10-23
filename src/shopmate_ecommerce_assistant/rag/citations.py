@@ -8,8 +8,8 @@ needs to audit the claim (document, chunk, heading, page, version, effective win
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
@@ -35,6 +35,9 @@ class EvidenceChunk:
     dense_similarity: float | None
     rrf_rank: int
     branch_support: int = 1
+    #: Raw ``metadata_jsonb`` of the chunk. Image documents carry an ``image`` block here
+    #: (file name, pixel size, OCR statistics, asset URL); text documents leave it empty.
+    metadata: Mapping[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +58,12 @@ class Citation:
     snippet: str
     score: float
     dense_similarity: float | None
+    #: Set only when the cited passage was OCR'd from an image, so the UI can show the
+    #: original screenshot instead of pretending the text was always text.
+    image_url: str | None = None
+    image_filename: str | None = None
+    image_width: int | None = None
+    image_height: int | None = None
 
     def as_dict(self) -> dict[str, Any]:
         """Return the payload used by the SSE ``citation`` event and the answer record."""
@@ -75,6 +84,10 @@ class Citation:
             "dense_similarity": (
                 None if self.dense_similarity is None else round(self.dense_similarity, 6)
             ),
+            "image_url": self.image_url,
+            "image_filename": self.image_filename,
+            "image_width": self.image_width,
+            "image_height": self.image_height,
         }
 
 
@@ -95,6 +108,21 @@ def _heading(path: Sequence[str]) -> str:
     return " / ".join(part for part in path if part)
 
 
+def _image_fields(metadata: Mapping[str, Any]) -> dict[str, Any]:
+    """Extract the citation fields that reference the original picture, if any."""
+    image = metadata.get("image")
+    if not isinstance(image, Mapping):
+        return {}
+    width = image.get("width")
+    height = image.get("height")
+    return {
+        "image_url": str(image["image_url"]) if image.get("image_url") else None,
+        "image_filename": str(image["filename"]) if image.get("filename") else None,
+        "image_width": int(width) if isinstance(width, int | float) else None,
+        "image_height": int(height) if isinstance(height, int | float) else None,
+    }
+
+
 def build_citation(evidence: EvidenceChunk, label: str) -> Citation:
     """Create the citation object for one evidence chunk."""
     return Citation(
@@ -112,6 +140,7 @@ def build_citation(evidence: EvidenceChunk, label: str) -> Citation:
         snippet=_snippet(evidence.text),
         score=evidence.score,
         dense_similarity=evidence.dense_similarity,
+        **_image_fields(evidence.metadata),
     )
 
 

@@ -102,3 +102,36 @@ def test_version_conflict_is_detected() -> None:
 
 def test_single_version_has_no_conflict() -> None:
     assert detect_version_conflicts([_chunk("a"), _chunk("b")]) == {}
+
+
+def test_image_citation_points_back_to_the_screenshot() -> None:
+    """An OCR'd chunk carries the picture's URL and size into the citation (stage 20)."""
+    image_chunk = replace(
+        _chunk("chunk-img"),
+        heading_path=(),
+        metadata={
+            "image": {
+                "filename": "gift-card-screenshot-2026.10.1.png",
+                "width": 1080,
+                "height": 1502,
+                "image_url": "/api/v1/knowledge-images/doc-1",
+            }
+        },
+    )
+
+    payload = build_citations([image_chunk])[0].as_dict()
+
+    assert payload["image_url"] == "/api/v1/knowledge-images/doc-1"
+    assert payload["image_filename"] == "gift-card-screenshot-2026.10.1.png"
+    assert payload["image_width"] == 1080
+    assert payload["image_height"] == 1502
+    assert payload["heading"] == ""
+
+
+def test_text_citation_has_no_image_fields() -> None:
+    payload = build_citations([_chunk("chunk-text")])[0].as_dict()
+
+    assert payload["image_url"] is None
+    assert payload["image_filename"] is None
+    assert payload["image_width"] is None
+    assert payload["image_height"] is None

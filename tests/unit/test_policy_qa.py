@@ -93,9 +93,11 @@ class StubModel:
     def __init__(self, text: str) -> None:
         self.text = text
         self.prompts: list[str] = []
+        self.generations: list[object] = []
 
-    def complete(self, *, system: str, user: str) -> str:
+    def complete(self, *, system: str, user: str, generation=None) -> str:
         self.prompts.append(user)
+        self.generations.append(generation)
         return self.text
 
 

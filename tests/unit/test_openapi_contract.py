@@ -30,8 +30,13 @@ def _operations(schema: dict) -> list[tuple[str, str, dict]]:
 def test_openapi_exposes_the_full_surface() -> None:
     schema = _schema()
     operations = _operations(schema)
-    assert len(schema["paths"]) == 43
-    assert len(operations) == 52
+    # 阶段 18 新增两条：GET /api/v1/knowledge-bases 与
+    # PATCH /api/v1/conversations/{id}/knowledge-bases（会话级知识库选择）。
+    # 阶段 19 再新增两条：GET /api/v1/generation-defaults 与
+    # PATCH /api/v1/conversations/{id}/generation-params（会话级推理参数）。
+    # 阶段 20 新增一条：GET /api/v1/knowledge-images/{document_id}（图片文档原图回源）。
+    assert len(schema["paths"]) == 48
+    assert len(operations) == 57
     assert schema["components"]["securitySchemes"]["HTTPBearer"]["scheme"] == "bearer"
 
 
@@ -76,9 +81,10 @@ def test_authenticated_operations_declare_401_and_403() -> None:
         authenticated += 1
         assert "401" in operation["responses"], f"{method} {path} misses 401"
         assert "403" in operation["responses"], f"{method} {path} misses 403"
-    # 43 operations minus the 8 unauthenticated ones (captcha/register/login/refresh/
-    # logout, health, ready, system/meta).
-    assert authenticated == 44
+    # 57 operations minus the 8 unauthenticated ones (captcha/register/login/refresh/
+    # logout, health, ready, system/meta) = 49, including the stage-18 knowledge-base,
+    # the stage-19 generation endpoints and the stage-20 image asset endpoint.
+    assert authenticated == 49
 
 
 def test_unauthenticated_operations_declare_no_auth_failures() -> None:

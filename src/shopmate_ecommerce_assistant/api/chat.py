@@ -19,6 +19,7 @@ from shopmate_ecommerce_assistant.api.deps import (
 from shopmate_ecommerce_assistant.api.schemas import ChatStreamRequest
 from shopmate_ecommerce_assistant.core.config import Settings
 from shopmate_ecommerce_assistant.core.errors import ErrorCode, ToolError
+from shopmate_ecommerce_assistant.core.generation import GenerationParams
 from shopmate_ecommerce_assistant.core.rate_limit import RateLimiter
 from shopmate_ecommerce_assistant.core.security import AccessContext
 
@@ -78,7 +79,13 @@ async def chat_stream(
     # Pre-flight (must finish before the SSE stream is established so 404/409 stay JSON).
     async with factory() as session:
         service = ChatService(session=session, settings=settings, policy=static_policy)
-        await service.ensure_conversation(context, body.conversation_id)
+        # Ownership check + the conversation's stage-18 knowledge-base selection and
+        # stage-19 generation-parameter overrides. An empty selection keeps the
+        # pre-existing "no restriction" retrieval scope; missing overrides keep the
+        # environment LLM defaults, so old conversations behave exactly as before.
+        conversation = await service.ensure_conversation(context, body.conversation_id)
+        knowledge_base_ids = conversation.knowledge_base_ids
+        generation = GenerationParams.resolve(conversation.generation_params, settings=settings)
         user_message_id = await service.insert_user_message(
             context, body.conversation_id, body.message, body.client_message_id
         )
@@ -96,6 +103,8 @@ async def chat_stream(
                     request_id=request_id,
                     trace_id=trace_id,
                     user_message_id=user_message_id,
+                    knowledge_base_ids=knowledge_base_ids,
+                    generation=generation,
                 ):
                     yield serializer.frame(event)
             except Exception:

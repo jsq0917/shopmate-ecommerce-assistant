@@ -8,6 +8,12 @@ route is a permission bug, not a style issue. The router therefore:
 * scores the remaining intents with weighted patterns and resolves ties by specificity;
 * requires ``>= INTENT_MIN_CONFIDENCE`` (default 0.70) before any tool is allowed; below
   it the route asks for clarification and exposes no tools;
+* when the weighted table matched nothing — or only a generic pattern worth <= 2 — a
+  knowledge-shaped turn (domain word / interrogative / bare question mark) is sent to the
+  policy RAG path instead of smalltalk, so PolicyQAService's evidence gate gets to decide
+  answer-vs-refuse. Turns carrying order/SKU ids, resolved referential follow-ups, risk
+  overrides and instruction-override text are excluded; the switch
+  ``knowledge_fallback_enabled`` turns it off for ablation;
 * history only resolves a referential follow-up and may only escalate, never downgrade:
   it can add support to one intent for a zero-word follow-up such as "那它呢", but it can
   never pull a turn down to a safer or less specific route;
@@ -88,7 +94,7 @@ PATH_BY_INTENT: dict[Intent, RoutePath] = {
 
 ALLOWED_TOOLS: dict[Intent, tuple[str, ...]] = {
     Intent.PRODUCT_DISCOVERY: ("search_products",),
-    Intent.PRODUCT_COMPARE: ("compare_products",),
+    Intent.PRODUCT_COMPARE: ("search_products", "compare_products"),
     Intent.PRODUCT_FACT: (
         "search_products",
         "get_product_detail",
@@ -295,6 +301,201 @@ OVERRIDE_CODES = frozenset(
     }
 )
 
+# -- knowledge fallback (stage 18) ---------------------------------------------
+#
+# The weighted table only recognises phrasings somebody wrote down. Stage 13 measured the
+# cost: 20 of 36 policy questions were routed elsewhere, 12 of them to smalltalk with a
+# zero score, and none of the seven ``no_answer`` cases ever reached the evidence gate, so
+# strict refusal was structurally 0/7. The tables below are the *topic* vocabulary, kept
+# apart from ``RULES`` on purpose: they decide "is this a knowledge question?", never "which
+# tool to call". Whether the corpus actually supports an answer stays with
+# PolicyQAService and ``policy_min_evidence_similarity`` — the fallback must not answer.
+KNOWLEDGE_DOMAIN_TERMS: tuple[str, ...] = (
+    "政策",
+    "规定",
+    "规则",
+    "条款",
+    "须知",
+    "售后",
+    "退换",
+    "退货",
+    "退款",
+    "换货",
+    "换新",
+    "保修",
+    "质保",
+    "维修",
+    "发票",
+    "开票",
+    "运费",
+    "邮费",
+    "快递费",
+    "包邮",
+    "免运费",
+    "价保",
+    "保价",
+    "补差价",
+    "降价",
+    "优惠券",
+    "满减",
+    "促销",
+    "积分",
+    "会员",
+    "分期",
+    "手续费",
+    "到账",
+    "时效",
+    "发货",
+    "配送",
+    "签收",
+    "破损",
+    "丢件",
+    "以旧换新",
+    "定制",
+    "刻字",
+    "拆封",
+    "试用",
+    "试戴",
+    "门店",
+    "预约",
+    "企业采购",
+    "框架协议",
+    "支付方式",
+    "付款",
+    "货到付款",
+    "附加运费",
+    "退货期",
+)
+
+INTERROGATIVE_MARKERS: tuple[str, ...] = (
+    "吗",
+    "呢",
+    "嘛",
+    "怎么",
+    "如何",
+    "能不能",
+    "可不可以",
+    "是否",
+    "多久",
+    "多少钱",
+    "几天",
+    "几点",
+    "哪些",
+    "什么",
+    "多少",
+)
+
+#: Condition (c): a question mark *plus* no explicit search/order action. The action words
+#: exist so that "帮我查订单 DEMO-1001 的进度？" stays on the structured path.
+SEARCH_ACTION_TERMS: tuple[str, ...] = (
+    "推荐",
+    "想买",
+    "买",
+    "下单",
+    "购物车",
+    "结算",
+    "搜索",
+    "帮我查",
+    "查订单",
+    "我的订单",
+    "订单号",
+    "物流单号",
+    "运单号",
+    "到哪了",
+    "发货了吗",
+    "还有货",
+    "价格",
+    "多少钱",
+)
+
+#: Texts that try to override instructions are handled as a safety matter, not as a
+#: knowledge question; letting the fallback claim them would hide the injection case.
+INSTRUCTION_OVERRIDE_MARKERS: tuple[str, ...] = (
+    "忽略",
+    "系统指令",
+    "系统提示",
+    "system prompt",
+)
+
+#: Fallback scores reuse the existing ``_confidence`` formula instead of a new constant:
+#: 3 -> 0.79 (domain word) and 2 -> 0.71 (interrogative / question mark), both above the
+#: default 0.70 gate. That is routing confidence ("this is a knowledge question"), not
+#: answer confidence; the evidence gate still decides whether an answer is allowed.
+KNOWLEDGE_FALLBACK_DOMAIN_SCORE = 3
+KNOWLEDGE_FALLBACK_WEAK_SCORE = 2
+
+#: A business match at or below this score carries no specific signal: it comes from
+#: generic patterns ("支持…吗" = 2, "有没有" = 2) that say nothing about the tool needed.
+KNOWLEDGE_FALLBACK_MAX_WEAK_SCORE = 2
+
+
+def knowledge_fallback_reason(text: str) -> str | None:
+    """Return which knowledge-fallback condition ``text`` satisfies, or ``None``.
+
+    Order matters: a domain word is the strongest evidence, then an interrogative of
+    reasonable length, then a bare question mark without a search/order action.
+    """
+    normalized = " ".join((text or "").split())
+    if not normalized:
+        return None
+    if any(marker in normalized for marker in INSTRUCTION_OVERRIDE_MARKERS):
+        return None
+    if any(term in normalized for term in KNOWLEDGE_DOMAIN_TERMS):
+        return "domain"
+    if any(marker in normalized for marker in INTERROGATIVE_MARKERS) and len(normalized) >= 8:
+        return "interrogative"
+    if ("？" in normalized or "?" in normalized) and not any(
+        term in normalized for term in SEARCH_ACTION_TERMS
+    ):
+        return "question_mark"
+    return None
+
+
+def _knowledge_fallback(
+    *,
+    text: str,
+    best_score: int,
+    entities: EntitySet,
+    history_used: bool,
+    text_risk: RiskAssessment,
+    settings: Settings,
+) -> tuple[Intent, int, str] | None:
+    """Decide whether a would-be ``smalltalk_or_unknown`` turn belongs to the RAG path.
+
+    Returns ``(intent, score, label)`` or ``None``. Guard rails, in order:
+
+    * the switch is off (ablation);
+    * the turn carries an order number / SKU / product id — structured facts must come from
+      structured sources, so those never go to the document RAG path;
+    * history already resolved a referential follow-up (never downgrade a resolved turn);
+    * a risk override applies (complaint / legal / money demands keep their own route).
+    """
+    if not settings.knowledge_fallback_enabled:
+        return None
+    if history_used or entities.has_realtime_id():
+        return None
+    if OVERRIDE_CODES & set(text_risk.codes):
+        return None
+    reason = knowledge_fallback_reason(text)
+    if reason is None:
+        return None
+    if best_score <= 0:
+        score = (
+            KNOWLEDGE_FALLBACK_DOMAIN_SCORE if reason == "domain" else KNOWLEDGE_FALLBACK_WEAK_SCORE
+        )
+        return Intent.POLICY_FAQ, score, f"knowledge_fallback:{reason}"
+    # A weak-only match ("支持…吗", "有没有…") is not evidence for *either* side: it is a
+    # generic question shape. Only a domain word may promote such a turn, so
+    # "充电器支持快充吗？" stays a product fact question.
+    if (
+        settings.knowledge_fallback_weak_intent_enabled
+        and reason == "domain"
+        and best_score <= KNOWLEDGE_FALLBACK_MAX_WEAK_SCORE
+    ):
+        return Intent.POLICY_FAQ, KNOWLEDGE_FALLBACK_DOMAIN_SCORE, "knowledge_fallback:domain:weak"
+    return None
+
+
 
 @dataclass(frozen=True, slots=True)
 class IntentRoute:
@@ -440,12 +641,25 @@ def route_intent(
             )
 
     intent, score = _pick(scores, reasons)
+    text_risk = assess_risk(cleaned)
+    fallback = _knowledge_fallback(
+        text=cleaned,
+        best_score=max(scores.values()),
+        entities=entities,
+        history_used=history_used,
+        text_risk=text_risk,
+        settings=resolved,
+    )
+    knowledge_fallback_used = fallback is not None
+    if fallback is not None:
+        intent, score, fallback_label = fallback
+        reasons[intent].append(fallback_label)
+
     boost = _entity_boost(intent, entities)
     confidence = _confidence(score, boost)
     if boost:
         reasons[intent].append("entity_support")
 
-    text_risk = assess_risk(cleaned)
     if OVERRIDE_CODES & set(text_risk.codes):
         intent = Intent.COMPLAINT_HANDOFF
         confidence = max(confidence, 0.90)
@@ -480,6 +694,9 @@ def route_intent(
         and not requires_clarification
         and risk.level is RiskLevel.LOW
         and not entities.has_realtime_id()
+        # A refusal that only exists because a question *shape* matched is not worth
+        # caching: the same shape can carry an answerable question next time.
+        and not knowledge_fallback_used
     )
 
     return IntentRoute(
@@ -503,12 +720,16 @@ def route_intent(
 __all__ = [
     "ALLOWED_TOOLS",
     "CLARIFICATION_TEXT",
+    "INTERROGATIVE_MARKERS",
     "Intent",
     "IntentRoute",
     "IntentRule",
+    "KNOWLEDGE_DOMAIN_TERMS",
     "PATH_BY_INTENT",
     "PRIORITY",
     "RULES",
     "RoutePath",
+    "SEARCH_ACTION_TERMS",
+    "knowledge_fallback_reason",
     "route_intent",
 ]

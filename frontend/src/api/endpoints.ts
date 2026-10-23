@@ -14,11 +14,13 @@ import type {
   ChunkPatchResult,
   CompareData,
   CompareRequest,
+  ConversationGenerationParams,
   ConversationItem,
   ConversationListData,
   CreateEvalRunData,
   CreateEvalRunRequest,
   CreateHandoffData,
+  KnowledgeBaseOptionListData,
   CreateHandoffRequest,
   CreateOrderRequest,
   CreateRefundRequest,
@@ -28,6 +30,7 @@ import type {
   DocumentListData,
   DocumentListItem,
   Envelope,
+  GenerationDefaults,
   HandoffListData,
   HandoffListItem,
   KnowledgeBaseItem,
@@ -64,6 +67,9 @@ import type {
 
 const json = <T>(path: string, options?: Parameters<typeof request>[1]) => request<T>(path, options)
 
+/** 对话页推理参数面板可调的四个字段（stage 19）。 */
+export type GenerationParams = ConversationGenerationParams
+
 // ---- 认证 ---------------------------------------------------------------
 
 export const authApi = {
@@ -98,16 +104,49 @@ export const conversationsApi = {
   list: (params: { limit?: number; cursor?: string } = {}) =>
     json<ConversationListData>('/conversations', { query: params }),
 
-  create: (title?: string) =>
-    json<ConversationItem>('/conversations', { method: 'POST', body: { title } }),
+  create: (title?: string, knowledgeBaseIds: string[] = []) =>
+    json<ConversationItem>('/conversations', {
+      method: 'POST',
+      body: { title, knowledge_base_ids: knowledgeBaseIds },
+    }),
 
   rename: (id: string, title: string) =>
     json<ConversationItem>(`/conversations/${id}`, { method: 'PATCH', body: { title } }),
+
+  /** 替换会话的知识库选择；传空数组表示「不限制，检索全部可见知识库」。 */
+  updateKnowledgeBases: (id: string, knowledgeBaseIds: string[]) =>
+    json<ConversationItem>(`/conversations/${id}/knowledge-bases`, {
+      method: 'PATCH',
+      body: { knowledge_base_ids: knowledgeBaseIds },
+    }),
+
+  /**
+   * 合并会话的推理参数覆盖（stage 19）：缺省字段保持原值，显式 null 清除该项，
+   * 全部传 null 恢复服务端默认。
+   */
+  updateGenerationParams: (id: string, params: ConversationGenerationParams) =>
+    json<ConversationItem>(`/conversations/${id}/generation-params`, {
+      method: 'PATCH',
+      body: params,
+    }),
 
   remove: (id: string) => request<void>(`/conversations/${id}`, { method: 'DELETE' }),
 
   messages: (id: string, params: { limit?: number; before?: string } = {}) =>
     json<MessageListData>(`/conversations/${id}/messages`, { query: params }),
+}
+
+// ---- 推理参数默认值（对话页参数面板） ---------------------------------------
+
+export const generationApi = {
+  /** 未覆盖参数时生效的服务端默认值与 max_tokens 安全上限。 */
+  defaults: () => json<GenerationDefaults>('/generation-defaults'),
+}
+
+// ---- 知识库（对话页多选） -------------------------------------------------
+
+export const knowledgeBasesApi = {
+  list: () => json<KnowledgeBaseOptionListData>('/knowledge-bases'),
 }
 
 // ---- 聊天（SSE） --------------------------------------------------------

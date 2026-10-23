@@ -20,7 +20,7 @@
 
 - 工作目录：`E:\project\shopmate-ecommerce-assistant`
 - 当前分支：`main`
-- 提交状态：尚无 commit
+- 提交状态：**阶段 0 当时**尚无 commit（现状：2026-10-23 已有 7 个提交、4 个已推送，见 `docs/project-status.md` §0.2）
 - 现有内容全部为未跟踪文件；本阶段新增的三份文档也属于未跟踪的 `docs/` 目录内容。
 
 当前基线文件：

@@ -1,14 +1,25 @@
 # 简历与面试证据台账
 
-> 版本：2026-10-20（阶段 15：简历证据与面试材料）
+> 版本：2026-10-23（阶段 18–20 收尾后同步 Git 状态与最新指标；上一版 2026-10-20 阶段 15）
 > 依据：`AGENTS.md` §21（完成报告）、§22（简历与面试证据规则）、§17（评估与性能）
 > 配套文档：[`interview-prep.md`](interview-prep.md)（中文项目描述 + 面试问答提纲）
 
 ## 0. 先说三条硬约束
 
-1. **本仓库当前 0 个 commit**（`git log` 返回 `your current branch 'main' does not have any commits yet`）。
-   因此无法提供 commit SHA 作为证据，所有结论只能以**文件 + 可复现命令 + 命令输出**为准。
-   若需要 commit 级追溯，须由项目所有者先授权提交。
+1. **Git 状态（2026-10-23 核对）**：仓库共 **7 个提交**，`main` 跟踪 `origin/main`
+   （`git@github.com:jsq0917/shopmate-ecommerce-assistant.git`），其中 **4 个已推送**：
+   `f81159b` 基线 → `1bae45d` 阶段 0–15 文档 → `a7b9632` 阶段 16 收尾 → `5978d82` 推送记录；
+   **3 个已提交未推送**：`28ef24a` 阶段 17 下单支付退款 → `23c3516` 结算/退款页与设计系统 →
+   `a19d053` 阶段 17 文档与截图。阶段 18–20 的改动**尚未提交**（工作区）。
+
+   ```bash
+   git rev-list --count HEAD   # 7
+   git log --oneline           # 上面 7 个 SHA
+   git status -sb              # ## main...origin/main [ahead 3]
+   ```
+
+   简历/面试可引用 SHA，但**证据主体仍是文件 + 可复现命令**：未推送的 3 个提交只有本地才有，
+   面试方 clone 不到；阶段 18–20 连提交都还没有。**不得**把"已提交/已推送"写成"已发布"。
 2. **本文件只记录本仓库实测结果**。课程场景里的 82% / 42% / 70% / 18% 是示例宣传值
    （`AGENTS.md` §2.3），四个 GitHub 参考仓库的工作也不属于本项目（§19），两者**都不得**出现在简历里。
 3. **没有量化数据的一律写定性**。本文件第 4 节每一行都带"限制与口径"，第 5 节明确区分
@@ -77,74 +88,113 @@
 
 ## 4. 量化指标证据表（每个数字都能追溯）
 
-> 全部来自同一次运行 `data/eval/results/stage13-20261020T013230Z.json`，
-> 可由 `uv run python scripts/verify_stage13.py` 逐项复算（不一致则退出码 1）。
+> §4.1（检索质量）来自 **2026-10-22 语料扩充后**的复测
+> `data/eval/results/stage13-corpus-expansion-20261022.json`（语料 88 版本 / 430 chunk、
+> 金标 140 条）；**§4.3 生成质量与 §4.4 的聊天/生成延迟来自 2026-10-23 DeepSeek 复测**
+> `data/eval/results/stage13-deepseek-20261023.json`（模型 `deepseek-flash`）；
+> §4.2 与 §4.4 的检索延迟来自 2026-10-20 全链路运行
+> `data/eval/results/stage13-20261020T013230Z.json`（136 条业务集 sha 三次相同）。
+> 全部可由 `uv run python scripts/verify_stage13.py`（`--raw` 指定对应结果）逐项复算，
+> 不一致则退出码 1。
 > "限制与口径"一列是**必须与数字一起说**的内容，单独引用数字视为误用。
 
-### 4.1 检索质量（58 条金标，50 条有金标文档）
+### 4.1 检索质量（143 条金标，123 条有金标文档；语料 89 版本 / 431 chunk；R@1 等主指标仍为 140 条口径，见末行「图片类」说明）
 
 | 指标 | 数值 | 数据集 / 样本 | 命令或文件 | 限制与口径 |
 |---|---|---|---|---|
-| Recall@1 / @3 / @5 / @10 | **1.00 / 1.00 / 1.00 / 1.00** | 58 条金标，分母 50（有金标文档） | `scripts/verify_stage13.py`；报告 2.4.1 | 语料仅 **27 条有效向量**（Milvus `count(*)` 28，含 1 条孤儿；21 个 ready 版本），**已饱和，不可外推到万级知识库** |
-| MRR@10 | **1.00** | 同上 | 同上 | 同上 |
-| context precision | **0.8459** | 50 | 同上 | 自建 RAGAS 同构实现（金标代替 LLM 判定），非官方 ragas 包 |
-| context recall | **1.00** | 50 | 同上 | 用 `expected_phrases` 短语法，非语义覆盖 |
-| 主引用正确率 | **1.00** | 期望可答案例 | 同上 | 严格口径：第一条引用标题必须命中金标 |
-| chunk 级引用精度 | **0.2664 → 0.3090（+16.0% 相对）** | 58 | 同上（baseline vs optimised） | 4–8 片段必然稀释；这是**上下文稀释改善**，不是排序变好、不是业务收益 |
-| 平均选取片段数 | **6.22 → 5.03（−19.1%）** | 58 | 同上 | 优化只改了配置（`retrieval_max_chunks` 8→6），没改业务规则 |
-| 检索行为正确率 | **0.9828**（误答 0 / 误拒 1） | 58 | 同上 | 唯一误拒 `exact-05`（相似度 0.6142 < 门槛 0.62），属阈值边界 |
-| 双路 vs dense-only | **无差异**（R@1、MRR、ctxP、行为正确率全部相同） | 58 | 报告 2.4.3 | **禁止写"混合检索提升召回/准确率"**；稀疏支路保留理由是契约要求 + 精确词鲁棒性 |
-| 证据门槛 | **0.62** | dev 29 条标定 / test 29 条复测 | 报告 2.4.5 | dev/test 各 29 条，单条用例约 3.4 个百分点；只作量级参考；test 上 0.60 略好但**未采用**（避免"调到赢"） |
+| Recall@1 / @3 / @5 / @10 | **0.9583 / 0.9917 / 1.00 / 1.00** | 140 条金标，分母 120（有金标文档） | `verify_stage13.py --raw stage13-corpus-expansion-20261022.json`；报告 3.3 | 扩充前 58 条金标上全 1.00（已饱和）；本轮的 R@1 < 1.00 是**解除饱和**，5 条未排第 1 但都在前 5 |
+| MRR@10 | **0.9739** | 同上 | 同上 | 同上 |
+| context precision / recall | **0.8136 / 0.8833** | 120 | 同上 | 自建 RAGAS 同构实现（金标代替 LLM 判定），非官方 ragas 包；recall 用 `expected_phrases` 短语法 |
+| 主引用正确率 | **0.9569** | 期望可答案例 | 同上 | 严格口径：第一条引用标题必须命中金标 |
+| chunk 级引用精度 | **0.4199 → 0.4885**（baseline → optimised） | 140 | 同上（报告 3.3） | 4–8 片段必然稀释；optimised 靠少给片段改善（6.60 → 5.63），不是排序变好 |
+| 平均选取片段数 | **6.60 → 5.63** | 140 | 同上 | 优化只改配置（`retrieval_max_chunks` 8→6），没改业务规则 |
+| 检索行为正确率 | **0.9714**（误答 4 / 误拒 0） | 140 | 同上 | 4 条误答全是 `no_answer` 类：相邻主题（碎屏险/以旧换新/支票传真/延保）相似度 0.6237–0.6488 刚过门槛；expired 37/37、conflict 4/4 handoff、cross_shop 6/6 refused 全对 |
+| 双路 vs dense-only | **有差异，且对双路不完全有利**：dense R@1 0.9750 / MRR 0.9833 略高；双路 R@5/@10 1.00 vs dense 0.9917、泄漏 1 vs 3 | 140 | 报告 3.3 | **仍禁止写"混合检索提升召回/准确率"**；稀疏支路可观测价值仅剩精确词召回（`x2-exact-09` 排名 5 vs 23）与更少次要引用泄漏 |
+| 图片类检索（阶段 20） | **hit@3 3/3、hit@1 2/3、MRR 0.8333（hybrid）/ 0.7778（dense-only）、短语召回 1.0、行为 3/3 answered** | 3 条（`image-01..03`） | `scripts/eval_retrieval.py --output data/eval/results/retrieval-image-20261023.json`；报告 3.8 | 检索文本来自 OCR（RapidOCR，平均置信度 0.9965）；同一脚本 143 条全量 hit 0.8601 的分母含 20 条无金标文档用例，**不可与 0.9583（分母 120）横比** |
+| 证据门槛 | **0.62**（未改） | dev 70 标定 / test 70 复测 | 报告 3.4；`verify_stage13.py` 新增门槛标定复算 | dev 上 0.62 与 0.65 并列 0.9857，规则选出 0.65；但 test 复测 0.65 更差（0.9286 vs 0.9571，误拒 5）。按约束 `.env` 保持 0.62；0.62–0.65 是"无答案/可答"两簇重叠的边界带，调阈值无法同时满足 |
+| 索引规模 | PG **89** ready 版本 / **431** enabled chunk（总 577，146 软禁用历史）；Milvus **431**；交集 **431**；**孤儿 0** | 1 个店铺 | `reconcile_index.py`；原始结果 `index` 快照 | 扩充前为 21 ready / 27 有效向量 + 1 孤儿（已修复）；431 chunk 仍属小语料，结论不可外推到万级知识库 |
+
+> **复算说明（2026-10-23）**：§4.1 的 Recall/MRR/ctxP 来自金标 140 条时的
+> `stage13-corpus-expansion-20261022.json`（`verify_stage13.py --raw` 可直接复算那一份）。
+> 金标其后增至 143 条，因此对同样的命令现在会额外报 2 项 `retrieval.sha256/cases` 差异，
+> 属数据集变更、不是数字造假；完整说明见 `docs/eval-report.md` §5.5。
 
 ### 4.2 业务与安全（136 条，真实调用 `ChatService` + 真实工具 + 真实 PG）
 
+**现行口径（2026-10-23，P0 修复后）**：数据 = `data/eval/eval_questions.jsonl` 136 条
+（sha `7606cfce…` 未变）；指标取 **persona 关闭**的运行（唯一变量干净），
+命令与原始结果见本节末"复现"。
+
 | 指标 | 数值 | 数据集 / 样本 | 命令或文件 | 限制与口径 |
 |---|---|---|---|---|
-| 意图准确率 | **0.7059（96/136）** | 136 | `verify_stage13.py`；报告 2.6 | 路由是关键词加权规则，长尾政策表述漏判；`multi_turn` 的 +1 来自数据集 `history` 重建，不是系统改动 |
-| 工具选择准确率 | **0.6691（91/136）** | 136 | 同上 | `PRODUCT_FACT` 被并到搜索分支，与 §9.1 契约不一致（9 条） |
-| 任务成功率 | **0.6324（86/136）** | 136 | 同上 | 安全类按"无泄漏且无写副作用"判 |
-| 严格拒答率 | **0.00（0/7）** | 7 条 `no_answer` | 同上 | **这是硬伤，必须写**：7 条无依据问题没有一条走到固定拒答文案 |
-| 不编造率（宽松） | **0.5714（4/7）** | 7 | 同上 | 拒答或澄清都算"未编造" |
-| 越权拦截率 | **1.00（8/8）** | 8 条带 `authorization` 标签 | 同上；分母 `authorization_cases=8` 写入原始结果 | 分母仅 8 条，样本小；跨店铺 admin 运行时用例仍未构造 |
-| 转人工召回 / 精确率 | **0.8182（9/11）/ 1.00（9/9）** | 11 条应升级 | 同上 | 漏判 2 条：`eval-089`（账号被盗）、`eval-121` |
+| 意图准确率 | **0.8235（112/136）** | 136 | `eval_stage13.py --parts business`；原始结果 `compare-operands-20261022T085413Z.json` | 仍是关键词加权规则 + 知识型兜底；长尾 4 条强规则误路由（`eval-042/051/059/060`）未修，见报告 2.6.1 末段 |
+| 工具选择准确率 | **0.8529（116/136）** | 136 | 同上 | 比修复前 +0.1838；`PRODUCT_FACT` 已接 `check_stock`/`get_product_detail`，剩余失败集中在退货链 `order_item_id`（11 条，数据集缺陷） |
+| 任务成功率 | **0.8897（121/136）** | 136 | 同上 | persona 关闭时的干净读数。同一数据集在 persona 开启的复测里读作 **0.9044（123/136）**，但多出的 2 条（`eval-060`/`eval-091`）是改写抹掉澄清标记词导致的**判定口径污染**，按铁律不改口径，也**不得**当成能力提升引用（报告 §3.5 有逐条说明） |
+| 严格拒答率 | **1.00（7/7）** | 7 条 `no_answer` | 同上 | 修复前 0/7；前提是门槛 0.62，**0.42 下会回到 0/7** |
+| 不编造率（宽松） | **1.00（7/7）** | 7 | 同上 | 拒答或澄清都算"未编造"；修复前 0.5714 |
+| 越权拦截率 | **1.00（8/8）** | 8 条带 `authorization` 标签 | 同上；分母 `authorization_cases=8` 在原始结果里 | 分母仅 8 条，样本小；跨店铺 admin 运行时用例仍未构造 |
+| 转人工召回 / 精确率 | **0.8182（9/11）/ 1.00（9/9）** | 11 条应升级 | 同上 | 漏判 2 条：`eval-089`（账号被盗）、`eval-121`；与本轮修复无关，未变 |
 | Prompt injection 安全率 | **1.00（11/11）** | 11 条注入用例 | 同上 | 用例由本项目编写，覆盖有限 |
-| 业务链路泄漏用例 | **0** | 136 | 同上 | 系统提示词 / 连接串 / API Key / 他人订单号 |
-| 错误轮 | **0** | 136 | 同上 | 无 5xx、无未捕获异常 |
+| 业务链路泄漏用例 / 错误轮 | **0 / 0** | 136 | 同上 | 系统提示词 / 连接串 / API Key / 他人订单号 |
 
-### 4.3 生成质量（分两条路径，不可混为一谈）
+**修复前基线（阶段 13 原始，2026-10-20，仅供对照，不要引用为现状）**：意图 0.7059（96/136）、
+工具 0.6691（91/136）、任务 0.6324（86/136）、严格拒答 **0/7**、宽松不编造 4/7。
+原始结果 `data/eval/results/stage13-20261020T013230Z.json`。
+
+**复现（1 条命令 + 1 条取值命令）**：
+
+```bash
+# 1) 重跑业务/安全 136 条（不调回答模型，不需要 API Key）
+POLICY_MIN_EVIDENCE_SIMILARITY=0.62 CHAT_PERSONA_ENABLED=false \
+  uv run python scripts/eval_stage13.py --parts business --output /tmp/business.json
+
+# 2) 从结果里取本节全部数字（分母一并打印，防止脱离分母引用）
+uv run python -c "import json;b=json.load(open('/tmp/business.json'))['parts']['business'];print({k: b[k] for k in ('cases','intent_accuracy','tool_accuracy','task_success_rate','correct_refusal_rate','no_fabrication_rate','refusal_expected_cases','authorization_cases','unauthorized_blocked_rate','handoff_recall','handoff_precision')})"
+```
+
+> 与本仓库已存档结果对齐：`compare-operands-20261022T085413Z.json` 的 `parts.business`
+> 即上表数值；`stage13-deepseek-20261023.json` 的同一段数值完全相同（该 part 不调用回答模型）。
+
+### 4.3 生成质量（模型：**`deepseek-flash`（DeepSeek-V4.1-Flash）**；两条路径，不可混为一谈）
 
 | 指标 | 数值 | 数据集 / 样本 | 命令或文件 | 限制与口径 |
 |---|---|---|---|---|
-| faithfulness（结构化路径，确定性代理） | **0.8318** | 107 轮 | 报告 2.5.1 | 句中数字必须能在工具卡片/引用/用户原话中找到；**不是** RAGAS；未逐轮落盘，需重跑脚本 |
-| answer relevancy（结构化路径，代理） | **0.5937** | 107 轮 | 同上 | BGE-M3 余弦，**不是** RAGAS 逆问题生成 |
-| 政策答案 status 分布 | **answered 5 / handoff 4 / refused 27** | 36 条政策用例 | `verify_stage13.py` | 本地 `qwen2.5:7b`，不代表云端强模型 |
-| 可答用例应答率 | **0.1724（5/29）** | 29 条期望可答 | 同上 | 20 条"有证据仍拒答"是模型过度保守，不是检索失败 |
-| 无答案用例正确拒答 | **1.00（7/7）** | 7 | 同上 | 与 4.2 的严格拒答 0/7 不矛盾：这里直接调 `PolicyQAService`，绕过了意图路由 |
-| 引用合规率 | **1.00（5/5）** | 5 条 answered | 同上 | 只用了提供的 `[cN]` |
-| faithfulness（LLM 判定） | **0.88** | 5 条 answered | 同上 | 剔除 2 条哨兵泄漏后为 0.9333（3 条）；judge 与被测模型同族，存在自偏好偏差 |
-| answer relevancy（LLM 判定） | **0.52** | 5 条 answered | 同上 | 同上；**不能**写成"政策问答准确率 88%" |
-| token / 成本 | **77,709 tokens / 0 USD** | 生成 72,500 + judge 5,209 | 同上 | **本地推理零费用**，不能据此推云上成本比例 |
+| faithfulness（结构化路径，确定性代理） | **0.7978** | 90 轮 | 报告 4.3 | 句中数字必须能在工具卡片/引用/用户原话中找到；**不是** RAGAS；输入答文本含 persona 改写，未逐轮落盘 |
+| answer relevancy（结构化路径，代理） | **0.6725** | 90 轮 | 同上 | BGE-M3 余弦，**不是** RAGAS 逆问题生成 |
+| 政策答案 status 分布 | **answered 20 / handoff 8 / refused 8** | 36 条政策用例 | `verify_stage13.py --raw stage13-deepseek-20261023.json` | 模型 `deepseek-flash`（`https://api.deepseek.com`） |
+| 可答用例应答率 | **0.6897（20/29）** | 29 条期望可答 | 同上 | 历史 7B 基线只有 5/29（0.1724）；7 条 handoff 是 `uncited_claim`/`model_conflict`，属"宁可转人工不编造" |
+| 无答案用例正确拒答/转人工 | **1.00（7/7）** | 7 | 同上 | 与 4.2 的严格拒答 7/7 同结论：直接调 `PolicyQAService`，绕过意图路由 |
+| 引用合规率 | **1.00（20/20）** | 20 条 answered | 同上 | 只用了提供的 `[cN]`；每轮逐条落盘 `citation_compliant` |
+| faithfulness（LLM 判定） | **0.9425** | 20 条 answered | 同上 | 自建 LLM-as-judge（judge 同为 `deepseek-flash`，`temperature=0`）；存在自偏好偏差，**不能**写成"政策问答准确率 94%" |
+| answer relevancy（LLM 判定） | **0.975** | 20 条 answered | 同上 | 同上口径；不是官方 RAGAS |
+| token 消耗 | **126,308**（回答 91,972 = prompt 71,643 + completion 20,329；judge 34,336 = 22,979 + 11,357，40 次判定 0 失败） | 36 条 | 同上 | 脚本**不计价**（`cost_usd=0` 是占位），真实成本按供应商账单 |
+| 历史对照（**已废弃，勿引用**） | 7B：可答 0.1724、faith 0.88、relevancy 0.52、77,709 tokens | 36 条 | 报告 2.5.2 | 本地 `qwen2.5:7b` 规模太小，已不再作为评测基线 |
 
 ### 4.4 工程与容量
 
 | 指标 | 数值 | 数据集 / 样本 | 命令或文件 | 限制与口径 |
 |---|---|---|---|---|
-| 聊天轮延迟 P50 / P95 | **25.63 / 43.10 ms** | n=109（`latency_kind=chat_turn`） | `verify_stage13.py` | 路由 + 工具 + 确定性回答；单机 CPU |
-| 政策检索轮延迟 P50 / P95 | **153.61 / 202.32 ms** | n=18（`policy_retrieval`） | 同上 | 仅 BGE-M3 编码 + 双路检索，无生成；约 130 ms 是 CPU 编码 |
-| SSE 首 token P50 / P95 | **24.99 / 42.39 ms** | n=107 | 同上 | 逐条 record 落盘 `first_delta_ms`，可复算 |
-| 政策答案（7B）延迟 P50 / P95 | **1373.22 / 2936.89 ms** | n=36 | 同上 | 本地 Ollama，单机 CPU |
-| 检索评测延迟 P50 / P95 | **147.20 / 192.08 ms** | 58 次 | 同上 | baseline_hybrid 单次检索 |
+| 聊天轮延迟 P50 / P95 | **1129.91 / 2895.97 ms** | n=93（`latency_kind=chat_turn`） | `verify_stage13.py` | 含 persona 拟人化改写（每轮一次 LLM 调用）；授权拒绝短路轮仍 ~23 ms |
+| 政策检索轮延迟 P50 / P95 | **158.46 / 171.77 ms**（10-22）／329.81 / 522.63 ms（10-23，负载差异） | n=34 | 同上 | 仅 BGE-M3 编码 + 双路检索，无生成；约 130 ms 是 CPU 编码 |
+| SSE 首 token P50 / P95 | **1158.84 / 2944.10 ms** | n=90 | 同上 | 逐条 record 落盘 `first_delta_ms`，可复算；与聊天轮同步（persona 主导） |
+| 政策答案（DeepSeek）延迟 P50 / P95 | **3255.32 / 9398.40 ms** | n=36 | 同上 | 云端生成 + 网络往返；历史 7B 为 1373.22 / 2936.89 ms（已废弃） |
+| 检索评测延迟 P50 / P95 | **147.20 / 192.08 ms** | 58 次 | 同上 | baseline_hybrid 单次检索；扩充语料（140 条）复测为 **158.81 / 221.41 ms**（报告 §3.3） |
 | 压测吞吐 | **23.08 → 29.61 req/s（+28.3%）** | 20u / 40u，各 60s | CSV `Aggregated` 行 `Requests/s` | 并发翻倍 P95 570→2400 ms，**已饱和**；不能当生产容量 |
 | 压测失败 | 20u: **0/1350**；40u: **2/1762（0.11%）** | 同上 | 同上 | 2 条 `RemoteDisconnected`，连接层抖动 |
-| 索引规模 | PG **48** chunk 行 / **32** 内容哈希 / **21** ready 版本；Milvus `count(*)` **28**，PG↔Milvus 交集 **27**，**孤儿 1** 条 | 1 个店铺 | 原始结果 `index` 快照 | 两个口径都对但含义不同；21 行 PG chunk 未索引，属索引卫生问题 |
+| 索引规模 | PG **575** chunk 行 / **463** 内容哈希 / **88** ready 版本（enabled **430**，145 行为软禁用历史版本）；Milvus `count(*)` **430**，PG↔Milvus 交集 **430**，**孤儿 0** | 1 个店铺 | 2026-10-22 语料扩充后对账：`reconcile_index.py`；原始结果 `index` 快照 | 扩充前为 48 行 / 21 ready / Milvus 28 含 1 孤儿（已重建修复）；430 chunk 仍是小语料，**不可外推到万级知识库** |
 | 后端规模 | **113** 个 `.py` / **22,751** 行（`src/`） | — | `find` + `wc -l` | 含合成数据生成器，不等于业务代码量 |
 | 前端规模 | **31** 个 `.vue`；`src` 下 ts+vue 共 **8,901** 行 | — | 同上 | — |
+
+> **延迟口径提醒（2026-10-22）**：聊天轮 25.63 ms / 首 token 24.99 ms 是 persona
+> （拟人化改写）上线前、且只有 18 个政策检索轮时的口径。同日复测（34 个政策检索轮）：
+> 聊天轮 P50/P95 **1161.74 / 2688.57 ms**（persona 每轮一次 LLM 调用，见报告 §3.5）、
+> 政策检索轮 **158.46 / 171.77 ms**。引用聊天延迟时必须说明是哪个口径。
 
 ### 4.5 质量门禁
 
 | 门禁 | 数值 | 命令 | 限制 |
 |---|---|---|---|
-| 后端测试 | **600 passed, 2 skipped**（收集 602，138.41s） | `uv run pytest -q` | 2 条 skip 需真实 BGE-M3 权重；阶段 12 曾在 `SHOPMATE_RUN_MODEL_TESTS=1` 下实测 2 passed |
+| 后端测试 | **738 passed, 2 skipped**（184.85s；含语料扩充后的检索/摄入用例、门槛网格一致性测试与 LLM 档位解析测试） | `uv run pytest -q --basetemp=/tmp/pyt-base` | 2 条 skip 需真实 BGE-M3 权重；阶段 12 曾在 `SHOPMATE_RUN_MODEL_TESTS=1` 下实测 2 passed |
 | 安全测试 | **86 passed** | `uv run pytest tests/security -q` | 矩阵覆盖 SEC-01–19，其中 2 项因路由未注册无法验证 |
 | 前端组件测试 | **124 passed / 14 files** | `npx vitest --run` | — |
 | 前端类型检查 | **0 错误** | `npm run typecheck` | strict 模式 |
@@ -163,27 +213,29 @@
 |---|---|---|
 | 商品搜索 / 详情 / 比较 / 库存（4 个只读工具） | `domain/catalog/*`、`db/repositories/catalog.py`、`tools/catalog_tools.py` | `tests/unit/test_catalog_*.py`、`tests/integration/test_catalog_*.py` |
 | 政策 RAG：BGE-M3 双向量 + hybrid + RRF + PG 复核 + 引用 + 无证据拒答 | `rag/{embeddings,retrieval,milvus_store,citations,policy_qa}.py` | `tests/unit/test_retrieval.py`、`test_policy_qa.py`、`test_citations.py`、`tests/integration/test_milvus_store.py`、`scripts/verify_stage13.py` |
+| 图片文档 OCR 入库 + 原图回源（阶段 20） | `rag/ingest/loaders.py`（`load_image`）、`api/knowledge_assets.py`、`synthetic/image_render.py` | `tests/unit/test_loaders.py`（6 条图片用例）、`tests/integration/test_image_ingestion.py`（3 条） |
 | 10 类意图路由 + 查询改写 + FAQ 缓存 | `agents/router.py`、`rag/query_rewrite.py`、`rag/faq.py` | `tests/unit/test_intent_router.py`（56）、`test_query_rewrite.py`（22）、`test_faq_cache.py`（31） |
 | 输入/输出护栏、PII 脱敏、风险判定 | `safety/{input_guard,output_guard,pii,risk}.py` | `tests/security/test_input_guard.py`（34）、`test_output_guard.py`（19）、`test_risk_handoff.py`（20）、`test_pii.py`（21） |
 | 订单 / 物流 / 退货资格 / 退货申请 / 转人工（5 个工具，含幂等） | `tools/{order,return,handoff}_tools.py`、`db/repositories/idempotency.py` | `tests/unit/test_return_rules.py`（30）、`test_order_tools.py`、`tests/integration/test_order_return_handoff_db.py` |
 | JWT + Argon2 + 算式验证码 + CSRF + 限流 | `core/security.py`、`api/auth.py` | `tests/unit/test_jwt.py`（10）、`test_rate_limit.py`、`tests/integration/test_api_security.py`（22） |
 | SSE 七类事件（meta/tool_status/product_card/citation/delta/done/error） | `agents/sse.py`、`api/chat.py` | `tests/unit/test_sse.py` |
-| Vue 3 前端（消费者 / 客服 / 管理三端） | `frontend/src`（31 个 `.vue`） | 124 vitest + 16 Playwright |
+| Vue 3 前端（消费者 / 客服 / 管理三端） | `frontend/src`（**36 个 `.vue`**） | **149 vitest（16 个测试文件）**；Playwright 16 条（本轮只复跑 2 条：知识库多选、推理参数） |
 | 生产部署（只读根文件系统、cap_drop、非 root、资源与日志限制、一次性 migrate） | `compose.prod.yaml`、`web/Dockerfile.prod`、`web/nginx.prod.conf` | `check_deploy_security.py` 34 项；阶段 14 实跑记录（7 容器 healthy、8080 登录成功） |
-| 评测与压测工具链 | `scripts/{eval_stage13,verify_stage13,locustfile}.py` | 136 + 58 数据集、8 个 Locust CSV |
+| 评测与压测工具链 | `scripts/{eval_stage13,eval_retrieval,verify_stage13,locustfile}.py` | 136 条业务 + **143 条检索金标**（含 3 条图片用例）、8 个 Locust CSV |
 
 ### 5.2 已实现但有已知缺陷（**必须带缺陷说**，不能写"完成"）
 
 | 缺陷 | 实测影响 | 证据 | 状态 |
 |---|---|---|---|
-| 意图路由长尾漏判：政策问题被当闲聊/商品/物流 | 36 条政策类问题只有 **16 条**真正进入 RAG，严格拒答率 0/7 | 报告 2.6、2.9.1 #1 | 未修（需加"知识型兜底"） |
-| `PRODUCT_FACT` 与 `PRODUCT_DISCOVERY` 合并到搜索分支，与工具契约不一致 | 9 条用例调用 `search_products` 而非 `get_product_detail`/`check_stock` | 报告 2.9.1 #3 | 未修 |
-| 商品对比只认 UUID，抽不到商品名 | 12 条对比用例退化为澄清 | 报告 2.9.1 #2 | 未修 |
-| 退货链路拿不到 `order_item_id` | 11 条退货用例未调用 `check_return_eligibility` | 报告 2.9.1 #4 | 未修 |
-| **`NO_EVIDENCE` / `CONFLICT` 哨兵 fail-open** | 模型输出 `NO_EVIDENCE [c1]…` 时被当答案返回用户，实测 2 条（`eval-058`/`eval-061`） | `rag/policy_qa.py` 的 `sentinel_of()` 归一化（剥离 `[cN]`/空白/句末标点，忽略大小写）；报告 §2.9.0 | **已修（阶段 16）**，回归 `tests/unit/test_policy_sentinel.py`；未重跑全量评测 |
-| 证据门槛是单一相似度信号 | 1 条元信息类问题误拒（`exact-05`） | 报告 2.9.2 | 未修（建议按意图分档） |
-| 索引卫生：Milvus 1 条孤儿、21 行 PG chunk 未索引 | 规模口径需分列说明 | 报告 2.9.4 | 未修 |
-| ~~`/api/v1/support/*` 未注册~~ | 前端客服工作台曾呈错误态 | `docs/06-api.md` §12；`tests/integration/test_support_api.py` | **已实现（阶段 16）** |
+| 意图路由长尾：强规则优先于知识型兜底 | 4 条仍误路由（`eval-042/051/059/060`）；兜底接管后严格拒答已从 0/7 恢复到 7/7 | 报告 2.6.1 末段、§5.1 | **主因已修（2026-10-22 知识型兜底）**，剩余 4 条需动规则权重，未做 |
+| `PRODUCT_FACT` 与 `PRODUCT_DISCOVERY` 合并到搜索分支 | 修复前 9 条只拿到搜索列表、到不了 `get_product_detail`/`check_stock`；修复后工具准确率 0.6985 → **0.8529** | 报告 2.6.2、`compare-operands-20261022T085413Z.json` | **已修（2026-10-22）** |
+| 商品对比只认 UUID，抽不到商品名 | 修复前 12 条对比用例全部退化成澄清；修复后对比簇恢复（`eval-023~032/134/136`） | 报告 2.6.2 | **已修（2026-10-22）** |
+| 退货链路拿不到 `order_item_id` | 11 条退货用例未调用 `check_return_eligibility` | 报告 2.9.1 #4 | **未修（所有者明确不做：`match_line` 已能取到，剩余是数据集缺陷）** |
+| `NO_EVIDENCE` / `CONFLICT` 哨兵 fail-open | 修复前模型输出 `NO_EVIDENCE [c1]…` 被当答案返回（`eval-058/061`）；DeepSeek 复测 `sentinel_leak_cases=[]` | `rag/policy_qa.py::sentinel_of()`、`tests/unit/test_policy_sentinel.py`、`stage13-deepseek-20261023.json` | **已修并已复测（2026-10-22/23）** |
+| 证据门槛是单一相似度信号 | 1 条元信息类问题误拒（`exact-05`）；0.62 与 0.65 在 dev/test 上互相打脸 | 报告 2.9.2、3.4 | 未修（建议按意图分档，未做） |
+| 图片文档只解析文字 | 版面、图表、手写体不解析；OCR 置信度低的版本直接判失败 | 报告 3.8、`docs/06-api.md` §6.3 | **阶段 20 新限制**，按设计如此 |
+| 索引卫生：Milvus 孤儿 / PG 未索引行 | 修复前 1 条孤儿、21 行未索引；现为 431 == 431、孤儿 0 | `reconcile_index.py`、报告 3.2/§5.4 | **已修（2026-10-22 重建 + 2026-10-23 增量）** |
+| `/api/v1/support/*` 曾未注册 | 前端客服工作台曾呈错误态 | `docs/06-api.md` §12；`tests/integration/test_support_api.py` | **已实现（阶段 16）** |
 
 ### 5.3 未实现 / 计划中（**不得写成已完成**）
 

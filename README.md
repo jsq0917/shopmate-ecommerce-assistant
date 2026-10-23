@@ -15,6 +15,8 @@
 | ------------------- | ------------------------------------------------------------- | ---------------------------------- |
 | 商品搜索 / 详情 / 比较 / 库存 | `tools/` 结构化查询 PostgreSQL                                     | 价格、库存、SKU 只来自数据库，带 `as_of`         |
 | 退换货/配送/保修政策问答       | BGE-M3 dense+sparse 双路检索 + RRF + 引用                           | 无证据则拒答，引用含文档/章节/版本/生效期/片段 ID       |
+| 图片政策截图入库（阶段 20）      | RapidOCR 离线识别 → 文本块；引用带 `image_url` 回源原图                       | 同图同文本可复现；≤10 MiB / ≤4000 万像素；无字图直接失败 |
+| 对话页知识库多选           | 会话级 `knowledge_base_ids`；Milvus `in [...]` + PG 复核            | 空选 = 全部可见库；跨店/停用库 422；历史消息引用不随切换改写   |
 | 订单与物流查询             | 归属校验后的结构化工具                                                   | 只能查自己的订单；日志脱敏                      |
 | 退货资格与申请             | 规则引擎 + 幂等写操作                                                  | 申请 ≠ 退款；LLM 不能批准资金                 |
 | 下单 / 模拟支付 / 取消      | `POST /orders` → `/pay` → `/cancel`，事务内扣减与回滚库存                  | 金额由服务端按 SKU 重算；行锁扣库存，不会超卖          |
@@ -24,7 +26,7 @@
 | 流式聊天                | SSE：`meta/tool_status/product_card/citation/delta/done/error` | 事件结构由后端决定，不由模型决定                   |
 | 管理端                 | 知识库/文档/片段/评测 + 上传/片段编辑/重建索引（阶段 16）                          | 上传后由具备 BGE-M3 的进程解析，见 §9          |
 | 客服工作台               | 工单队列/详情/状态流转/质量标记（阶段 16）                                    | 需 `support:*` 权限；admin 默认不含会话读取      |
-| 评测与压测               | 136 条业务评测 + 58 条检索金标 + Locust                                 | 数字全部来自实际运行，见 `docs/eval-report.md` |
+| 评测与压测               | 136 条业务评测 + 143 条检索金标（含 3 条图片截图）+ Locust                | 数字全部来自实际运行，见 `docs/eval-report.md` |
 
 不在范围内：接入真实资金（支付/退款）、K8s、微服务、消息队列、多 Agent、模型微调。
 下单、支付、退款都是**模拟结算**：状态流转与库存约束是真的，钱不流动。
@@ -89,6 +91,14 @@ FastAPI ── Auth/JWT/CSRF/限流 ── 输入护栏 ── 意图路由 ─�
 
 缺少权重时 API 仍可启动：政策问答会降级为“知识库暂不可用”，商品/订单/退货/转人工不受影响。
 
+**回答模型**：生产、开发与评测统一走 **DeepSeek**（OpenAI 兼容端点，`LLM_PROFILE=deepseek` +
+`LLM_MODEL=deepseek-flash`，即 DeepSeek-V4.1-Flash），只需在 `.env` 填 `LLM_API_KEY`。
+不填也能启动：政策问答退回“只给引用 + 明确拒答”，其余功能不受影响。
+本机 Ollama（`LLM_PROFILE=local`）仅用于离线烟测，**不作为评测基线**（7B 小模型的拒答行为
+不代表线上模型，相关历史数字在 `docs/eval-report.md` 已标注“历史”）。
+课程任务书要求通义千问 `qwen-max`：如要临时对齐，设 `LLM_PROFILE=qwen` 并填 DashScope key
+即可（兼容端点已支持，`base_url`/`model` 由档位预设填充，代码无需改动）。
+
 ---
 
 ## 4. 快速开始（Docker，推荐）
@@ -99,6 +109,8 @@ FastAPI ── Auth/JWT/CSRF/限流 ── 输入护栏 ── 意图路由 ─�
 cp .env.example .env
 # 编辑 .env：至少替换 POSTGRES_PASSWORD / REDIS_PASSWORD / MINIO_ROOT_PASSWORD
 # 并保持 DATABASE_URL / REDIS_URL 中的口令与上面一致（本机脚本会用它们连容器）
+# 想启用政策问答生成，再填 LLM_API_KEY（默认 LLM_PROFILE=deepseek，base_url/model 已预置）；
+# 不填也能启动：政策问答退回“只给引用 + 明确拒答”。
 ```
 
 `.env` 已在 `.gitignore` 中，禁止提交。
@@ -132,6 +144,11 @@ uv run python scripts/ingest.py
 ```
 
 `seed.py` 会写 `data/` 下的 JSON/JSONL（含评测集）并 upsert 数据库；重复执行不会产生重复行，**也不会覆盖已存在的手写评测用例**。
+
+其中 `data/knowledge/policy/gift-card-screenshot-2026.10.1.png` 是**用 Pillow 现渲染**的图片文档
+（阶段 20，用于验证 OCR 入库）。渲染需要一个中文字体：Windows 用系统 `msyh.ttc`，Linux 装
+`fonts-noto-cjk`，或用 `SHOPMATE_IMAGE_FONT=/path/to/font.ttc` 指定；找不到字体会直接报错，
+不会生成一堆方框的废图。
 
 ### 4.4 演示账号
 
@@ -230,9 +247,9 @@ uv run python scripts/verify_stage13.py          # 从评测原始结果复算�
 # 检索 + 业务行为（不需要外部 LLM）
 uv run python scripts/eval_stage13.py --parts retrieval business --output /tmp/eval.json
 
-# 生成质量（需要 OpenAI 兼容端点，例如本机 Ollama）
-uv run python scripts/eval_stage13.py --parts generation \
-  --llm-base-url http://localhost:11434/v1 --llm-model qwen2.5:7b
+# 生成质量 / 政策答案（模型默认取 .env 的 LLM_PROFILE / LLM_BASE_URL / LLM_MODEL / LLM_API_KEY，
+# 基线为 DeepSeek deepseek-flash = DeepSeek-V4.1-Flash；也可用 --llm-base-url/--llm-model 显式覆盖）
+uv run python scripts/eval_stage13.py --parts business policy_llm generation
 
 # 压测（另开 API 后；--host 必填，否则 locust 默认打 locust 自己的 web 端口）
 # 脚本默认账号见 scripts/locustfile.py docstring（SHOPMATE_LOAD_EMAIL/PASSWORD），
@@ -243,6 +260,12 @@ uv run --with locust locust -f scripts/locustfile.py --headless \
 ```
 
 指标定义、baseline 对照、失败案例与复现命令见 [`docs/eval-report.md`](docs/eval-report.md)。
+
+> **证据门槛 `POLICY_MIN_EVIDENCE_SIMILARITY` 统一为 0.62**（按 140 条金标的 dev 划分标定；
+> 金标已于 2026-10-23 增至 143 条（含 3 条图片用例），**阈值未改动**；
+> `.env` / `.env.example` / `compose.yaml` / `compose.prod.yaml` / 文档一致）。
+> 0.42 只作**宽松演示档**：无答案问题更容易被判为“有依据”，实测严格拒答率会从 7/7 掉到 0/7，
+> 因此只适合现场演示“链路能答”，**任何指标对比必须用 0.62**。
 
 ---
 
@@ -270,14 +293,17 @@ docker compose -f compose.prod.yaml --env-file .env.prod up -d api web
 
 ---
 
-## 9. 已知限制（阶段 16 现状）
+## 9. 已知限制（阶段 20 现状，2026-10-23）
 
 | 项                             | 现状                                    | 影响                                           |
 | ----------------------------- | ------------------------------------- | -------------------------------------------- |
-| 开发栈 web 容器（`localhost:3000`） | 只 COPY `web/public/`，是**阶段 4 占位页** | 无法登录、无聊天界面；看真实 UI 走 §4.5 的 (a)/(b)/(c) |
+| 开发栈 web 容器（`localhost:3000`） | 只 COPY `web/public/`，仍是**阶段 4 占位页**（一个静态 `index.html`，无构建、无路由） | 打不开登录/聊天/结算页面；真实 UI 走 §4.5 的 (a)/(b)/(c)（Vue 前端在 `frontend/`） |
+| 结算与退款（阶段 17）              | **已实现**：`POST /orders`（下单）→ `/pay`（模拟支付，扣库存）→ `/cancel`（未支付/已支付均可取消，已支付回补库存）；`GET/POST /api/v1/refunds`（消费者申请）；`GET /api/v1/support/refunds` + `POST /refunds/{id}/review`（客服审批） | 全是**模拟结算**：状态流转与库存约束是真的，钱不流动；退款只有"通过/拒绝"两步，无打款重试、对账、导出 |
+| 聊天商品卡片                    | **已实现**：SSE `product_card` 实时下发，`messages.cards_jsonb` 持久化 | 重开历史会话时前端按 `product_cards` 还原卡片；卡片只存快照，不回查最新价格/库存 |
 | `GET/PATCH /api/v1/support/*` | **已实现（阶段 16）**：队列、详情、状态流转、会话取证、质量标记 | admin 默认无 `support:*` 权限，需显式授予 |
 | 管理端文档上传 / 重建索引 / 片段编辑         | **已实现（阶段 16）**，返回 202 + `queued` job | 解析需 BGE-M3：进程未装配时 job 保持 `queued`，用 `scripts/ingest.py` 继续 |
 | 管理端只读接口                       | 已实现（知识库、文档、片段、评测历史、模型配置）              | —                                            |
+| 图片文档                            | **已实现（阶段 20）**：PNG/JPG 走 OCR，元数据与引用可回溯原图 | 只支持截图/扫描图上的**文字**；版面、图表、手写体不解析；OCR 依赖 onnxruntime（镜像约 +250 MB） |
 | 多副本横向扩展                       | 不支持                                   | 单 worker + 进程内 BGE-M3；扩展需拆独立 embedding 服务    |
 | 真实数据接入                        | 未实现                                   | 仅合成数据；Mock OMS，非真实订单系统                       |
 | Alembic 自动迁移                  | 仅开发 compose 的 API 启动时执行               | 生产走独立 `migrate` 服务，避免并发迁移                    |

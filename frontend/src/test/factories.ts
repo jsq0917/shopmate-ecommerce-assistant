@@ -4,7 +4,10 @@
  */
 
 import type {
+  ConversationGenerationParams,
   ConversationItem,
+  GenerationDefaults,
+  KnowledgeBaseOption,
   MessageCitation,
   MessageItem,
   ProductCardData,
@@ -14,7 +17,17 @@ import type {
 
 export const CONVERSATION_ID = '11111111-1111-4111-8111-111111111111'
 export const CONVERSATION_ID_2 = '22222222-2222-4222-8222-222222222222'
+export const KB_CN = '44444444-4444-4444-8444-444444444441'
+export const KB_SG = '44444444-4444-4444-8444-444444444442'
 export const MESSAGE_ID = '33333333-3333-4333-8333-333333333333'
+
+/** 未覆盖任何参数时的默认形态（stage 19）。 */
+export const EMPTY_GENERATION_PARAMS: ConversationGenerationParams = {
+  temperature: null,
+  top_p: null,
+  max_tokens: null,
+  history_turns: null,
+}
 
 export function conversationFixture(overrides: Partial<ConversationItem> = {}): ConversationItem {
   return {
@@ -22,6 +35,35 @@ export function conversationFixture(overrides: Partial<ConversationItem> = {}): 
     title: '耳机咨询',
     created_at: '2026-03-01T09:00:00Z',
     updated_at: '2026-03-01T09:05:00Z',
+    knowledge_base_ids: [],
+    generation_params: {},
+    ...overrides,
+  }
+}
+
+/** GET /generation-defaults 的返回样例（stage 19）。 */
+export function generationDefaultsFixture(
+  overrides: Partial<GenerationDefaults> = {},
+): GenerationDefaults {
+  return {
+    temperature: 0.1,
+    top_p: null,
+    max_tokens: null,
+    history_turns: 10,
+    max_tokens_cap: 4096,
+    ...overrides,
+  }
+}
+
+/** 对话页知识库多选的候选项（GET /knowledge-bases）。 */
+export function knowledgeBaseFixture(
+  overrides: Partial<KnowledgeBaseOption> = {},
+): KnowledgeBaseOption {
+  return {
+    id: '44444444-4444-4444-8444-444444444444',
+    name: 'policy-cn',
+    locale: 'zh-CN',
+    region: 'CN',
     ...overrides,
   }
 }

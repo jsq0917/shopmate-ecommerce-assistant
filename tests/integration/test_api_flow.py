@@ -83,7 +83,7 @@ class _FakePolicyService:
     its persistence can be verified end to end.
     """
 
-    async def answer(self, question, scope, *, query_plan=None):
+    async def answer(self, question, scope, *, query_plan=None, generation=None):
         return SimpleNamespace(
             answer_text="七天无理由退货需保持商品完好 [c1]。",
             citations=(_fake_citation(),),

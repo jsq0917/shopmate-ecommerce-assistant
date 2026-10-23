@@ -196,6 +196,9 @@ docker compose -f compose.prod.yaml --env-file .env.prod run --rm ingest
 
 **数据影响**：新增 `knowledge_versions` / `knowledge_chunks` 行与 Milvus collection 数据；幂等（同内容不重复建版本）。需要 `./models/bge-m3` 存在，否则进程直接失败并给出权重路径错误。
 
+图片文档（阶段 20）走本地 OCR（`rapidocr-onnxruntime`，模型随 wheel 打包），入库时同样产生 chunk 与向量，
+不需要额外的 OCR 服务或外网。镜像里的 `fonts-noto-cjk` 只服务于 `seed` 渲染合成截图；纯 ingest 不需要字体。
+
 > `seed`（合成数据）**只用于演示/预发**：它会写 `data/` 目录与业务表。生产环境不要执行。
 
 ---
@@ -454,10 +457,13 @@ docker inspect --format '{{.Name}} readonly={{.HostConfig.ReadonlyRootfs}} privi
 | `SSE_KEEPALIVE_SECONDS` / `SSE_TOTAL_TIMEOUT_SECONDS` | SSE 心跳与总时长 | 15 / 120 | 与边缘代理超时匹配 |
 | `EMBEDDING_MODEL_PATH` | 权重目录 | `models/bge-m3` | 容器内 `/models/bge-m3` |
 | `EMBEDDING_DIMENSION` | dense 维度 | 1024 | 改动必须重建 collection |
-| `POLICY_MIN_EVIDENCE_SIMILARITY` | 证据门槛 | 0.42（编排）/ 0.62（代码默认） | 按评测调，不要凭感觉改 |
-| `LLM_*` | 回答模型 | 空 | 留空则只给引用并拒答；填写时密钥只走环境变量 |
+| `POLICY_MIN_EVIDENCE_SIMILARITY` | 证据门槛 | **0.62**（`.env` / `.env.example` / 两个 compose / 本文档一致） | 按 140 条金标 dev 划分标定（2026-10-23 金标增至 143 条后**阈值未改**）；0.42 仅作宽松演示档（无答案问题会被答出来，严格拒答 7/7 → 0/7），任何指标对比都用 0.62 |
+| `LLM_PROFILE` | 回答模型档位 | `deepseek` | 只填空缺：`deepseek` / `qwen`（课程任务书对齐）/ `local`（Ollama，**仅离线烟测，不作评测基线**）；显式 `LLM_BASE_URL`/`LLM_MODEL` 优先级更高 |
+| `LLM_BASE_URL` / `LLM_MODEL` | 回答模型端点 | `https://api.deepseek.com` / `deepseek-flash` | 生产、开发、评测统一 DeepSeek；`deepseek-v4-flash` 只是网关别名（不在 `/models` 列表） |
+| `LLM_API_KEY` | 回答模型密钥 | 空 | **只走环境变量或 secret 管理器**；留空则政策问答退回"只给引用 + 明确拒答" |
+| `LLM_TIMEOUT_SECONDS` / `LLM_TEMPERATURE` / `LLM_MAX_TOKENS` | 调用参数 | 60 / 0.1 / 0 | `LLM_MAX_TOKENS=0` 表示不发送该参数、沿用供应商默认 |
 
-> `POLICY_MIN_EVIDENCE_SIMILARITY` 在代码默认值与编排默认值不一致（0.62 vs 0.42）。编排值来自阶段 13 评测口径，若要改必须同步更新 `docs/eval-report.md` 并复跑 `scripts/verify_stage13.py`。
+> 2026-10-23 口径统一：`POLICY_MIN_EVIDENCE_SIMILARITY` 此前编排默认 0.42、代码/评测 0.62，现已全部改为 **0.62**；若确要放宽到 0.42 做演示，README §7 写明了差异与适用场景（只是演示，不能用于指标对比）。
 
 ---
 

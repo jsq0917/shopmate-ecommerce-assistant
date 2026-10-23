@@ -120,7 +120,7 @@ class _FailingPolicyService:
     def __init__(self, error: Exception) -> None:
         self._error = error
 
-    async def answer(self, question, scope, *, query_plan=None):
+    async def answer(self, question, scope, *, query_plan=None, generation=None):
         raise self._error
 
 

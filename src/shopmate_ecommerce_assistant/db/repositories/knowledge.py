@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Iterable, Sequence
+from collections.abc import Collection, Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -150,6 +150,7 @@ def authorization_issues(
     *,
     shop_id: UUID,
     knowledge_base_id: UUID | None,
+    knowledge_base_ids: Collection[UUID] | None = None,
     locale: str | None,
     region: str | None,
     at: datetime,
@@ -159,8 +160,11 @@ def authorization_issues(
     issues: list[str] = []
     if meta.shop_id != shop_id:
         issues.append("cross_shop")
-    if knowledge_base_id is not None and meta.knowledge_base_id != knowledge_base_id:
+    if knowledge_base_ids and meta.knowledge_base_id not in knowledge_base_ids:
         issues.append("wrong_knowledge_base")
+    elif not knowledge_base_ids and knowledge_base_id is not None:
+        if meta.knowledge_base_id != knowledge_base_id:
+            issues.append("wrong_knowledge_base")
     if meta.parse_status != ParseStatus.READY.value:
         issues.append("version_not_ready")
     if meta.document_deleted_at is not None:

@@ -132,13 +132,27 @@ def test_chunk_patch_requires_a_field() -> None:
 def test_suffix_gate_rejects_traversal_and_unsupported_types() -> None:
     assert _safe_suffix("policy.md") == ".md"
     assert _safe_suffix("POLICY.PDF") == ".pdf"
+    # Stage 20: screenshots are offline documents too.
+    assert _safe_suffix("policy-shot.PNG") == ".png"
+    assert _safe_suffix("policy-shot.jpg") == ".jpg"
+    assert _safe_suffix("policy-shot.jpeg") == ".jpeg"
     for name in ("../escape.md", "dir/escape.md", "dir\\escape.md", ""):
         with pytest.raises(ToolError) as excinfo:
             _safe_suffix(name)
         assert excinfo.value.code is ErrorCode.UNSAFE_FILE
-    with pytest.raises(ToolError) as excinfo:
-        _safe_suffix("payload.exe")
-    assert excinfo.value.code is ErrorCode.UNSUPPORTED_FILE_TYPE
+    for name in ("payload.exe", "animation.gif", "scan.bmp", "scan.webp"):
+        with pytest.raises(ToolError) as excinfo:
+            _safe_suffix(name)
+        assert excinfo.value.code is ErrorCode.UNSUPPORTED_FILE_TYPE
+
+
+def test_image_uploads_get_a_lower_size_cap() -> None:
+    """The OCR path loads the whole picture in memory, so images are capped tighter."""
+    from shopmate_ecommerce_assistant.api.admin import _read_upload_limit, _upload_limit_for
+    from shopmate_ecommerce_assistant.rag.ingest import loaders
+
+    assert _upload_limit_for(".png") == min(_read_upload_limit(), loaders.IMAGE_MAX_BYTES)
+    assert _upload_limit_for(".md") == _read_upload_limit()
 
 
 def test_magic_check_rejects_disguised_containers() -> None:
@@ -147,6 +161,10 @@ def test_magic_check_rejects_disguised_containers() -> None:
     assert _magic_ok(".docx", b"PK\x03\x04rest")
     assert not _magic_ok(".pptx", b"%PDF-1.7")
     assert _magic_ok(".md", b"any text")
+    assert _magic_ok(".png", b"\x89PNG\r\n\x1a\n")
+    assert not _magic_ok(".png", b"<html>")
+    assert _magic_ok(".jpg", b"\xff\xd8\xff\xe0")
+    assert not _magic_ok(".jpeg", b"\x89PNG\r\n\x1a\n")
 
 
 async def test_read_limited_enforces_the_size_cap() -> None:

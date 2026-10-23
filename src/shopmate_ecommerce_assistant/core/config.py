@@ -3,8 +3,24 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+#: Provider presets used by :meth:`Settings._fill_llm_profile`.
+#:
+#: * ``deepseek`` — **the baseline** for production, development and evaluation.
+#: * ``qwen`` — kept only to align with the course brief (Alibaba DashScope
+#:   OpenAI-compatible endpoint); not used by default.
+#: * ``local`` — **offline smoke test only** (Ollama on 127.0.0.1); never an evaluation
+#:   baseline. Kept so an air-gapped check of the chat path still works.
+LLM_PROFILES: dict[str, dict[str, str]] = {
+    "deepseek": {"base_url": "https://api.deepseek.com", "model": "deepseek-flash"},
+    "qwen": {
+        "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "model": "qwen-max",
+    },
+    "local": {"base_url": "http://127.0.0.1:11434/v1", "model": "qwen2.5:7b"},
+}
 
 
 class Settings(BaseSettings):
@@ -68,6 +84,15 @@ class Settings(BaseSettings):
     # engineering baseline from docs/03-architecture.md §6; below it the router asks a
     # clarifying question instead of guessing, and writes are never allowed.
     intent_min_confidence: float = Field(default=0.70, ge=0.0, le=1.0)
+    # Knowledge fallback (stage 18). Rule scoring only recognises phrasings that were
+    # written down; long-tail policy questions ("分期退款手续费会退吗") scored zero and fell
+    # through to smalltalk, so they never reached the evidence gate. When no business
+    # intent matched, a domain-word / interrogative / question-mark turn now goes to the
+    # policy RAG path and lets PolicyQAService decide answer-vs-refuse. The switch exists
+    # for ablation runs; ``weak_intent`` additionally covers turns whose only match is a
+    # weak (score <= 2) pattern such as "支持…吗".
+    knowledge_fallback_enabled: bool = True
+    knowledge_fallback_weak_intent_enabled: bool = True
     max_user_input_chars: int = Field(default=2000, ge=1, le=20000)
     query_rewrite_max_keywords: int = Field(default=6, ge=0, le=20)
     query_rewrite_max_subqueries: int = Field(default=3, ge=1, le=3)
@@ -85,13 +110,41 @@ class Settings(BaseSettings):
     faq_cache_ttl_seconds: int = Field(default=3600, ge=60, le=7 * 24 * 3600)
     faq_min_match_confidence: float = Field(default=0.86, ge=0.5, le=1.0)
 
-    # Optional answer model for policy QA. When unset, the service returns citations
-    # and refuses to fabricate an answer.
+    # Answer model for policy QA (stage 13/18). **DeepSeek is the production, development
+    # and evaluation baseline** (OpenAI-compatible endpoint). Explicit ``LLM_BASE_URL`` /
+    # ``LLM_MODEL`` always win; ``LLM_PROFILE`` only fills the blanks, so switching the
+    # whole stack to another provider is one variable.
+    #
+    # ``local`` is an **offline smoke-test only** profile (Ollama on 127.0.0.1) — it is
+    # NOT an evaluation baseline and must never be quoted as a quality number. The retired
+    # qwen2.5:7b numbers in docs/eval-report.md are marked as history for that reason.
+    # When ``LLM_BASE_URL`` / ``LLM_MODEL`` are empty the service returns citations and
+    # refuses to fabricate an answer (retrieval-only mode).
+    llm_profile: Literal["deepseek", "qwen", "local"] = "deepseek"
     llm_base_url: str = ""
     llm_api_key: str = ""
     llm_model: str = ""
-    llm_timeout_seconds: float = Field(default=45.0, gt=0, le=180)
+    llm_timeout_seconds: float = Field(default=60.0, gt=0, le=180)
     llm_temperature: float = Field(default=0.1, ge=0.0, le=1.0)
+    #: ``0`` keeps the provider default (the parameter is simply not sent).
+    llm_max_tokens: int = Field(default=0, ge=0, le=8192)
+    #: Hard ceiling for a *per-conversation* ``max_tokens`` override (stage 19). The chat
+    #: page lets a shopper cap the answer length, but an unbounded value could stall a turn
+    #: and burn quota, so the write path rejects anything above this and the read path
+    #: clamps stale rows to it. ``LLM_MAX_TOKENS`` (the operator default) is unaffected.
+    llm_max_tokens_cap: int = Field(default=4096, ge=256, le=8192)
+
+    @model_validator(mode="after")
+    def _fill_llm_profile(self) -> "Settings":
+        """Fill provider defaults from ``LLM_PROFILE`` without overriding explicit values."""
+        preset = LLM_PROFILES.get(self.llm_profile)
+        if preset is None:
+            return self
+        if not self.llm_base_url.strip():
+            object.__setattr__(self, "llm_base_url", preset["base_url"])
+        if not self.llm_model.strip():
+            object.__setattr__(self, "llm_model", preset["model"])
+        return self
 
     # Eligibility tokens (stage 9). The signing key must never be committed; the default
     # is a placeholder for local development, exactly like the database password above.

@@ -28,6 +28,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PATH=/opt/venv/bin:$PATH \
     APP_ENV=production
 
+# fonts-noto-cjk: 合成语料里有一张图片文档（stage 20），seed 需要中文字体把它渲染成 PNG；
+# 缺字体时会直接报错而不是生成方框废图。libglib2.0-0 是 headless OpenCV 的运行时依赖。
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends fonts-noto-cjk libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN groupadd --gid "${APP_GID}" shopmate \
     && useradd --uid "${APP_UID}" --gid shopmate --create-home --shell /usr/sbin/nologin shopmate
 

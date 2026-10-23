@@ -16,7 +16,11 @@ import type { DocumentType, KnowledgeBaseItem, UploadDocumentData } from '@/api/
 import { docTypeLabel } from '@/utils/format'
 
 const MAX_SIZE_MIB = 20
-const ACCEPT = '.pdf,.docx,.pptx,.md,.txt'
+const IMAGE_MAX_MIB = 10
+//: 图片同样只是「离线文档」的一种：入库时走 OCR（stage 20），因此扩展名白名单要与后端
+//: `SUPPORTED_SUFFIXES` 保持一致，否则前端能选、后端 415。
+const ALLOWED_EXTENSIONS = ['pdf', 'docx', 'pptx', 'md', 'txt', 'png', 'jpg', 'jpeg']
+const ACCEPT = ALLOWED_EXTENSIONS.map((item) => `.${item}`).join(',')
 
 const props = defineProps<{
   modelValue: boolean
@@ -45,11 +49,13 @@ const docTypeOptions: DocumentType[] = ['policy', 'faq', 'manual', 'warranty', '
 const fileError = computed(() => {
   if (!file.value) return ''
   const extension = file.value.name.toLowerCase().split('.').pop() ?? ''
-  if (!['pdf', 'docx', 'pptx', 'md', 'txt'].includes(extension)) {
+  if (!ALLOWED_EXTENSIONS.includes(extension)) {
     return `不支持的文件类型：.${extension}（仅支持 ${ACCEPT}）`
   }
-  if (file.value.size > MAX_SIZE_MIB * 1024 * 1024) {
-    return `文件超过 ${MAX_SIZE_MIB} MiB 上限`
+  // 图片后端限 10 MiB（OCR 前要整图读入内存），文档仍是 20 MiB。
+  const limit = ['png', 'jpg', 'jpeg'].includes(extension) ? IMAGE_MAX_MIB : MAX_SIZE_MIB
+  if (file.value.size > limit * 1024 * 1024) {
+    return `文件超过 ${limit} MiB 上限`
   }
   return ''
 })

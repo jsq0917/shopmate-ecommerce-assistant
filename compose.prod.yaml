@@ -227,10 +227,18 @@ services:
       EMBEDDING_MAX_LENGTH: ${EMBEDDING_MAX_LENGTH:-512}
       EMBEDDING_DIMENSION: ${EMBEDDING_DIMENSION:-1024}
       RETRIEVAL_RRF_K: ${RETRIEVAL_RRF_K:-60}
-      POLICY_MIN_EVIDENCE_SIMILARITY: ${POLICY_MIN_EVIDENCE_SIMILARITY:-0.42}
-      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      # Evidence gate: 0.62 everywhere (.env / .env.example / compose / docs).
+      POLICY_MIN_EVIDENCE_SIMILARITY: ${POLICY_MIN_EVIDENCE_SIMILARITY:-0.62}
+      # Answer model: DeepSeek baseline; LLM_PROFILE=local is an offline smoke test only.
+      LLM_PROFILE: ${LLM_PROFILE:-deepseek}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.deepseek.com}
       LLM_API_KEY: ${LLM_API_KEY:-}
-      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_MODEL: ${LLM_MODEL:-deepseek-flash}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-60}
+      LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0.1}
+      LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-0}
+      # Safety ceiling for the chat page's per-conversation max-output override.
+      LLM_MAX_TOKENS_CAP: ${LLM_MAX_TOKENS_CAP:-4096}
       # 只读根文件系统下，torch / huggingface 的缓存必须落到 tmpfs。
       HOME: /tmp
       XDG_CACHE_HOME: /tmp/cache

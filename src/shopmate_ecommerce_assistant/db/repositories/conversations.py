@@ -10,7 +10,8 @@ from __future__ import annotations
 
 import base64
 import hashlib
-from dataclasses import dataclass
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
@@ -31,6 +32,11 @@ class ConversationRow:
     title: str
     created_at: datetime
     updated_at: datetime
+    #: Per-conversation knowledge-base selection; empty tuple means "no restriction".
+    knowledge_base_ids: tuple[UUID, ...] = ()
+    #: Per-conversation generation-parameter overrides (stage 19). Only the keys the user
+    #: actually set are present; a missing key means "use the LLM_* environment default".
+    generation_params: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +54,14 @@ class MessageRow:
     is_complete: bool
     created_at: datetime
     client_message_id: UUID | None
+
+
+def _dedupe(items: Sequence[UUID]) -> tuple[UUID, ...]:
+    """Keep first-seen order, drop duplicates (selection order is not semantic)."""
+    seen: dict[UUID, None] = {}
+    for item in items:
+        seen.setdefault(item, None)
+    return tuple(seen)
 
 
 def _encode_cursor(stamp: datetime, resource_id: UUID) -> str:
@@ -114,9 +128,21 @@ class ConversationRepository:
             next_cursor = _encode_cursor(last.updated_at, last.id)
         return [self._to_row(row) for row in page], next_cursor
 
-    async def create(self, *, shop_id: UUID, user_id: UUID, title: str) -> ConversationRow:
+    async def create(
+        self,
+        *,
+        shop_id: UUID,
+        user_id: UUID,
+        title: str,
+        knowledge_base_ids: Sequence[UUID] = (),
+    ) -> ConversationRow:
         """Create a conversation for the user and return it."""
-        row = Conversation(shop_id=shop_id, user_id=user_id, title=title)
+        row = Conversation(
+            shop_id=shop_id,
+            user_id=user_id,
+            title=title,
+            knowledge_base_ids_jsonb=[str(item) for item in _dedupe(knowledge_base_ids)],
+        )
         self._session.add(row)
         await self._session.commit()
         await self._session.refresh(row)
@@ -167,10 +193,71 @@ class ConversationRepository:
         await self._session.commit()
         return result.rowcount == 1
 
+    async def set_knowledge_base_ids(
+        self,
+        *,
+        shop_id: UUID,
+        user_id: UUID,
+        conversation_id: UUID,
+        knowledge_base_ids: Sequence[UUID],
+    ) -> bool:
+        """Replace the conversation's knowledge-base selection (empty = no restriction)."""
+        result = await self._session.execute(
+            sa.update(Conversation)
+            .where(
+                Conversation.shop_id == shop_id,
+                Conversation.user_id == user_id,
+                Conversation.id == conversation_id,
+                Conversation.deleted_at.is_(None),
+            )
+            .values(knowledge_base_ids_jsonb=[str(item) for item in _dedupe(knowledge_base_ids)])
+        )
+        await self._session.commit()
+        return result.rowcount == 1
+
+    async def set_generation_params(
+        self,
+        *,
+        shop_id: UUID,
+        user_id: UUID,
+        conversation_id: UUID,
+        params: Mapping[str, Any],
+    ) -> bool:
+        """Replace the conversation's generation-parameter overrides (stage 19).
+
+        ``params`` carries only the keys the caller wants to store; ``{}`` clears every
+        override and restores the environment defaults.
+        """
+        result = await self._session.execute(
+            sa.update(Conversation)
+            .where(
+                Conversation.shop_id == shop_id,
+                Conversation.user_id == user_id,
+                Conversation.id == conversation_id,
+                Conversation.deleted_at.is_(None),
+            )
+            .values(generation_params_jsonb=dict(params))
+        )
+        await self._session.commit()
+        return result.rowcount == 1
+
     @staticmethod
     def _to_row(row: Conversation) -> ConversationRow:
+        raw = row.knowledge_base_ids_jsonb or []
+        parsed: list[UUID] = []
+        for item in raw:
+            try:
+                parsed.append(UUID(str(item)))
+            except (TypeError, ValueError):  # pragma: no cover - defensive against bad rows
+                continue
+        stored = row.generation_params_jsonb
         return ConversationRow(
-            id=row.id, title=row.title, created_at=row.created_at, updated_at=row.updated_at
+            id=row.id,
+            title=row.title,
+            created_at=row.created_at,
+            updated_at=row.updated_at,
+            knowledge_base_ids=tuple(parsed),
+            generation_params=dict(stored) if isinstance(stored, dict) else {},
         )
 
 

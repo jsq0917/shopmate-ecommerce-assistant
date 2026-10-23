@@ -353,6 +353,7 @@ class MilvusKnowledgeStore:
         *,
         shop_id: str,
         knowledge_base_id: str | None = None,
+        knowledge_base_ids: Sequence[str] | None = None,
         region: str | None = None,
         locale: str | None = None,
         doc_types: Sequence[str] | None = None,
@@ -370,7 +371,10 @@ class MilvusKnowledgeStore:
             clauses.append("is_enabled == true")
         if status:
             clauses.append(f'status == "{_escape(status)}"')
-        if knowledge_base_id:
+        if knowledge_base_ids:
+            joined = ", ".join(f'"{_escape(item)}"' for item in knowledge_base_ids)
+            clauses.append(f"knowledge_base_id in [{joined}]")
+        elif knowledge_base_id:
             clauses.append(f'knowledge_base_id == "{_escape(knowledge_base_id)}"')
         if region:
             clauses.append(f'region == "{_escape(region)}"')

@@ -14,6 +14,7 @@ dependencies = [
     "fastapi>=0.145.0",
     "flagembedding>=1.4.2",
     "httpx>=0.28.1",
+    "pillow>=13.0.0",
     "pydantic-settings>=2.16.0",
     "pyjwt>=2.15.1",
     "pymilvus>=2.4.9,<2.5",
@@ -21,6 +22,7 @@ dependencies = [
     "python-docx>=1.2.0",
     "python-multipart>=0.0.32",
     "python-pptx>=1.0.2",
+    "rapidocr-onnxruntime>=1.4.4",
     "redis>=8.1.0",
     "reportlab>=5.0.1",
     "setuptools<81",
@@ -61,5 +63,15 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "ASYNC"]
 
+[tool.ruff.lint.per-file-ignores]
+# 合成语料是数据文件：整条政策语句保持为单一字符串字面量，拆成隐式拼接会污染
+# 已建索引的语料文本；这些模块不写逻辑。2026-10-22 语料扩充时新增。
+"src/shopmate_ecommerce_assistant/synthetic/knowledge_corpus*.py" = ["E501"]
+
 [tool.ruff.format]
 quote-style = "double"
+
+[tool.uv]
+# rapidocr-onnxruntime 声明依赖 opencv-python（带 GUI 后端，需要 libGL）。服务端只做识别，
+# 换成 headless 版本后 slim 镜像不必再装 libGL，镜像也更小。
+override-dependencies = ["opencv-python-headless"]

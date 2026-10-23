@@ -13,4 +13,6 @@ def test_alembic_has_a_single_baseline_head() -> None:
 
     script = ScriptDirectory.from_config(config)
 
-    assert script.get_heads() == ["20261022_0007"]
+    # 阶段 18 新增 20261023_0008（会话级知识库选择），阶段 19 新增 20261023_0009
+    # （会话级推理参数）；仍要求单头，避免分支迁移。
+    assert script.get_heads() == ["20261023_0009"]

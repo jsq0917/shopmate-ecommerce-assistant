@@ -56,7 +56,7 @@ from shopmate_ecommerce_assistant.db.models.enums import KnowledgeDocType, UserR
 from shopmate_ecommerce_assistant.db.repositories.audit import AuditRepository
 from shopmate_ecommerce_assistant.db.repositories.knowledge_admin import KnowledgeAdminRepository
 from shopmate_ecommerce_assistant.domain.audit.models import AuditEventRecord
-from shopmate_ecommerce_assistant.rag.ingest.loaders import SUPPORTED_SUFFIXES
+from shopmate_ecommerce_assistant.rag.ingest.loaders import IMAGE_MAX_BYTES, SUPPORTED_SUFFIXES
 
 logger = logging.getLogger(__name__)
 
@@ -75,12 +75,32 @@ def _read_upload_limit() -> int:
     return get_settings().knowledge_upload_max_bytes
 
 
+#: Suffixes handled by the OCR loader (stage 20).
+IMAGE_SUFFIXES = frozenset({".png", ".jpg", ".jpeg"})
+
+
+def _upload_limit_for(suffix: str) -> int:
+    """Return the byte limit for one upload.
+
+    Images are capped lower than text documents: OCR rendering in memory and a 10 MiB
+    screenshot is already far beyond what a policy page needs.
+    """
+    limit = _read_upload_limit()
+    if suffix in IMAGE_SUFFIXES:
+        return min(limit, IMAGE_MAX_BYTES)
+    return limit
+
+
 def _magic_ok(suffix: str, head: bytes) -> bool:
     """Return True when the first bytes match the declared container format."""
     if suffix == ".pdf":
         return head.startswith(b"%PDF-")
     if suffix in {".docx", ".pptx"}:
         return head.startswith(b"PK\x03\x04")
+    if suffix == ".png":
+        return head.startswith(b"\x89PNG\r\n\x1a\n")
+    if suffix in {".jpg", ".jpeg"}:
+        return head.startswith(b"\xff\xd8\xff")
     return True  # markdown/plain text is validated by decoding, not by magic
 
 
@@ -128,7 +148,7 @@ def _safe_suffix(filename: str) -> str:
     if suffix not in SUPPORTED_SUFFIXES:
         raise ToolError(
             ErrorCode.UNSUPPORTED_FILE_TYPE,
-            "仅支持 PDF、DOCX、PPTX、Markdown、TXT。",
+            "仅支持 PDF、DOCX、PPTX、Markdown、TXT、PNG、JPG。",
         )
     return suffix
 
@@ -444,7 +464,7 @@ async def upload_document(
         raise ToolError(ErrorCode.VALIDATION_ERROR, "effective_to 必须晚于 effective_from。")
 
     suffix = _safe_suffix(file.filename or "")
-    payload = await _read_limited(file, limit=_read_upload_limit(), suffix=suffix)
+    payload = await _read_limited(file, limit=_upload_limit_for(suffix), suffix=suffix)
 
     unique = uuid4().hex
     relative = f"uploads/{context.shop_id}/{unique}{suffix}"

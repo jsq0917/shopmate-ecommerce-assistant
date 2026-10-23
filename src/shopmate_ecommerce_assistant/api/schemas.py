@@ -14,6 +14,11 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from shopmate_ecommerce_assistant.core.generation import (
+    DEFAULT_HISTORY_TURNS,
+    MAX_HISTORY_TURNS,
+    MAX_TOKENS_CEILING,
+)
 from shopmate_ecommerce_assistant.db.models.enums import ReturnReasonCode
 
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -94,11 +99,34 @@ class LogoutData(BaseModel):
 # -- conversations ------------------------------------------------------
 
 
+class ConversationGenerationParams(BaseModel):
+    """Per-conversation generation overrides (stage 19); every field is optional.
+
+    ``None`` means "not overridden": the ``LLM_*`` environment default applies (for
+    ``top_p`` the parameter is simply not sent). Range checks live here so an out-of-range
+    value can never be stored; ``max_tokens`` additionally has to stay under the
+    operator-controlled ``llm_max_tokens_cap``, which the endpoint enforces.
+    """
+
+    temperature: float | None = Field(default=None, ge=0.0, le=1.0)
+    top_p: float | None = Field(default=None, ge=0.0, le=1.0)
+    max_tokens: int | None = Field(default=None, ge=1, le=MAX_TOKENS_CEILING)
+    history_turns: int | None = Field(default=None, ge=0, le=MAX_HISTORY_TURNS)
+
+
 class ConversationItem(BaseModel):
     id: UUID
     title: str
     created_at: datetime
     updated_at: datetime
+    #: Knowledge bases this conversation retrieves from (stage 18).
+    #: Empty list = no restriction (every knowledge base visible to the shop).
+    knowledge_base_ids: list[UUID] = Field(default_factory=list)
+    #: Generation-parameter overrides stored on the conversation (stage 19). Only keys the
+    #: user set are present; a missing key/null means "use the environment default".
+    generation_params: ConversationGenerationParams = Field(
+        default_factory=ConversationGenerationParams
+    )
 
 
 class ConversationListData(BaseModel):
@@ -108,6 +136,8 @@ class ConversationListData(BaseModel):
 
 class CreateConversationRequest(_Strict):
     title: str | None = Field(default=None, max_length=120)
+    #: Optional initial selection; empty keeps the "no restriction" default.
+    knowledge_base_ids: list[UUID] = Field(default_factory=list, max_length=20)
 
     @field_validator("title")
     @classmethod
@@ -165,6 +195,57 @@ class ChatStreamRequest(_Strict):
         if not stripped:
             raise ValueError("消息不能为空")
         return stripped
+
+
+class UpdateKnowledgeBasesRequest(_Strict):
+    """Replace a conversation's knowledge-base selection.
+
+    ``[]`` is a *meaningful* value: it restores "no restriction" (every visible knowledge
+    base). The field is required so a caller cannot clear the selection by omission.
+    """
+
+    knowledge_base_ids: list[UUID] = Field(max_length=20)
+
+
+class UpdateGenerationParamsRequest(_Strict):
+    """Merge generation-parameter overrides onto a conversation.
+
+    Merge semantics: an omitted field keeps its stored value, an explicit ``null`` clears
+    that override. Sending every field as ``null`` restores the environment defaults.
+    """
+
+    temperature: float | None = Field(default=None, ge=0.0, le=1.0)
+    top_p: float | None = Field(default=None, ge=0.0, le=1.0)
+    max_tokens: int | None = Field(default=None, ge=1, le=MAX_TOKENS_CEILING)
+    history_turns: int | None = Field(default=None, ge=0, le=MAX_HISTORY_TURNS)
+
+
+class GenerationDefaultsData(BaseModel):
+    """Server-side defaults the chat page shows as "currently effective" values."""
+
+    #: Effective default temperature (``LLM_TEMPERATURE``); always a concrete number.
+    temperature: float
+    #: ``None`` = not sent by default (the provider default applies).
+    top_p: float | None = None
+    #: ``None`` = not sent by default (``LLM_MAX_TOKENS=0``).
+    max_tokens: int | None = None
+    #: Default history turns (the pre-stage-19 fixed limit).
+    history_turns: int = DEFAULT_HISTORY_TURNS
+    #: Hard ceiling for a per-conversation ``max_tokens`` override.
+    max_tokens_cap: int
+
+
+class KnowledgeBaseOption(BaseModel):
+    """One knowledge base a chat user may select."""
+
+    id: UUID
+    name: str
+    locale: str
+    region: str
+
+
+class KnowledgeBaseOptionListData(BaseModel):
+    items: list[KnowledgeBaseOption]
 
 
 # -- catalog ------------------------------------------------------------
@@ -798,6 +879,7 @@ __all__ = [
     "CompareRowItem",
     "CompareValueItem",
     "CompareProductRefItem",
+    "ConversationGenerationParams",
     "ConversationItem",
     "ConversationListData",
     "CreateConversationRequest",
@@ -812,6 +894,7 @@ __all__ = [
     "DocumentListItem",
     "EvalRunItem",
     "EvalRunListData",
+    "GenerationDefaultsData",
     "HandoffListItem",
     "HandoffListData",
     "KnowledgeBaseItem",
@@ -839,6 +922,7 @@ __all__ = [
     "ShipmentEventItem",
     "SystemMetaData",
     "TokenData",
+    "UpdateGenerationParamsRequest",
     "UserSummary",
     "VariantDetailItem",
 ]

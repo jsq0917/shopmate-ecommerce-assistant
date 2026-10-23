@@ -18,7 +18,10 @@ from shopmate_ecommerce_assistant.api import (
     catalog,
     chat,
     conversations,
+    generation,
     handoff,
+    knowledge,
+    knowledge_assets,
     orders,
     refunds,
     returns,
@@ -50,6 +53,7 @@ _OPENAPI_TAGS = [
         "name": "chat",
         "description": "SSE 流式聊天（meta/tool_status/product_card/citation/delta/done/error）。",
     },
+    {"name": "generation", "description": "对话页推理参数的默认值与安全上限。"},
     {"name": "products", "description": "商品搜索、详情与对比。"},
     {
         "name": "orders",
@@ -312,6 +316,9 @@ def create_app(
     app.include_router(auth.router)
     app.include_router(conversations.router)
     app.include_router(chat.router)
+    app.include_router(generation.router)
+    app.include_router(knowledge.router)
+    app.include_router(knowledge_assets.router)
     app.include_router(catalog.router)
     app.include_router(orders.router)
     app.include_router(refunds.router)

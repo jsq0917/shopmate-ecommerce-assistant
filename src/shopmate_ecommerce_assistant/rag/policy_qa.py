@@ -28,6 +28,7 @@ from typing import Any, Literal, Protocol
 import httpx
 
 from shopmate_ecommerce_assistant.core.config import Settings
+from shopmate_ecommerce_assistant.core.generation import GenerationParams
 from shopmate_ecommerce_assistant.rag.citations import Citation
 from shopmate_ecommerce_assistant.rag.query_rewrite import QueryPlan
 from shopmate_ecommerce_assistant.rag.retrieval import (
@@ -83,8 +84,19 @@ class AnswerModel(Protocol):
 
     name: str
 
-    def complete(self, *, system: str, user: str) -> str:
-        """Return the model's raw text answer."""
+    def complete(
+        self,
+        *,
+        system: str,
+        user: str,
+        generation: GenerationParams | None = None,
+    ) -> str:
+        """Return the model's raw text answer.
+
+        ``generation`` carries the conversation's stage-19 overrides; ``None`` (the default)
+        keeps the environment-configured behaviour, which is what every pre-stage-19 caller
+        and test double uses.
+        """
 
 
 class AnswerModelError(Exception):
@@ -97,7 +109,13 @@ class AnswerModelError(Exception):
 
 
 class OpenAICompatibleAnswerModel:
-    """Thin OpenAI-compatible chat client (no SDK dependency)."""
+    """Thin OpenAI-compatible chat client (no SDK dependency).
+
+    The baseline provider is DeepSeek (``LLM_PROFILE=deepseek``); the same client also
+    serves the DashScope ``qwen-max`` endpoint and, for **offline smoke tests only**, a
+    local Ollama server (``LLM_PROFILE=local``) — the latter is never an evaluation
+    baseline, because a 7B model's refusals say nothing about the production model.
+    """
 
     def __init__(self, settings: Settings) -> None:
         self.name = settings.llm_model
@@ -106,20 +124,49 @@ class OpenAICompatibleAnswerModel:
         self._model = settings.llm_model
         self._timeout = settings.llm_timeout_seconds
         self._temperature = settings.llm_temperature
+        #: ``0`` means "do not send the parameter and keep the provider default".
+        self._max_tokens = settings.llm_max_tokens
         #: ``usage`` dict of the most recent call (prompt/completion tokens), or ``None``.
         #: Read-only telemetry for evaluation and cost accounting; never affects the answer.
         self.last_usage: dict[str, Any] | None = None
 
-    def complete(self, *, system: str, user: str) -> str:
-        """Call ``/chat/completions`` and return the message content."""
-        payload = {
+    def complete(
+        self,
+        *,
+        system: str,
+        user: str,
+        generation: GenerationParams | None = None,
+    ) -> str:
+        """Call ``/chat/completions`` and return the message content.
+
+        Stage 19: a conversation may override ``temperature`` / ``top_p`` / ``max_tokens``.
+        An override wins over the environment default; ``top_p`` is only sent when it is
+        explicitly set (the provider default applies otherwise), and ``max_tokens`` keeps
+        the "0 = do not send" convention when neither the override nor the environment sets
+        one. ``history_turns`` is irrelevant here — it shapes the context assembly upstream.
+        """
+        temperature = self._temperature
+        top_p: float | None = None
+        max_tokens = self._max_tokens
+        if generation is not None:
+            if generation.temperature is not None:
+                temperature = generation.temperature
+            if generation.top_p is not None:
+                top_p = generation.top_p
+            if generation.max_tokens is not None:
+                max_tokens = generation.max_tokens
+        payload: dict[str, Any] = {
             "model": self._model,
-            "temperature": self._temperature,
+            "temperature": temperature,
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
         }
+        if top_p is not None:
+            payload["top_p"] = top_p
+        if max_tokens:
+            payload["max_tokens"] = max_tokens
         headers = {"Authorization": f"Bearer {self._api_key}"}
         try:
             with httpx.Client(timeout=self._timeout) as client:
@@ -204,6 +251,7 @@ def sentinel_of(text: str) -> str | None:
     if upper == "CONFLICT":
         return "CONFLICT"
     return None
+
 
 #: Only transitional / action-guidance sentences may appear without a ``[cN]`` label.
 #: Everything else is treated as a policy claim, so a claim phrased without any of the
@@ -367,6 +415,7 @@ class PolicyQAService:
         scope: RetrievalScope,
         *,
         query_plan: QueryPlan | None = None,
+        generation: GenerationParams | None = None,
     ) -> PolicyAnswer:
         """Retrieve, gate, then compose an answer (or refuse/hand off).
 
@@ -375,6 +424,10 @@ class PolicyQAService:
         same BGE-M3 provider, normalisation and dense+sparse path as an unrewritten
         question. The original ``question`` is still what the prompt asks the model to
         answer, so rewriting cannot silently change the user's intent.
+
+        ``generation`` carries the conversation's stage-19 parameter overrides (temperature
+        / top_p / max_tokens) and is forwarded verbatim to the answer model; ``None`` keeps
+        the environment defaults.
         """
         retrieval_query = (
             query_plan.primary_query.strip()
@@ -421,7 +474,9 @@ class PolicyQAService:
 
         prompt = build_policy_prompt(question, list(retrieval.citations))
         try:
-            draft = self._answer_model.complete(system=SYSTEM_PROMPT, user=prompt)
+            draft = self._answer_model.complete(
+                system=SYSTEM_PROMPT, user=prompt, generation=generation
+            )
         except AnswerModelError as exc:
             audit["decision"] = "error"
             audit["error"] = {"code": exc.code, "message": exc.message}

@@ -95,10 +95,51 @@ export interface ConversationItem {
   title: string
   created_at: string
   updated_at: string
+  /** 会话级知识库选择；空数组 = 不限制（检索全部可见知识库）。 */
+  knowledge_base_ids: string[]
+  /**
+   * 会话级推理参数覆盖（stage 19）。只有用户设置过的字段非 null；
+   * null = 未覆盖，用服务端默认值（GET /generation-defaults）。
+   */
+  generation_params: ConversationGenerationParams
+}
+
+/** 对话页可调的推理参数；null/缺省 = 不覆盖，沿用服务端默认。 */
+export interface ConversationGenerationParams {
+  temperature?: number | null
+  top_p?: number | null
+  max_tokens?: number | null
+  history_turns?: number | null
+}
+
+/** GET /generation-defaults：未覆盖参数时生效的服务端默认值与安全上限。 */
+export interface GenerationDefaults {
+  /** 生效的默认温度（LLM_TEMPERATURE）。 */
+  temperature: number
+  /** null = 默认不发送（供应商默认）。 */
+  top_p: number | null
+  /** null = 默认不发送（LLM_MAX_TOKENS=0）。 */
+  max_tokens: number | null
+  /** 默认历史轮数。 */
+  history_turns: number
+  /** 「最长输出」的硬上限，超过会被后端拒绝。 */
+  max_tokens_cap: number
 }
 
 export interface ConversationListData extends Pagination {
   items: ConversationItem[]
+}
+
+/** 对话页可勾选的知识库（GET /knowledge-bases）。 */
+export interface KnowledgeBaseOption {
+  id: string
+  name: string
+  locale: string
+  region: string
+}
+
+export interface KnowledgeBaseOptionListData {
+  items: KnowledgeBaseOption[]
 }
 
 export interface MessageCitation {

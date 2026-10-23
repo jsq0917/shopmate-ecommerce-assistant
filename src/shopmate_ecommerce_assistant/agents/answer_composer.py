@@ -90,6 +90,42 @@ def compose_product_detail(product: Mapping[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def compose_stock(
+    data: Mapping[str, Any], *, title: str | None = None, as_of: str | None = None
+) -> str:
+    """Return a stock answer built only from ``check_stock`` facts.
+
+    The contract keeps a shortage inside the success envelope (``is_available=false`` with
+    the real quantity), so the wording must report the true number instead of hiding it or
+    pretending the item is available.
+    """
+    name = f"「{title}」" if title else "该商品"
+    available = data.get("available_qty")
+    status = str(data.get("stock_status") or "unknown")
+    if data.get("is_available"):
+        head = f"{name}现在有货（可售 {available} 件）。"
+    elif available:
+        requested = data.get("requested_qty")
+        head = f"{name}库存不足，目前可售 {available} 件，不够你想要的 {requested} 件。"
+    elif status == "out_of_stock":
+        head = f"{name}暂时无货。"
+    else:
+        head = f"{name}的库存还无法确认，建议稍后再查或转人工核实。"
+    lines = [head]
+    sku = data.get("sku")
+    if sku:
+        lines.append(f"SKU：{sku}")
+    for warehouse in (data.get("warehouses") or [])[:3]:
+        updated = warehouse.get("updated_at")
+        suffix = f"（更新于 {updated}）" if updated else ""
+        lines.append(
+            f"仓库 {warehouse.get('warehouse_code')}：{warehouse.get('available_qty')} 件{suffix}"
+        )
+    if as_of:
+        lines.append(f"数据更新时间：{as_of}")
+    return "\n".join(lines)
+
+
 def compose_compare(compare: Mapping[str, Any]) -> str:
     """Return a compact comparison of the aligned rows."""
     products = compare.get("products") or []
@@ -217,4 +253,5 @@ __all__ = [
     "compose_return_eligibility",
     "compose_shipment",
     "compose_smalltalk",
+    "compose_stock",
 ]

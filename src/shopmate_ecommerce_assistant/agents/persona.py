@@ -22,6 +22,7 @@ import re
 from dataclasses import dataclass
 
 from shopmate_ecommerce_assistant.core.config import Settings
+from shopmate_ecommerce_assistant.core.generation import GenerationParams
 from shopmate_ecommerce_assistant.rag.policy_qa import (
     AnswerModel,
     AnswerModelError,
@@ -90,11 +91,14 @@ def naturalize(
     settings: Settings,
     model: AnswerModel | None = None,
     history: list[str] | None = None,
+    generation: GenerationParams | None = None,
 ) -> PersonaResult:
     """Rewrite ``draft`` into conversational Chinese, or return it unchanged.
 
     The call is synchronous (the underlying client is ``httpx.Client``); callers inside the
-    async chat pipeline must wrap it in ``asyncio.to_thread``.
+    async chat pipeline must wrap it in ``asyncio.to_thread``. ``generation`` forwards the
+    conversation's stage-19 parameter overrides to the model; ``None`` keeps the
+    environment defaults.
     """
     if not settings.chat_persona_enabled:
         return PersonaResult(draft, False, "disabled")
@@ -118,7 +122,7 @@ def naturalize(
         "请按要求改写这段答复。"
     )
     try:
-        candidate = llm.complete(system=SYSTEM_PROMPT, user=prompt)
+        candidate = llm.complete(system=SYSTEM_PROMPT, user=prompt, generation=generation)
     except AnswerModelError as exc:
         logger.info("chat persona rewrite skipped: %s", exc.code)
         return PersonaResult(draft, False, exc.code)
@@ -142,6 +146,7 @@ async def naturalize_async(
     settings: Settings,
     model: AnswerModel | None = None,
     history: list[str] | None = None,
+    generation: GenerationParams | None = None,
 ) -> PersonaResult:
     """Await :func:`naturalize` in a worker thread with a hard timeout."""
     timeout = settings.chat_persona_timeout_seconds
@@ -154,6 +159,7 @@ async def naturalize_async(
                 settings=settings,
                 model=model,
                 history=history,
+                generation=generation,
             ),
             timeout=timeout,
         )

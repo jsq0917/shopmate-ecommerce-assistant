@@ -205,7 +205,9 @@ async def test_empty_retrieval_refuses_without_calling_the_model() -> None:
     class _ForbiddenModel:
         calls = 0
 
-        def complete(self, *, system: str, user: str) -> str:  # pragma: no cover - guard
+        def complete(  # pragma: no cover - guard
+            self, *, system: str, user: str, generation=None
+        ) -> str:
             self.calls += 1
             return "自编政策 [c1]"
 

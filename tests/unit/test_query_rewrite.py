@@ -323,7 +323,7 @@ class StubModel:
         self.text = text
         self.prompts: list[str] = []
 
-    def complete(self, *, system: str, user: str) -> str:
+    def complete(self, *, system: str, user: str, generation=None) -> str:
         self.prompts.append(user)
         return self.text
 

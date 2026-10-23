@@ -67,6 +67,9 @@ class RetrievalScope:
 
     shop_id: str
     knowledge_base_id: str | None = None
+    #: Explicit multi-selection (stage 18). Empty tuple = no knowledge-base restriction.
+    #: When set it takes precedence over ``knowledge_base_id``.
+    knowledge_base_ids: tuple[str, ...] = ()
     locale: str | None = "zh-CN"
     region: str | None = "CN"
     at: datetime | None = None
@@ -81,6 +84,7 @@ class RetrievalScope:
         return {
             "shop_id": self.shop_id,
             "knowledge_base_id": self.knowledge_base_id,
+            "knowledge_base_ids": list(self.knowledge_base_ids),
             "locale": self.locale,
             "region": self.region,
             "at": self.moment.isoformat(),
@@ -175,6 +179,9 @@ class DocumentRetriever:
         scope = RetrievalScope(
             shop_id=scope.shop_id,
             knowledge_base_id=scope.knowledge_base_id,
+            # Must be carried over: dropping it silently widens the search to every
+            # knowledge base of the shop (stage 18 regression).
+            knowledge_base_ids=scope.knowledge_base_ids,
             locale=scope.locale,
             region=scope.region,
             at=at,
@@ -197,6 +204,7 @@ class DocumentRetriever:
         expr = self._store.build_filter(
             shop_id=scope.shop_id,
             knowledge_base_id=scope.knowledge_base_id,
+            knowledge_base_ids=scope.knowledge_base_ids or None,
             region=scope.region,
             locale=scope.locale,
             doc_types=scope.doc_types or None,
@@ -389,6 +397,13 @@ class DocumentRetriever:
         metadata = await self._authorize(valid_ids) if valid_ids else {}
         shop_uuid = _uuid(scope.shop_id, field_name="shop_id")
         kb_uuid = _uuid(scope.knowledge_base_id, field_name="knowledge_base_id")
+        kb_uuids = {
+            parsed
+            for parsed in (
+                _uuid(item, field_name="knowledge_base_ids") for item in scope.knowledge_base_ids
+            )
+            if parsed is not None
+        }
         if shop_uuid is None:
             raise RetrievalError("INVALID_SCOPE", "shop_id 不能为空", retryable=False)
         allowed: list[Any] = []
@@ -402,6 +417,7 @@ class DocumentRetriever:
                 meta,
                 shop_id=shop_uuid,
                 knowledge_base_id=kb_uuid,
+                knowledge_base_ids=kb_uuids or None,
                 locale=scope.locale,
                 region=scope.region,
                 at=scope.moment,
@@ -468,6 +484,7 @@ class DocumentRetriever:
                     dense_similarity=similarities.get(str(meta.chunk_id)),
                     rrf_rank=rank,
                     branch_support=support,
+                    metadata=meta.metadata_jsonb,
                 )
             )
         top_n = self._settings.retrieval_candidate_limit

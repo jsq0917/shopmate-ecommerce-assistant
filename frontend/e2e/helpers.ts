@@ -32,7 +32,8 @@ function solveCaptcha(question: string): string {
 /** 通过登录页完成登录，落地到首页。 */
 export async function login(page: Page, fixture: Fixture = readFixture()): Promise<void> {
   await page.goto('/login')
-  await expect(page.getByRole('heading', { name: 'ShopMate 电商智能客服' })).toBeVisible()
+  // 登录页在阶段 17 改版：标题为「登录 ShopMate」，旧标题「ShopMate 电商智能客服」已不存在
+  await expect(page.getByRole('heading', { name: '登录 ShopMate' })).toBeVisible()
 
   // 登录/注册两个 Tab 面板都在 DOM 中，只操作可见面板，避免 strict mode 冲突
   const loginPane = page.locator('.el-tab-pane:not([style*="display: none"])')
@@ -55,6 +56,6 @@ export async function login(page: Page, fixture: Fixture = readFixture()): Promi
 /** 未登录访问受保护页面时应重定向到登录页。 */
 export async function expectRedirectToLogin(page: Page, path: string): Promise<void> {
   await page.goto(path)
-  await expect(page.getByRole('heading', { name: 'ShopMate 电商智能客服' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '登录 ShopMate' })).toBeVisible()
   await expect(page).toHaveURL(/\/login/)
 }

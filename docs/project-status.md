@@ -1,10 +1,78 @@
 # ShopMate 项目状态
 
-> 最后更新：2026-10-20 09:40（Asia/Shanghai；阶段 13 评测验收整改完成）
-> 当前阶段：阶段 13 — 评测、RAGAS 与压测
-> 阶段状态：**整改完成，可判 PASS（待所有者复核）**；首次验收为 CONDITIONAL PASS，
-> 4 个阻断项（D1–D4）已全部关闭并复算一致，详见 `docs/eval-report.md` 2.14 与本文件 §21。
-> 阶段 14 **未开始**。
+> 最后更新：2026-10-23 15:10（Asia/Shanghai；阶段 18–20 收尾，文档与代码/git 对齐）
+> 当前阶段：**阶段 0–16 已完成并推送 GitHub；阶段 17 已提交待推送；阶段 18–20 已实现未提交**
+> 阶段状态：阶段 13 已 PASS（D1–D4 全部关闭，见 §21、`docs/eval-report.md` 2.14）；
+> 阶段 14／15／16 已完成（§22／§23／§24）；阶段 17 补齐结算、退款与客服回复并改版前端（§25）；
+> 阶段 18／19／20 见 §26。**阶段 14 早已完成**；16 阶段计划之外的工作（18–20）属课程任务书补齐，
+> 是否继续扩展由所有者决定。
+
+## 0. 当前状态速览（2026-10-23，先读这一节）
+
+### 0.1 阶段进度
+
+| 阶段 | 内容 | 状态 | 记录位置 |
+|---|---|---|---|
+| 0–4 | 环境基线、资料审计、契约、Compose 与骨架 | 完成 | §1–§13 |
+| 5–9 | 数据、结构化工具、政策 RAG、路由与安全、订单/退货/转人工 | 完成 | §14–§18 |
+| 11–12 | Vue 3 前端、测试与安全 | 完成 | §19–§20 |
+| 13 | 评测、RAGAS 与压测 | **PASS**（整改 D1–D4 关闭） | §21、`docs/eval-report.md` 2.14 |
+| 14 | 生产部署、文档与演示 | 完成 | §22 |
+| 15 | 简历证据与面试材料 | 完成 | §23、`docs/resume-evidence.md` |
+| 16 | 最终收尾（客服工单、上传、质检标签） | 完成 | §24 |
+| 17 | 结算/支付/取消、退款审核、客服回复、前端设计系统 | 完成（已提交，待推送） | §25 |
+| 18 | 对话页知识库多选 | 完成（未提交） | §26.1、`docs/06-api.md` §6.1 |
+| 19 | 对话页推理参数面板 | 完成（未提交） | §26.2、`docs/06-api.md` §6.1 |
+| 20 | 图片文档 OCR 入库与原图回源（可选扩展） | 完成（未提交） | §26.3、`docs/06-api.md` §6.3 |
+
+### 0.2 Git 与远端（命令可复算）
+
+```bash
+cd E:/project/shopmate-ecommerce-assistant
+git log --oneline                 # 7 个提交
+git rev-list --count HEAD         # 7
+git status -sb                    # ## main...origin/main [ahead 3]
+git remote -v                     # origin git@github.com:jsq0917/shopmate-ecommerce-assistant.git
+```
+
+- **已推送**（`origin/main` 有 4 个提交）：`f81159b` 仓库基线 → `1bae45d` 阶段 0–15 文档
+  → `a7b9632` 阶段 16 收尾 → `5978d82` 推送记录。
+- **已在本地提交、尚未推送**（3 个）：`28ef24a` 阶段 17 下单支付退款与商品卡片 →
+  `23c3516` 结算页/退款页与前端设计系统 → `a19d053` 阶段 17 文档、验收截图与演示脚本。
+- **未提交的工作区改动**：阶段 18–20 的全部代码与文档（`git status --short` 可列出，
+  含 `api/knowledge_assets.py`、`synthetic/image_render.py`、图片语料与 3 条图片金标）。
+- 默认不自行 `git commit` / `git push`（`AGENTS.md` §0.6），提交时机由所有者决定。
+
+### 0.3 读法说明：历史段落里的"仓库无 commit"
+
+§2、§23.2、§23.4 与各阶段完成报告里的"仓库仍无 commit／0 个 commit"是**写那段时的真实状态**
+（首次提交发生在 2026-10-21 上午；推送记录见 `5978d82`，提交时间 2026-10-21 11:18）。**现状以 §0.2 为准**，
+不要把历史段落当成当前结论。
+
+### 0.4 证据门槛口径（0.42 / 0.62）
+
+- **0.62 是唯一的生产/评测口径**：`.env`、`.env.example`、`compose.yaml`、`compose.prod.yaml`、
+  `docs/08-deployment.md` §460 与 `README.md` §7 已全部一致（可用
+  `rg -n "POLICY_MIN_EVIDENCE_SIMILARITY" .env.example compose.yaml compose.prod.yaml` 核对）。
+- **0.42 只是"宽松演示档"**：用它能让无答案问题也被答出来，实测严格拒答率 7/7 → 0/7，
+  因此**任何指标对比都必须用 0.62**；0.42 仅用于现场演示"链路能答"。
+- 历史实验（`data/eval/results/intent-fallback-on-gate042-*.json`）就是 0.42 的反例证明，
+  见 `docs/eval-report.md` 2.6.1 与新增的 §5。
+
+### 0.5 复算脚本当前输出（2026-10-23 实测）
+
+```bash
+uv run python scripts/verify_stage13.py --raw data/eval/results/stage13-deepseek-20261023.json
+# → 业务/政策/索引段全部 OK；检索段报 2 项：
+#   retrieval.sha256: recomputed=03978693… claimed=5fe76a09…
+#   retrieval.cases : recomputed=143       claimed=140
+uv run python reconcile_index.py
+# → PG 577 chunk 行 / 89 ready 版本 / enabled 431；Milvus 431；交集 431；孤儿 0
+```
+
+那 2 项差异来自金标 140 → 143 条（新增 3 条图片用例，见 §26.3），**不是数字造假**；
+历史阶段记录里"verify 输出 0 不一致"是各自当时的真实输出。处理方案二选一（重跑 143 条 /
+把指纹检查限定为同一数据集）都需要所有者确认，本轮不改代码，详见 `docs/eval-report.md` §5.5。
 
 ## 1. 阶段范围与边界
 
@@ -18,7 +86,9 @@
 - 未修改 `E:\AI大模型开发\eduRAG(陈杰老师)` 下的任何内容。
 - 未安装或修改 Docker Desktop 配置。
 
-## 2. 工作目录与 Git 基线
+## 2. 工作目录与 Git 基线（阶段 0 快照）
+
+> **这一节是阶段 0 开工时的快照，已过时**。当前提交数、远端与推送状态见 §0.2。
 
 - 工作目录：`E:\project\shopmate-ecommerce-assistant`
 - 目录确认：正确。
@@ -1194,7 +1264,8 @@ sha256sum（pytest 之后）      -> 7606cfce… 仍为 136 行（seed 不再覆
 ### 21.7 结论
 
 阶段 13 的四个阻断项全部关闭，数据集/原始结果/报告三方指纹一致，头条指标可由独立脚本复算。
-**可判 PASS（待所有者复核）**；阶段 14 未开始，本轮未做任何阶段 14 准备性改动。
+**可判 PASS（待所有者复核）**；按阶段门禁，当时（2026-10-20）未做任何阶段 14 准备性改动，
+阶段 14 随后在 §22 完成。
 
 ## 22. 阶段 14：生产部署、文档与演示（2026-10-20）
 
@@ -1457,7 +1528,7 @@ uv run python scripts/verify_stage13.py          -> 全部一致（独立复算 
 uv run python scripts/check_deploy_security.py   -> 34 PASS / 0 WARN / 0 FAIL
 wc -l / sha256sum 数据集                          -> 136 / 7606cfce…；58 / 856f3338…
 grep Aggregated locust u20 / u40                 -> 1350 请求 0 失败 23.0833 req/s；1762 请求 2 失败 29.6058 req/s
-git log --oneline                                -> 仓库 0 commit（无 SHA 可引用）
+git log --oneline                                -> 阶段 15 当时仓库 0 commit（现状见 §0.2：7 个提交）
 ```
 
 前端 E2E（16 用例）与本机容器启动**本轮未复跑**，台账中已标注"引用阶段 11/12 记录、本轮未复跑"，
@@ -1474,7 +1545,7 @@ git log --oneline                                -> 仓库 0 commit（无 SHA �
 
 ### 23.4 已知问题与风险
 
-- 仓库 0 commit，无法提供 commit SHA 作为简历证据；所有证据以文件 + 命令为准。
+- 阶段 15 当时仓库 0 commit（**现状已不同**：2026-10-21 起共 7 个提交、4 个已推送，见 §0.2）；即便如此，证据仍以文件 + 可复算命令为准，commit SHA 只是追加的可追溯项。
 - 用户侧若把 `R@1=1.00` 单独引用会被误读（语料仅 27 条有效向量，Milvus `count(*)` 28 含 1 条孤儿、已饱和），台账已在同一行写死限制。
 - `NO_EVIDENCE` fail-open（`rag/policy_qa.py`）仍未修，属安全相关缺陷，**已作为"已知缺陷"写进台账与面试提纲**，
   未在简历里隐瞒。
@@ -1505,7 +1576,7 @@ git log --oneline                                -> 仓库 0 commit（无 SHA �
 | 1 | `docs/interview-prep.md` §2 Q10（L174–L187） | 「27 条 refused 里，7 条门槛拦截 + 20 条模型自判 + 4 条未标注引用」= 31 ≠ 27 | 先给 status 分布 **answered 5 / handoff 4 / refused 27（5+4+27=36）**；27 拆成 **7 条证据门槛拦截 + 20 条模型自判（7+20=27）**；**4 条未标注引用属 handoff（`uncited_claim`），不计入 refused**；证据行补原始结果 `parts.policy_llm.status_counts` 与逐条 `reasons` 计数 | P2 阻断项 |
 | 2 | `docs/interview-prep.md` Q3（L104）、数字速查卡（L251）、`docs/resume-evidence.md` §4.1（L88）、`docs/eval-report.md` 2.4.3（L355）与 2.9.4（L653） | 口径混用：「27 条有效向量」与未标 `count(*)` 的「28 条」并存，2.4.3 结论句只写「28 条」不注含义 | 统一为 **「27 条有效向量（Milvus `count(*)` 28，含 1 条孤儿）」**；2.9.4 的历史引文改为「Milvus `count(*)` 28」+「27 条有效向量」，**27 / 28 两个原始值均未改动** | P3-1 |
 | 3 | `README.md` §12（L309–L310） | 文档表缺两份阶段 15 文档 | 按 `docs/README.md` 顺序补 `docs/resume-evidence.md`、`docs/interview-prep.md` 两行 | P3-2 |
-| 4 | `docs/demo.md` §3.4 演示前自检（L128–L133） | 只有「政策问答能返回引用」一条 | 补两条：① 本地 `qwen2.5:7b` 可答率仅 **5/29（0.1724）**，现场返回「证据不足」按已知模型保守解释，改为展示「检索命中 + 引用字段」而非反复追问；② 若 `NO_EVIDENCE [c1]…` 被当答案返回，属已知 fail-open（`rag/policy_qa.py` 哨兵精确相等判定），**不得当场解释成「系统会正确拒答」** | P3-3 |
+| 4 | `docs/demo.md` §3.4 演示前自检（L128–L133） | 只有「政策问答能返回引用」一条 | 补两条：① 本地 `qwen2.5:7b`（**历史基线**，2026-10-23 起改为 DeepSeek）可答率仅 **5/29（0.1724）**，现场返回「证据不足」按已知模型保守解释，改为展示「检索命中 + 引用字段」而非反复追问；② 若 `NO_EVIDENCE [c1]…` 被当答案返回，属已知 fail-open（`rag/policy_qa.py` 哨兵精确相等判定），**不得当场解释成「系统会正确拒答」** | P3-3 |
 | 5 | `docs/project-status.md` §22.5（L1280–L1283）、§23.4（L1478） | 「未启动生产栈」与 §22.7 实跑记录冲突；§23.4 仍写「27 条向量」 | §22.5 加**补注**：生产栈已在 §22.7 实跑（`migrate` exit 0 / 7 容器 healthy / 8080 登录成功），**历史结论不改**，仅「未在全新主机复核 checklist」仍成立；§23.4 统一为 27 条有效向量 + `count(*)` 28 含 1 孤儿 | P3-4、P3-1 |
 | 6（可选，未改代码） | `docs/resume-evidence.md` §8（L266–L269） | 单跑 `tests/unit/test_query_rewrite.py` 会因 `db/repositories/knowledge.py` 循环导入 collect 失败，文档未提 | 在复核命令下加说明：**单跑该文件需先导入 `db.repositories.knowledge`**；全量收集 602 不受影响。**未改 Python**，避免为可维护性问题引入回归 | 可选项 |
 
@@ -1803,3 +1874,51 @@ frontend: vite build           → built in 10.20s
   需要重建镜像（`docker compose build api`）后才能启动；本轮按约定未启停/重建容器。
 - 退款审批只有「通过/拒绝」两步，没有打款重试、对账与退款单导出。
 - 聊天里的下单仍是引导到商品页，不在对话内直接创建订单（写操作需要显式确认，保持人机边界）。
+
+## 26. 阶段 18–20：课程任务书补齐与图片扩展（2026-10-23，未提交）
+
+> 这三项都不在原始 16 阶段计划里，来自课程任务书与可选扩展。代码已在工作区，**未提交 git**；
+> 详细契约在 `docs/06-api.md`，评测口径在 `docs/eval-report.md` §3.8 与新增 §5。
+
+### 26.1 阶段 18：会话级知识库多选
+
+- 存储：`conversations.knowledge_base_ids_jsonb`（迁移 `20261023_0008`，空数组 = 不限制）。
+- 端点：`GET /api/v1/knowledge-bases`（登录用户、本店 + active）、
+  `PATCH /api/v1/conversations/{id}/knowledge-bases`（`[]` = 全部）。
+- 检索：`RetrievalScope.knowledge_base_ids` → Milvus `knowledge_base_id in [...]` + PostgreSQL 复核；
+  显式选择时放开隐式 locale/region 收窄，空选择保持 `zh-CN/CN`。
+- 跨店/停用/不存在的库统一 `422 KNOWLEDGE_BASE_NOT_SELECTABLE`，整单拒绝，不落部分选择。
+- 回归：`tests/unit/test_retrieval_kb_filter.py`；E2E `frontend/e2e/knowledge-bases.spec.ts`。
+
+### 26.2 阶段 19：对话页推理参数面板
+
+- 存储：`conversations.generation_params_jsonb`（迁移 `20261023_0009`）。
+- 端点：`GET /api/v1/generation-defaults`、`PATCH /api/v1/conversations/{id}/generation-params`
+  （合并语义：缺省不变、显式 `null` 清除）。
+- 模型调用：`AnswerModel.complete(..., generation=)` 注入 temperature/top_p/max_tokens，
+  `history_turns` 打到 `recent_history(limit=…)`；`max_tokens` 超 `LLM_MAX_TOKENS_CAP` 直接 400，不静默截断。
+- 前端：`GenerationParamsPanel.vue`（拖动改草稿、松手/回车才 PATCH、失败回滚）+ ChatView 顶栏弹层。
+
+### 26.3 阶段 20：图片文档 OCR 与原图回源（可选扩展）
+
+- 支持 `.png/.jpg/.jpeg`：Pillow 校验真伪与尺寸（≤10 MiB、≤4000 万像素）+ RapidOCR 离线识别
+  → 文本块入库，检索/引用/护栏零改动。
+- 元数据：`metadata_jsonb.image = {filename, format, width, height, ocr_lines, ocr_mean_confidence, image_url}`；
+  引用事件新增 `image_url/image_filename/image_width/image_height`（文本文档为 `null`）。
+- 原图回源：`GET /api/v1/knowledge-images/{document_id}`（登录 + 同店 + 仅图片 + 路径必须在知识目录内，
+  否则 404 `DOCUMENT_NOT_FOUND`）。
+- 语料与金标：新增 1 张渲染截图（`scripts/seed.py` 可重现）与 `image-01..03` 三条金标，金标 140 → 143。
+
+### 26.4 本轮门禁（2026-10-23 实测）
+
+```text
+uv run pytest -q                     -> 804 passed, 2 skipped
+uv run ruff check .                  -> All checks passed!
+cd frontend && npm run typecheck     -> 0 errors
+cd frontend && npx vitest --run      -> 149 passed (16 files)
+uv run python scripts/eval_retrieval.py --output data/eval/results/retrieval-image-20261023.json
+                                     -> 图片类 hit@3 3/3、hit@1 2/3、MRR 0.8333（hybrid）
+```
+
+未做：`scripts/verify_stage13.py` 未按 143 条重跑（§3.3 的 140 条口径原样保留，见 eval-report §3.8 的口径说明）；
+前端 E2E 仅跑了 `knowledge-bases` 与 `chat-generation` 两条，其余 16 条未复跑。

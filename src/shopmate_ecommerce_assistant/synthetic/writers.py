@@ -23,6 +23,7 @@ from reportlab.pdfgen import canvas
 from shopmate_ecommerce_assistant.core.ids import stable_uuid
 from shopmate_ecommerce_assistant.synthetic.catalog_data import Dataset
 from shopmate_ecommerce_assistant.synthetic.eval_cases import build_eval_cases
+from shopmate_ecommerce_assistant.synthetic.image_render import render_policy_screenshot
 from shopmate_ecommerce_assistant.synthetic.knowledge_corpus import (
     PolicyDoc,
     dumps_rows,
@@ -175,6 +176,11 @@ def _pptx(doc: PolicyDoc, target: Path) -> None:
     presentation.save(str(target))
 
 
+def _png(doc: PolicyDoc, target: Path) -> None:
+    """Render the document as a screenshot (stage 20 OCR fixture)."""
+    render_policy_screenshot(doc, target)
+
+
 def _retry_write(action: Callable[[], None], *, attempts: int = 4) -> None:
     """Run a binary document write, retrying transient Windows sharing violations.
 
@@ -208,6 +214,8 @@ def render_policy(doc: PolicyDoc, directory: Path) -> Path:
         _retry_write(lambda: _docx(doc, target))
     elif doc.file_format == "pptx":
         _retry_write(lambda: _pptx(doc, target))
+    elif doc.file_format == "png":
+        _retry_write(lambda: _png(doc, target))
     else:  # pragma: no cover - guarded by the corpus definition
         raise ValueError(f"unsupported file format: {doc.file_format}")
     return target

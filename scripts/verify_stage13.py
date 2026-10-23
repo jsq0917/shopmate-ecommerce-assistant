@@ -154,6 +154,104 @@ def check_retrieval(report: dict[str, Any]) -> None:
         compare(f"{config}.p50_ms", percentile(latencies, 0.5), summary["latency"]["p50_ms"])
 
 
+#: Same grid as ``scripts/eval_stage13.py::THRESHOLD_GRID`` — kept in sync by
+#: ``tests/unit/test_verify_threshold_grid.py``.
+THRESHOLD_GRID: tuple[float, ...] = (0.50, 0.55, 0.58, 0.60, 0.62, 0.65, 0.70)
+
+
+def _recompute_sweep(records: list[dict[str, Any]]) -> dict[str, dict[str, int | float]]:
+    """Recompute behaviour at every gate from the persisted records (no retrieval)."""
+    sweep: dict[str, dict[str, int | float]] = {}
+    for threshold in THRESHOLD_GRID:
+        correct = false_answer = false_refusal = 0
+        for row in records:
+            if row["conflicts"]:
+                behavior = "handoff"
+            else:
+                similarity = row["top_dense_similarity"]
+                behavior = (
+                    "answered"
+                    if (similarity is not None and similarity >= threshold)
+                    else "refused"
+                )
+            if behavior == row["expected_behavior"]:
+                correct += 1
+            if row["expected_behavior"] == "refused" and behavior == "answered":
+                false_answer += 1
+            if row["expected_behavior"] == "answered" and behavior != "answered":
+                false_refusal += 1
+        sweep[f"{threshold:.2f}"] = {
+            "behavior_accuracy": rate(correct, len(records)),
+            "false_answer_cases": false_answer,
+            "false_refusal_cases": false_refusal,
+        }
+    return sweep
+
+
+def _recompute_pick(sweep: dict[str, dict[str, int | float]]) -> float:
+    """Same rule as ``eval_stage13._pick_threshold``: dev only, ties to the higher gate."""
+    best_key: tuple[int, int, int, float] | None = None
+    best_value = 0.62
+    for raw_threshold, row in sweep.items():
+        key = (
+            round(float(row.get("behavior_accuracy") or 0.0) * 1000),
+            -int(row.get("false_answer_cases") or 0),
+            -int(row.get("false_refusal_cases") or 0),
+            float(raw_threshold),
+        )
+        if best_key is None or key > best_key:
+            best_key = key
+            best_value = float(raw_threshold)
+    return best_value
+
+
+def check_threshold_calibration(report: dict[str, Any]) -> None:
+    """Recompute the dev-selected evidence gate and both split sweeps from records."""
+    retrieval = report["parts"].get("retrieval") or {}
+    baseline = retrieval.get("baseline_hybrid") or {}
+    optimisation = retrieval.get("optimisation") or {}
+    if "records" not in baseline:
+        return
+    records = baseline["records"]
+    print("\n== 证据门槛标定（从 baseline_hybrid records 重算，不读脚本汇总）==")
+    for split in ("dev", "test"):
+        rows = [row for row in records if row["split"] == split]
+        claimed = baseline.get(f"threshold_sweep_{split}")
+        if claimed is None:
+            print(f"  -- {split}: 原始结果未落盘 threshold_sweep_{split}")
+            continue
+        recomputed = _recompute_sweep(rows)
+        print(f"  -- {split}: cases={len(rows)}")
+        for threshold in THRESHOLD_GRID:
+            label = f"{threshold:.2f}"
+            row, want = recomputed[label], claimed[label]
+            compare(
+                f"{split}@{threshold}.accuracy",
+                row["behavior_accuracy"],
+                want["behavior_accuracy"],
+            )
+            compare(
+                f"{split}@{threshold}.false_answer",
+                row["false_answer_cases"],
+                want["false_answer_cases"],
+                tol=0,
+            )
+            compare(
+                f"{split}@{threshold}.false_refusal",
+                row["false_refusal_cases"],
+                want["false_refusal_cases"],
+                tol=0,
+            )
+    if optimisation:
+        pick = _recompute_pick(_recompute_sweep([r for r in records if r["split"] == "dev"]))
+        compare(
+            "dev_calibrated_threshold",
+            pick,
+            optimisation.get("dev_calibrated_threshold"),
+            tol=0,
+        )
+
+
 def check_business(report: dict[str, Any]) -> None:
     print("\n== 业务/安全（从 records 重算）==")
     block = report["parts"]["business"]
@@ -286,13 +384,35 @@ def check_policy(report: dict[str, Any]) -> None:
     if not block:
         print("\n== 政策答案：未运行 ==")
         return
-    print("\n== 政策答案（本地 7B）==")
+    print(f"\n== 政策答案（模型：{block.get('answer_model') or '未配置'}）==")
     records = block["records"]
     counts: dict[str, int] = {}
     for record in records:
         counts[record["status"]] = counts.get(record["status"], 0) + 1
     print(f"  cases={len(records)} status={counts}")
     compare("status_counts", counts, block["status_counts"], tol=0)
+    answerable = [r for r in records if r.get("expected_behavior") == "answered"]
+    no_answer = [r for r in records if r.get("expected_behavior") == "refused"]
+    answered = [r for r in records if r["status"] == "answered"]
+    compare("answered_rate", rate(len(answered), len(records)), block["answered_rate"])
+    compare(
+        "answer_rate_on_answerable",
+        rate(len(answered), len(answerable)),
+        block["answer_rate_on_answerable"],
+    )
+    compare(
+        "refused_or_handoff_on_no_answer",
+        rate(
+            sum(1 for r in no_answer if r["status"] in {"refused", "handoff"}),
+            len(no_answer),
+        ),
+        block["refused_or_handoff_on_no_answer"],
+    )
+    compare(
+        "citation_compliance",
+        rate(sum(1 for r in answered if r.get("citation_compliant")), len(answered)),
+        block["citation_compliance"],
+    )
     for key in ("faithfulness_llm", "relevancy_llm"):
         judged = [r[key] for r in records if r.get(key) is not None]
         compare(key, mean(judged), block[key])
@@ -302,6 +422,12 @@ def check_policy(report: dict[str, Any]) -> None:
         "answer_prompt_tokens",
         sum(int(r["prompt_tokens"]) for r in records),
         block["tokens"]["answer_prompt"],
+        tol=0,
+    )
+    compare(
+        "answer_completion_tokens",
+        sum(int(r["completion_tokens"]) for r in records),
+        block["tokens"]["answer_completion"],
         tol=0,
     )
     latencies = [r["latency_ms"] for r in records]
@@ -354,6 +480,7 @@ def main() -> int:
     check_datasets(report)
     if "retrieval" in report["parts"]:
         check_retrieval(report)
+        check_threshold_calibration(report)
     if "business" in report["parts"]:
         check_business(report)
     check_policy(report)

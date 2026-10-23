@@ -1,18 +1,26 @@
-"""Document loaders for PDF, DOCX, PPTX, Markdown and plain text.
+"""Document loaders for PDF, DOCX, PPTX, Markdown, plain text and images.
 
 Every loader returns :class:`ParsedBlock` values that keep the origin metadata required by
 the citation contract: heading path and (where the format exposes it) page number.
+
+Images (stage 20) are read with OCR: the recognised lines become ordinary text blocks, so
+retrieval, chunking, citation and the answer guard all work unchanged. The image itself is
+referenced through ``LoadedDocument.metadata`` (file name, pixel size, OCR statistics); the
+ingestion pipeline turns that into ``metadata_jsonb`` + a ``/knowledge-images/{id}`` URL so
+a citation can be traced back to the original picture.
 """
 
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from docx import Document as DocxDocument
 from docx.table import Table as DocxTable
 from docx.text.paragraph import Paragraph as DocxParagraph
+from PIL import Image, UnidentifiedImageError
 from pptx import Presentation
 from pptx.slide import Slide
 from pypdf import PdfReader
@@ -32,7 +40,18 @@ SUPPORTED_SUFFIXES: dict[str, str] = {
     ".md": "text/markdown",
     ".markdown": "text/markdown",
     ".txt": "text/plain",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
 }
+
+#: Images are rendered screenshots; anything bigger is either a scan at absurd DPI or a
+#: decompression bomb. Pillow's own ``MAX_IMAGE_PIXELS`` guard stays active on top of this.
+IMAGE_MAX_BYTES = 10 * 1024 * 1024
+IMAGE_MAX_PIXELS = 40_000_000
+#: OCR lines below this confidence are dropped: a mis-read policy number is worse than no
+#: number at all, and the remaining text still has to clear the retrieval threshold.
+IMAGE_MIN_OCR_CONFIDENCE = 0.45
 
 _ATX_HEADING = re.compile(r"^(#{1,6})\s+(.+?)\s*#*$")
 _PAGE_NUMBER_LINE = re.compile(
@@ -45,11 +64,17 @@ _CN_CLAUSE = re.compile(r"^第[一二三四五六七八九十百零\d]+[章节�
 
 @dataclass(frozen=True, slots=True)
 class LoadedDocument:
-    """Parsed blocks plus the detected media type."""
+    """Parsed blocks plus the detected media type.
+
+    ``metadata`` carries format-specific extras that belong to the whole document (for
+    images: pixel size, OCR statistics). The pipeline copies it into every chunk's
+    ``metadata_jsonb`` so citations can point back at the original file.
+    """
 
     blocks: list[ParsedBlock]
     mime_type: str
     page_count: int
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 def _trim_heading(text: str) -> str:
@@ -328,6 +353,96 @@ def load_pptx(path: Path) -> LoadedDocument:
     )
 
 
+_OCR_ENGINE: Any | None = None
+
+
+def _ocr_engine() -> Any:
+    """Return the process-wide OCR engine, building it on first use.
+
+    The engine loads ~15 MB of ONNX weights and takes a couple of seconds to construct, so
+    it is created lazily: a deployment that only ingests text never pays for it, and unit
+    tests that exercise the other loaders do not either.
+    """
+    global _OCR_ENGINE
+    if _OCR_ENGINE is None:
+        try:
+            from rapidocr_onnxruntime import RapidOCR
+        except ImportError as exc:  # pragma: no cover - the dependency is declared
+            raise DocumentParseFailed("图片文字识别组件缺失") from exc
+        _OCR_ENGINE = RapidOCR()
+    return _OCR_ENGINE
+
+
+def _image_size(path: Path) -> tuple[int, int, str]:
+    """Validate an image and return ``(width, height, format)``.
+
+    ``Image.verify()`` reads the whole file structure, so a text file renamed to ``.png``
+    fails here instead of reaching OCR.
+    """
+    if path.stat().st_size > IMAGE_MAX_BYTES:
+        raise DocumentParseFailed(f"图片超过 {IMAGE_MAX_BYTES // (1024 * 1024)} MB")
+    try:
+        with Image.open(path) as probe:
+            probe.verify()
+        with Image.open(path) as image:
+            width, height = image.size
+            fmt = (image.format or "").upper()
+    except (UnidentifiedImageError, OSError, SyntaxError, ValueError) as exc:
+        raise DocumentParseFailed("图片文件无法读取") from exc
+    if width <= 0 or height <= 0:
+        raise DocumentParseFailed("图片尺寸非法")
+    if width * height > IMAGE_MAX_PIXELS:
+        raise DocumentParseFailed("图片像素超过上限")
+    return width, height, fmt
+
+
+def _ocr_lines(path: Path) -> list[tuple[str, float]]:
+    """Return ``(text, confidence)`` for every line the engine kept."""
+    try:
+        result, _ = _ocr_engine()(str(path))
+    except Exception as exc:  # pragma: no cover - engine internals raise arbitrary types
+        raise DocumentParseFailed("图片文字识别失败") from exc
+    lines: list[tuple[str, float]] = []
+    for item in result or []:
+        text = str(item[1]).strip() if len(item) > 1 else ""
+        score = float(item[2]) if len(item) > 2 else 0.0
+        if text and score >= IMAGE_MIN_OCR_CONFIDENCE:
+            lines.append((text, score))
+    return lines
+
+
+def load_image(path: Path) -> LoadedDocument:
+    """Load a policy screenshot through OCR.
+
+    The recognised lines form one block (``page_no=1``). No heading path is invented: a
+    screenshot has no section structure, and the citation already carries the document
+    title, so the heading stays empty rather than repeating the file name. The picture's
+    own metadata is returned separately and lands in ``metadata_jsonb``.
+    """
+    width, height, image_format = _image_size(path)
+    lines = _ocr_lines(path)
+    if not lines:
+        # A photo without legible text is not a knowledge document: fail loudly instead of
+        # indexing an empty chunk that can only ever be a false citation.
+        raise EmptyDocument()
+    confidence = sum(score for _, score in lines) / len(lines)
+    return LoadedDocument(
+        blocks=[ParsedBlock(text="\n".join(text for text, _ in lines), page_no=1)],
+        mime_type=SUPPORTED_SUFFIXES.get(path.suffix.lower(), "image/png"),
+        page_count=1,
+        metadata={
+            "image": {
+                "filename": path.name,
+                "format": image_format,
+                "width": width,
+                "height": height,
+                "ocr_lines": len(lines),
+                "ocr_mean_confidence": round(confidence, 4),
+            }
+        },
+    )
+
+
 _LOADERS = {
     ".pdf": load_pdf,
     ".docx": load_docx,
@@ -335,6 +450,9 @@ _LOADERS = {
     ".md": load_markdown,
     ".markdown": load_markdown,
     ".txt": load_text,
+    ".png": load_image,
+    ".jpg": load_image,
+    ".jpeg": load_image,
 }
 
 

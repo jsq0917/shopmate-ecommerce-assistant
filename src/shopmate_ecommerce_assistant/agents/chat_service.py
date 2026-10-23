@@ -15,7 +15,7 @@ are answered with an honest clarification instead of guessing.
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncIterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
@@ -24,19 +24,26 @@ from uuid import UUID
 from shopmate_ecommerce_assistant.agents.answer_composer import (
     compose_compare,
     compose_order_status,
+    compose_product_detail,
     compose_product_discovery,
     compose_purchase_intro,
     compose_return_eligibility,
     compose_shipment,
     compose_smalltalk,
+    compose_stock,
 )
 from shopmate_ecommerce_assistant.agents.persona import naturalize_async
 from shopmate_ecommerce_assistant.agents.query_understanding import (
+    best_overlap_item,
     category_terms,
     expand_query,
     extract_budget_cents,
     infer_return_reason,
+    is_stock_question,
     match_line,
+    model_tokens,
+    resolve_catalog_item,
+    split_compare_sides,
 )
 from shopmate_ecommerce_assistant.agents.router import Intent, IntentRoute, route_intent
 from shopmate_ecommerce_assistant.agents.sse import (
@@ -51,6 +58,7 @@ from shopmate_ecommerce_assistant.agents.sse import (
 )
 from shopmate_ecommerce_assistant.core.config import Settings
 from shopmate_ecommerce_assistant.core.errors import ErrorCode, ToolError
+from shopmate_ecommerce_assistant.core.generation import DEFAULT_HISTORY_TURNS, GenerationParams
 from shopmate_ecommerce_assistant.core.security import AccessContext
 from shopmate_ecommerce_assistant.db.models.enums import ReturnReasonCode
 from shopmate_ecommerce_assistant.db.repositories.checkout import CheckoutRepository
@@ -72,7 +80,9 @@ from shopmate_ecommerce_assistant.tools.order_schemas import (
     GetShipmentInput,
 )
 from shopmate_ecommerce_assistant.tools.schemas import (
+    CheckStockInput,
     CompareProductsInput,
+    GetProductDetailInput,
     SearchProductsInput,
     ToolFailure,
     ToolSuccess,
@@ -87,6 +97,13 @@ RETURN_CLARIFY_TEXT = "请告诉我订单中具体要退货的商品（名称或
 COMPARE_CLARIFY_TEXT = "请告诉我想要对比的 2–4 个具体商品（名称或链接），我再帮你横向比较。"
 ORDER_CLARIFY_TEXT = "请提供订单号（例如 DEMO-1001），我帮你查询当前状态。"
 SHIPMENT_CLARIFY_TEXT = "请提供订单号，我帮你查询物流进度。"
+
+#: ``PolicyAnswer.status`` -> the ``finish_reason`` the client and the evaluation see.
+#: ``answered`` stays ``stop`` so existing behaviour is untouched.
+_FINISH_REASON_BY_STATUS: dict[str, str] = {
+    "refused": "refusal",
+    "handoff": "handoff",
+}
 
 
 @dataclass(slots=True)
@@ -133,13 +150,18 @@ class ChatService:
         self._messages = MessageRepository(session)
 
     # -- pre-flight (run before the stream is established) -----------------
-    async def ensure_conversation(self, ctx: AccessContext, conversation_id: UUID) -> None:
-        """Raise ``ToolError(CONVERSATION_NOT_FOUND)`` when the user does not own it."""
+    async def ensure_conversation(self, ctx: AccessContext, conversation_id: UUID):
+        """Return the owned conversation row, or raise ``CONVERSATION_NOT_FOUND``.
+
+        Returning the row lets the SSE endpoint read the conversation's knowledge-base
+        selection (stage 18) without a second query.
+        """
         row = await self._conversations.get(
             shop_id=ctx.shop_id, user_id=ctx.user_id, conversation_id=conversation_id
         )
         if row is None:
             raise ToolError(ErrorCode.CONVERSATION_NOT_FOUND, "未找到可由当前账号访问的会话。")
+        return row
 
     async def insert_user_message(
         self, ctx: AccessContext, conversation_id: UUID, message: str, client_message_id: UUID
@@ -154,10 +176,22 @@ class ChatService:
         )
         return row.id
 
-    async def recent_history(self, ctx: AccessContext, conversation_id: UUID) -> list[str]:
-        """Return recent user turns (oldest first) for routing/rewriting."""
+    async def recent_history(
+        self,
+        ctx: AccessContext,
+        conversation_id: UUID,
+        *,
+        limit: int = DEFAULT_HISTORY_TURNS,
+    ) -> list[str]:
+        """Return recent user turns (oldest first) for routing/rewriting.
+
+        ``limit`` is the conversation's stage-19 ``history_turns`` (the most recent user
+        messages to assemble context from, this turn included because the user message is
+        persisted before the stream starts). ``0`` returns no history at all, which disables
+        reference resolution, follow-up stitching and the persona context in one move.
+        """
         rows = await self._messages.list_history(
-            shop_id=ctx.shop_id, conversation_id=conversation_id, user_id=ctx.user_id, limit=10
+            shop_id=ctx.shop_id, conversation_id=conversation_id, user_id=ctx.user_id, limit=limit
         )
         return [row.content for row in rows if row.role == "user"]
 
@@ -171,10 +205,21 @@ class ChatService:
         request_id: UUID,
         trace_id: UUID,
         user_message_id: UUID,
+        knowledge_base_ids: Sequence[UUID] = (),
+        generation: GenerationParams | None = None,
     ) -> AsyncIterator[StreamEvent]:
-        """Yield the SSE business events for one already-accepted user turn."""
+        """Yield the SSE business events for one already-accepted user turn.
+
+        ``knowledge_base_ids`` is the conversation's knowledge-base selection (stage 18).
+        Empty means "no restriction", which is the pre-existing behaviour.
+        ``generation`` carries the conversation's stage-19 parameter overrides; ``None``
+        keeps the pre-stage-19 behaviour (fixed 10 history turns, environment LLM defaults).
+        """
         guard = guard_input(message, settings=self._settings)
-        history = await self.recent_history(ctx, conversation_id)
+        history_turns = (
+            generation.history_turns if generation is not None else DEFAULT_HISTORY_TURNS
+        )
+        history = await self.recent_history(ctx, conversation_id, limit=history_turns)
         route = route_intent(
             guard.sanitized_text or message, history=history, settings=self._settings
         )
@@ -209,7 +254,12 @@ class ChatService:
 
         try:
             outcome = await self._run(
-                route, guard.sanitized_text or message, tool_context, history=history
+                route,
+                guard.sanitized_text or message,
+                tool_context,
+                history=history,
+                knowledge_base_ids=knowledge_base_ids,
+                generation=generation,
             )
             if route.intent is not Intent.POLICY_FAQ:
                 persona = await naturalize_async(
@@ -217,6 +267,7 @@ class ChatService:
                     user_text=guard.sanitized_text or message,
                     settings=self._settings,
                     history=history,
+                    generation=generation,
                 )
                 if persona.rewritten:
                     outcome.answer_text = persona.text
@@ -289,19 +340,29 @@ class ChatService:
 
     # -- execution ---------------------------------------------------------
     async def _run(
-        self, route: IntentRoute, text: str, tctx: ToolContext, history: list[str] | None = None
+        self,
+        route: IntentRoute,
+        text: str,
+        tctx: ToolContext,
+        history: list[str] | None = None,
+        knowledge_base_ids: Sequence[UUID] = (),
+        generation: GenerationParams | None = None,
     ) -> ChatOutcome:
         intent = route.intent
         if route.handoff_required or intent is Intent.COMPLAINT_HANDOFF:
             return await self._handoff_outcome(route, tctx)
         if intent is Intent.POLICY_FAQ:
-            return await self._policy_outcome(route, text, tctx)
+            return await self._policy_outcome(
+                route, text, tctx, knowledge_base_ids, generation=generation
+            )
         if intent is Intent.PURCHASE:
             return await self._search_outcome(route, text, tctx, history=history, purchase=True)
-        if intent in {Intent.PRODUCT_DISCOVERY, Intent.PRODUCT_FACT}:
+        if intent is Intent.PRODUCT_FACT:
+            return await self._fact_outcome(route, text, tctx, history=history)
+        if intent is Intent.PRODUCT_DISCOVERY:
             return await self._search_outcome(route, text, tctx, history=history)
         if intent is Intent.PRODUCT_COMPARE:
-            return await self._compare_outcome(route, tctx)
+            return await self._compare_outcome(route, text, tctx)
         if intent is Intent.ORDER_STATUS:
             return await self._order_outcome(route, tctx)
         if intent is Intent.SHIPMENT:
@@ -398,9 +459,7 @@ class ChatService:
             cards.sort(key=lambda card: int(card["price_cents"]))
         terms = category_terms(text)
         if terms:
-            on_topic = [
-                card for card in cards if any(term in card["title"] for term in terms)
-            ]
+            on_topic = [card for card in cards if any(term in card["title"] for term in terms)]
             if on_topic:
                 cards = on_topic
         for card in cards:
@@ -417,21 +476,202 @@ class ChatService:
             product_cards=cards,
         )
 
-    async def _compare_outcome(self, route: IntentRoute, tctx: ToolContext) -> ChatOutcome:
+    async def _fact_outcome(
+        self,
+        route: IntentRoute,
+        text: str,
+        tctx: ToolContext,
+        *,
+        history: list[str] | None = None,
+    ) -> ChatOutcome:
+        """Answer a price/spec/stock question with the contract tool, not a search list.
+
+        ``get_product_detail`` and ``check_stock`` both take UUIDs while shoppers type
+        names ("声岚 SL-BUDS Air 卖多少钱"). The search is therefore a *lookup* step here,
+        never the answer: it resolves the name, and the contract tool produces the facts
+        (docs/05-tool-contract.md §5.2/§5.4). When the name cannot be resolved the turn
+        degrades to the stage-8 card list instead of inventing a product.
+        """
         events: list[StreamEvent] = []
-        product_ids = route.entities.product_ids
-        if len(product_ids) < 2:
-            return ChatOutcome(
-                answer_text=COMPARE_CLARIFY_TEXT,
-                structured_facts_verified=True,
-                risk=route.risk.as_dict(),
+        query = text
+        if history and len(text.strip()) < 12:
+            previous = next(
+                (
+                    turn.strip()
+                    for turn in reversed(history)
+                    if turn.strip() and turn.strip() != text.strip()
+                ),
+                "",
             )
+            if previous:
+                topic = category_terms(previous)
+                query = f"{' '.join(topic)} {text}" if topic else f"{previous} {text}"
+
+        search = await self._invoke(
+            "search_products",
+            SearchProductsInput(
+                query=expand_query(query),
+                budget_max_cents=extract_budget_cents(text),
+                limit=8,
+            ),
+            tctx,
+            "正在定位商品",
+            events,
+        )
+        if isinstance(search, ToolFailure):
+            raise _as_tool_error(search)
+        items = (search.data or {}).get("items", []) or []
+        item = resolve_catalog_item(text, items) or resolve_catalog_item(query, items)
+        implied = category_terms(text)
+        illustrative = False
+        if item is None and implied and items and not model_tokens(text):
+            # "机械键盘多少钱" names a category, not a product: answering with the best
+            # match and saying so is truthful; silently picking one is not.
+            item = items[0]
+            illustrative = True
+        if item is None:
+            return self._card_list_outcome(route, text, items, events)
+
+        variant_id = item.get("variant_id")
+        product_id = item.get("product_id")
+        as_of_text: str | None = None
+        if is_stock_question(text) and variant_id:
+            stock = await self._invoke(
+                "check_stock",
+                CheckStockInput(variant_id=UUID(str(variant_id))),
+                tctx,
+                "正在查询库存",
+                events,
+            )
+            if isinstance(stock, ToolFailure):
+                raise _as_tool_error(stock)
+            as_of = getattr(stock, "as_of", None)
+            as_of_text = as_of.isoformat() if isinstance(as_of, datetime) else None
+            answer = compose_stock(stock.data or {}, title=item.get("title"), as_of=as_of_text)
+        elif product_id:
+            detail = await self._invoke(
+                "get_product_detail",
+                GetProductDetailInput(
+                    product_id=UUID(str(product_id)),
+                    variant_id=UUID(str(variant_id)) if variant_id else None,
+                ),
+                tctx,
+                "正在查询商品详情",
+                events,
+            )
+            if isinstance(detail, ToolFailure):
+                raise _as_tool_error(detail)
+            answer = compose_product_detail((detail.data or {}).get("product") or {})
+            as_of = getattr(detail, "as_of", None)
+            as_of_text = as_of.isoformat() if isinstance(as_of, datetime) else None
+            if as_of_text:
+                answer = f"{answer}\n数据更新时间：{as_of_text}"
+        else:
+            return self._card_list_outcome(route, text, items, events)
+
+        if illustrative:
+            answer = f"「{item.get('title')}」是比较匹配的一款，供你参考：\n{answer}"
+        card = _product_card(item)
+        events.append(product_card_event(card))
+        return ChatOutcome(
+            answer_text=answer,
+            pre_events=events,
+            structured_facts_verified=True,
+            risk=route.risk.as_dict(),
+            product_cards=[card],
+        )
+
+    def _card_list_outcome(
+        self,
+        route: IntentRoute,
+        text: str,
+        items: Sequence[Mapping[str, Any]],
+        events: list[StreamEvent],
+    ) -> ChatOutcome:
+        """Stage-8 fallback for an unresolved fact question: show the real cards."""
+        cards: list[dict[str, Any]] = [_product_card(item) for item in items]
+        terms = category_terms(text)
+        if terms:
+            on_topic = [card for card in cards if any(term in card["title"] for term in terms)]
+            if on_topic:
+                cards = on_topic
+        for card in cards:
+            events.append(product_card_event(card))
+        return ChatOutcome(
+            answer_text=compose_product_discovery(cards, question=text),
+            pre_events=events,
+            structured_facts_verified=True,
+            risk=route.risk.as_dict(),
+            product_cards=cards,
+        )
+
+    async def _resolve_compare_targets(
+        self, text: str, tctx: ToolContext, events: list[StreamEvent]
+    ) -> tuple[list[str], bool] | None:
+        """Turn the two names a shopper typed into two catalogue product ids.
+
+        ``compare_products`` only accepts UUIDs (docs/05-tool-contract.md §5.3), so each
+        operand is resolved through the catalogue first. Returns ``(ids, illustrative)``
+        or ``None`` when an operand resolves to nothing or both sides land on the same
+        product — the caller then keeps its clarification rather than comparing a guess.
+        A category operand ("移动电源") is represented by its best title overlap, never
+        by a blind first hit: both keyboard operands of eval-136 expand to the same
+        family, and the search can rank one membrane keyboard first for both sides.
+        """
+        sides = split_compare_sides(text)
+        if sides is None:
+            return None
+        ids: list[str] = []
+        illustrative = False
+        for side in sides:
+            found = await self._invoke(
+                "search_products",
+                SearchProductsInput(query=expand_query(side), limit=8),
+                tctx,
+                "正在定位商品",
+                events,
+            )
+            if isinstance(found, ToolFailure):
+                raise _as_tool_error(found)
+            items = (found.data or {}).get("items", []) or []
+            item = resolve_catalog_item(side, items)
+            if item is None and category_terms(side) and items and not model_tokens(side):
+                # "移动电源和充电器": a category has no single id, so compare the best
+                # match of each side and say so — never imply the category is one SKU.
+                item = best_overlap_item(side, items)
+                illustrative = True
+            if item is None or item.get("product_id") is None:
+                return None
+            ids.append(str(item["product_id"]))
+        if len(set(ids)) < 2:
+            return None
+        return ids, illustrative
+
+    async def _compare_outcome(
+        self, route: IntentRoute, text: str, tctx: ToolContext
+    ) -> ChatOutcome:
+        events: list[StreamEvent] = []
+        product_ids = list(route.entities.product_ids)
+        illustrative = False
+        if len(product_ids) < 2:
+            resolved = await self._resolve_compare_targets(text, tctx, events)
+            if resolved is None:
+                return ChatOutcome(
+                    answer_text=COMPARE_CLARIFY_TEXT,
+                    pre_events=events,
+                    structured_facts_verified=True,
+                    risk=route.risk.as_dict(),
+                )
+            product_ids, illustrative = resolved
         payload = CompareProductsInput(product_ids=[UUID(pid) for pid in product_ids[:4]])
         result = await self._invoke("compare_products", payload, tctx, "正在对比商品", events)
         if isinstance(result, ToolFailure):
             raise _as_tool_error(result)
+        answer = compose_compare(result.data or {})
+        if illustrative:
+            answer = f"你没指定具体型号，我按两边最匹配的商品比较，供你参考：\n{answer}"
         return ChatOutcome(
-            answer_text=compose_compare(result.data or {}),
+            answer_text=answer,
             pre_events=events,
             structured_facts_verified=True,
             risk=route.risk.as_dict(),
@@ -554,9 +794,7 @@ class ChatService:
                 risk=route.risk.as_dict(),
             )
 
-        chosen = match_line(
-            text, [(item.id, item.sku, item.title) for item in items]
-        )
+        chosen = match_line(text, [(item.id, item.sku, item.title) for item in items])
         if chosen is None:
             names = "、".join(f"「{item.title}」" for item in items[:4])
             more = "等" if len(items) > 4 else ""
@@ -618,9 +856,7 @@ class ChatService:
         lines = [f"我查到你有 {len(rows)} 笔退款申请："]
         for row in rows[:3]:
             amount = (
-                row.amount_cents // 100
-                if row.amount_cents % 100 == 0
-                else row.amount_cents / 100
+                row.amount_cents // 100 if row.amount_cents % 100 == 0 else row.amount_cents / 100
             )
             label = status_labels.get(row.status, row.status)
             lines.append(
@@ -635,7 +871,13 @@ class ChatService:
         )
 
     async def _policy_outcome(
-        self, route: IntentRoute, text: str, tctx: ToolContext
+        self,
+        route: IntentRoute,
+        text: str,
+        tctx: ToolContext,
+        knowledge_base_ids: Sequence[UUID] = (),
+        *,
+        generation: GenerationParams | None = None,
     ) -> ChatOutcome:
         events: list[StreamEvent] = []
         if self._policy is None:
@@ -645,10 +887,22 @@ class ChatService:
                 structured_facts_verified=False,
                 risk=route.risk.as_dict(),
             )
-        scope = RetrievalScope(shop_id=str(tctx.shop_id))
+        # Empty selection keeps the pre-stage-18 scope (shop + default locale/region).
+        # An explicit selection is authoritative: it wins over the implicit locale/region
+        # narrowing, otherwise a cross-region knowledge base could never be retrieved.
+        selected = tuple(str(item) for item in knowledge_base_ids)
+        scope = (
+            RetrievalScope(
+                shop_id=str(tctx.shop_id), knowledge_base_ids=selected, locale=None, region=None
+            )
+            if selected
+            else RetrievalScope(shop_id=str(tctx.shop_id))
+        )
         plan = plan_query(text, settings=self._settings, intent=route.intent.value)
         try:
-            answer = await self._policy.answer(text, scope, query_plan=plan)
+            answer = await self._policy.answer(
+                text, scope, query_plan=plan, generation=generation
+            )
         except (AnswerModelError, RetrievalError):
             return ChatOutcome(
                 answer_text=UPSTREAM_TEXT,
@@ -671,6 +925,16 @@ class ChatService:
             citation_labels=labels,
             structured_facts_verified=False,
             risk=route.risk.as_dict(),
+            # ``PolicyAnswer.status`` is the only truthful source for how the turn ended.
+            # Without this, a refusal streamed ``done.finish_reason="stop"`` and was stored
+            # with ``finish_reason="stop"``, so the client never showed the 已拒答 badge
+            # (MessageBubble.vue checks ``finish_reason === 'refusal'``). The stage-13
+            # business metric does not read this field — it evaluates policy turns on the
+            # evidence gate directly (scripts/eval_stage13.py, ``policy_retrieval``) — so
+            # this is a truthfulness fix for the API/UI, not a measurement change.
+            # ``getattr`` keeps duck-typed test doubles (policy services injected by the
+            # integration suite) working: an object without ``status`` degrades to "stop".
+            finish_reason=_FINISH_REASON_BY_STATUS.get(getattr(answer, "status", ""), "stop"),
         )
 
     async def _handoff_outcome(self, route: IntentRoute, tctx: ToolContext) -> ChatOutcome:
@@ -783,6 +1047,12 @@ def _citation(citation: Mapping[str, Any], *, as_of: str | None = None) -> dict[
         "effective_from": citation.get("effective_from"),
         "effective_to": citation.get("effective_to"),
         "excerpt": citation.get("snippet"),
+        # Present only when the passage was OCR'd from a screenshot (stage 20): the UI can
+        # then link the citation back to the original picture.
+        "image_url": citation.get("image_url"),
+        "image_filename": citation.get("image_filename"),
+        "image_width": citation.get("image_width"),
+        "image_height": citation.get("image_height"),
         # Retrieval time of this turn: the knowledge facts are only "as of" this moment.
         "as_of": as_of,
     }

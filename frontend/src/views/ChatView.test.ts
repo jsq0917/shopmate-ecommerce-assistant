@@ -6,8 +6,12 @@ import { networkError } from '@/api/errors'
 import { ApiError } from '@/api/errors'
 import {
   CONVERSATION_ID,
+  KB_CN,
+  KB_SG,
   MESSAGE_ID,
   conversationFixture,
+  generationDefaultsFixture,
+  knowledgeBaseFixture,
   messageFixture,
   sseEvent,
 } from '@/test/factories'
@@ -19,13 +23,26 @@ vi.mock('@/api/endpoints', () => ({
     rename: vi.fn(),
     remove: vi.fn(),
     messages: vi.fn(),
+    updateKnowledgeBases: vi.fn(),
+    updateGenerationParams: vi.fn(),
   },
+  generationApi: { defaults: vi.fn() },
+  knowledgeBasesApi: { list: vi.fn() },
   chatApi: { stream: vi.fn() },
   productsApi: { detail: vi.fn() },
   handoffApi: { list: vi.fn(), get: vi.fn(), create: vi.fn() },
 }))
 
-const { conversationsApi, chatApi } = await import('@/api/endpoints')
+const { conversationsApi, chatApi, generationApi, knowledgeBasesApi } = await import(
+  '@/api/endpoints'
+)
+
+/** ElPopover 在 jsdom 里不渲染浮层内容；同形展开两个插槽，保证面板可被断言。 */
+const ElPopoverStub = {
+  name: 'ElPopover',
+  props: ['placement', 'trigger', 'width'],
+  template: '<div class="el-popover-stub"><slot name="reference" /><slot /></div>',
+}
 
 /** 一轮完整 SSE 事件序列。 */
 function happyEvents() {
@@ -40,7 +57,9 @@ function happyEvents() {
 }
 
 async function mountChat() {
-  const wrapper = mount(ChatView)
+  const wrapper = mount(ChatView, {
+    global: { stubs: { ElPopover: ElPopoverStub } },
+  })
   await flushPromises()
   await flushPromises()
   return wrapper
@@ -69,6 +88,120 @@ describe('ChatView 集成', () => {
       items: [messageFixture({ role: 'user', content: '有没有降噪耳机' })],
       next_cursor: null,
     })
+    vi.mocked(knowledgeBasesApi.list).mockResolvedValue({
+      items: [
+        knowledgeBaseFixture({ id: KB_CN, name: 'policy-cn' }),
+        knowledgeBaseFixture({ id: KB_SG, name: 'policy-sg', region: 'SG' }),
+      ],
+    })
+    vi.mocked(generationApi.defaults).mockResolvedValue(generationDefaultsFixture())
+  })
+
+  it('切换知识库只发一次 PATCH，并把会话状态同步成新选择', async () => {
+    const wrapper = await mountChat()
+    expect(knowledgeBasesApi.list).toHaveBeenCalled()
+    vi.mocked(conversationsApi.updateKnowledgeBases).mockResolvedValue(
+      conversationFixture({ knowledge_base_ids: [KB_SG] }),
+    )
+
+    const selector = wrapper.findComponent({ name: 'KnowledgeBaseSelect' })
+    selector.vm.$emit('change', [KB_SG])
+    await flushPromises()
+
+    expect(conversationsApi.updateKnowledgeBases).toHaveBeenCalledWith(CONVERSATION_ID, [KB_SG])
+    expect(wrapper.text()).toContain('仅检索所选 1 个知识库')
+  })
+
+  it('知识库保存失败时回滚选择并提示', async () => {
+    const wrapper = await mountChat()
+    vi.mocked(conversationsApi.updateKnowledgeBases).mockRejectedValue(
+      Object.assign(new Error('所选知识库不可用'), { code: 'KNOWLEDGE_BASE_NOT_SELECTABLE' }),
+    )
+
+    const selector = wrapper.findComponent({ name: 'KnowledgeBaseSelect' })
+    selector.vm.$emit('change', [KB_SG])
+    await flushPromises()
+
+    // 回滚到「全部」并显示后端消息，避免界面与后端不一致。
+    expect(wrapper.text()).toContain('全部可见知识库')
+    expect(wrapper.find('[role="alert"]').exists()).toBe(true)
+  })
+
+  it('挂载后加载推理参数默认值并展示生效值', async () => {
+    const wrapper = await mountChat()
+    expect(generationApi.defaults).toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="gen-effective"]').text()).toContain('温度 0.1')
+    expect(wrapper.find('[data-testid="gen-effective"]').text()).toContain('历史 10 轮')
+  })
+
+  it('面板反映当前会话已存储的参数覆盖', async () => {
+    vi.mocked(conversationsApi.list).mockResolvedValue({
+      items: [conversationFixture({ generation_params: { temperature: 0.7, history_turns: 4 } })],
+      next_cursor: null,
+    })
+    const wrapper = await mountChat()
+    expect(wrapper.find('[data-testid="gen-effective"]').text()).toContain('温度 0.7')
+    expect(wrapper.find('[data-testid="gen-effective"]').text()).toContain('历史 4 轮')
+  })
+
+  it('修改参数只发一次 PATCH，并以服务端返回为准', async () => {
+    const wrapper = await mountChat()
+    vi.mocked(conversationsApi.updateGenerationParams).mockResolvedValue(
+      conversationFixture({ generation_params: { temperature: 0.5 } }),
+    )
+
+    const panel = wrapper.findComponent({ name: 'GenerationParamsPanel' })
+    panel.vm.$emit('change', { temperature: 0.5 })
+    await flushPromises()
+
+    expect(conversationsApi.updateGenerationParams).toHaveBeenCalledTimes(1)
+    expect(conversationsApi.updateGenerationParams).toHaveBeenCalledWith(CONVERSATION_ID, {
+      temperature: 0.5,
+    })
+    // 服务端返回后生效值随之更新
+    expect(wrapper.find('[data-testid="gen-effective"]').text()).toContain('温度 0.5')
+  })
+
+  it('拖动过程只更新草稿，不发请求', async () => {
+    const wrapper = await mountChat()
+    const panel = wrapper.findComponent({ name: 'GenerationParamsPanel' })
+
+    panel.vm.$emit('update:modelValue', { temperature: 0.5 })
+    await flushPromises()
+
+    expect(conversationsApi.updateGenerationParams).not.toHaveBeenCalled()
+  })
+
+  it('参数保存失败时回滚到服务端值并提示', async () => {
+    const wrapper = await mountChat()
+    vi.mocked(conversationsApi.updateGenerationParams).mockRejectedValue(
+      new ApiError({
+        code: 'VALIDATION_ERROR',
+        message: '最长输出不能超过 4096 tokens，请调小后重试。',
+        status: 400,
+      }),
+    )
+
+    const panel = wrapper.findComponent({ name: 'GenerationParamsPanel' })
+    panel.vm.$emit('change', { max_tokens: 99999 })
+    await flushPromises()
+
+    expect(conversationsApi.updateGenerationParams).toHaveBeenCalledTimes(1)
+    // 回滚：生效值回到默认，错误提示可见
+    expect(wrapper.find('[data-testid="gen-effective"]').text()).toContain('温度 0.1')
+    expect(wrapper.find('[role="alert"]').text()).toContain('最长输出不能超过')
+  })
+
+  it('参数默认值加载失败时不挂载面板、禁用入口，但不影响聊天', async () => {
+    vi.mocked(generationApi.defaults).mockRejectedValue(networkError())
+    const wrapper = await mountChat()
+
+    // 没有默认值就无法展示「当前生效」，因此不挂载面板（避免 aria-disabled 卡在 true）
+    expect(wrapper.findComponent({ name: 'GenerationParamsPanel' }).exists()).toBe(false)
+    expect(wrapper.get('[data-testid="generation-params-trigger"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('[role="alert"]').text()).toContain('默认值加载失败')
+    // 聊天本身不受影响
+    expect(wrapper.find('.sm-composer-input').exists()).toBe(true)
   })
 
   it('挂载后加载会话并展示首条消息', async () => {

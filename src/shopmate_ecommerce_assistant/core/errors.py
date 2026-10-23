@@ -36,6 +36,10 @@ class ErrorCode(StrEnum):
     UPSTREAM_UNAVAILABLE = "UPSTREAM_UNAVAILABLE"
     RATE_LIMITED = "RATE_LIMITED"
     INTERNAL_ERROR = "INTERNAL_ERROR"
+    # Conversation knowledge-base selection (docs/06-api.md §6.1, stage 18).
+    KNOWLEDGE_BASE_NOT_SELECTABLE = "KNOWLEDGE_BASE_NOT_SELECTABLE"
+    # Knowledge document assets (docs/06-api.md §6.3, stage 20 image citations).
+    DOCUMENT_NOT_FOUND = "DOCUMENT_NOT_FOUND"
     # Upload protocol codes (docs/06-api.md §14, stage 16 admin upload).
     FILE_TOO_LARGE = "FILE_TOO_LARGE"
     UNSUPPORTED_FILE_TYPE = "UNSUPPORTED_FILE_TYPE"

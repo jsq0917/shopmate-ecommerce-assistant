@@ -1,0 +1,30 @@
+{
+  "collection": "shopmate_knowledge_chunks",
+  "expected_dimension": 1024,
+  "postgres": {
+    "children": 430,
+    "children_with_embedding_metadata": 430,
+    "ready_versions": 88
+  },
+  "milvus": {
+    "collection": "shopmate_knowledge_chunks",
+    "rows": 430,
+    "dense_dimensions": [
+      1024
+    ],
+    "sparse_non_empty": 430,
+    "sparse_coverage": 1.0,
+    "norms_outside_tolerance": 0,
+    "min_norm": 1.0,
+    "max_norm": 1.0,
+    "embedding_models": {
+      "bge-m3": 430
+    }
+  },
+  "expected_fingerprint": "468b391066f99bc2703682b65930cc82",
+  "runtime_fingerprint": {
+    "bge-m3": 430
+  },
+  "checked_at": "2026-10-22T11:22:49.330848+00:00",
+  "problems": []
+}

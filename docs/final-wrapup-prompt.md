@@ -64,7 +64,9 @@
 
 ## W1 · Git 基线（最重要，先做）
 
-**现状**：仓库 **0 commit**，`git log` 报 `your current branch 'main' does not have any commits yet`，全部文件为 `??` 未跟踪。这意味着没有回滚点，也无法对外提供 commit SHA。
+**现状（写这份提示词时，2026-10-20）**：仓库 0 commit，`git log` 报 `your current branch 'main' does not have any commits yet`，全部文件为 `??` 未跟踪。
+
+> **已完成**：该任务已执行完毕。截至 2026-10-23 共有 7 个提交（4 个已推送 GitHub），见 `docs/project-status.md` §0.2。此段保留为任务背景，不代表当前状态。
 
 **执行**：
 

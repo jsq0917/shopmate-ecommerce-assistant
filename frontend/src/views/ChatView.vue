@@ -9,21 +9,31 @@
  * - 人工客服回复写入同一会话，页面用低频轮询把新消息并进线程（不打断正在生成的回答）。
  */
 
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { ElButton, ElDrawer } from 'element-plus'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { ElButton, ElDrawer, ElPopover } from 'element-plus'
 
 import ChatComposer from '@/components/chat/ChatComposer.vue'
 import ChatThread from '@/components/chat/ChatThread.vue'
 import CitationPanel from '@/components/chat/CitationPanel.vue'
 import ConversationSidebar from '@/components/chat/ConversationSidebar.vue'
+import GenerationParamsPanel from '@/components/chat/GenerationParamsPanel.vue'
+import KnowledgeBaseSelect from '@/components/chat/KnowledgeBaseSelect.vue'
 import HandoffDialog from '@/components/chat/HandoffDialog.vue'
 import ProductDetailDialog from '@/components/catalog/ProductDetailDialog.vue'
 import StateBlock from '@/components/common/StateBlock.vue'
-import { conversationsApi } from '@/api/endpoints'
+import { conversationsApi, generationApi, knowledgeBasesApi } from '@/api/endpoints'
 import { toApiError } from '@/api/errors'
 import type { ApiError } from '@/api/errors'
 import type { ChatMessageView } from '@/components/chat/MessageBubble.vue'
-import type { ConversationItem, MessageCitation, MessageItem, ProductCardData } from '@/api/types'
+import type {
+  ConversationGenerationParams,
+  ConversationItem,
+  GenerationDefaults,
+  KnowledgeBaseOption,
+  MessageCitation,
+  MessageItem,
+  ProductCardData,
+} from '@/api/types'
 import { useChatStream } from '@/composables/useChatStream'
 import { routeLabel } from '@/utils/format'
 
@@ -50,10 +60,107 @@ const detailProductId = ref<string | null>(null)
 const handoffVisible = ref(false)
 
 const lastUserText = ref('')
+
+// 会话级知识库多选（stage 18）：空数组 = 不限制，检索全部可见知识库。
+const kbOptions = ref<KnowledgeBaseOption[]>([])
+const kbLoading = ref(false)
+const kbSaving = ref(false)
+const selectedKbIds = ref<string[]>([])
+const kbError = ref<string | null>(null)
+
+// 会话级推理参数（stage 19）：temperature / top_p / max_tokens / history_turns。
+// 草稿由本页持有，控件拖动只更新草稿，提交点（松手/失焦）才 PATCH；保存成功以服务端
+// 返回为准，失败回滚到服务端值并提示。未覆盖的字段用服务端默认值展示生效值。
+const generationDefaults = ref<GenerationDefaults | null>(null)
+const generationDraft = ref<ConversationGenerationParams>({})
+const generationSaving = ref(false)
+const generationError = ref<string | null>(null)
+
+async function loadKnowledgeBases(): Promise<void> {
+  kbLoading.value = true
+  try {
+    const data = await knowledgeBasesApi.list()
+    kbOptions.value = data.items
+    // 首次加载把当前会话的选择同步过来（旧会话没有该字段时按「全部」处理）。
+    selectedKbIds.value = activeConversation.value?.knowledge_base_ids ?? []
+  } catch {
+    // 知识库列表失败不影响聊天本身：多选置灰，检索仍按「全部」进行。
+    kbOptions.value = []
+  } finally {
+    kbLoading.value = false
+  }
+}
+
+async function onKnowledgeBasesChange(ids: string[]): Promise<void> {
+  const id = activeId.value
+  if (!id) return
+  kbError.value = null
+  const previous = selectedKbIds.value
+  selectedKbIds.value = ids
+  kbSaving.value = true
+  try {
+    const updated = await conversationsApi.updateKnowledgeBases(id, ids)
+    conversations.value = conversations.value.map((item) => (item.id === id ? updated : item))
+    selectedKbIds.value = updated.knowledge_base_ids
+  } catch (caught) {
+    selectedKbIds.value = previous
+    kbError.value = toApiError(caught).message
+  } finally {
+    kbSaving.value = false
+  }
+}
+
+async function loadGenerationDefaults(): Promise<void> {
+  try {
+    generationDefaults.value = await generationApi.defaults()
+    generationError.value = null
+  } catch {
+    // 默认值拉取失败只禁用参数面板，不影响聊天本身（参数按服务端默认执行）。
+    generationDefaults.value = null
+    generationError.value = '推理参数默认值加载失败，参数面板暂不可用。'
+  }
+}
+
+/** 拖动过程中的实时更新：只改草稿，不发请求（提交点才 PATCH）。 */
+function onGenerationParamsUpdate(params: ConversationGenerationParams): void {
+  generationDraft.value = params
+}
+
+async function onGenerationParamsChange(params: ConversationGenerationParams): Promise<void> {
+  const id = activeId.value
+  if (!id) return
+  generationError.value = null
+  generationSaving.value = true
+  try {
+    const updated = await conversationsApi.updateGenerationParams(id, params)
+    conversations.value = conversations.value.map((item) => (item.id === id ? updated : item))
+    generationDraft.value = { ...updated.generation_params }
+  } catch (caught) {
+    // 失败回滚到服务端存储值：换一个新对象引用，让 watch 把面板同步回去。
+    conversations.value = conversations.value.map((item) =>
+      item.id === id ? { ...item, generation_params: { ...(item.generation_params ?? {}) } } : item,
+    )
+    generationDraft.value = { ...(activeConversation.value?.generation_params ?? {}) }
+    generationError.value = toApiError(caught).message
+  } finally {
+    generationSaving.value = false
+  }
+}
+
 const busy = computed(() => turn.value.active)
-const activeTitle = computed(
-  () => conversations.value.find((item) => item.id === activeId.value)?.title ?? '智能客服',
+const activeConversation = computed(
+  () => conversations.value.find((item) => item.id === activeId.value) ?? null,
 )
+
+/** 切换会话 / 保存成功后，把面板草稿同步成服务端存储的覆盖值。 */
+watch(
+  activeConversation,
+  (conversation) => {
+    generationDraft.value = { ...(conversation?.generation_params ?? {}) }
+  },
+  { immediate: true },
+)
+const activeTitle = computed(() => activeConversation.value?.title ?? '智能客服')
 const showWelcome = computed(() => !messages.value.length && !busy.value)
 
 const SUGGESTIONS: Array<{ icon: string; title: string; text: string }> = [
@@ -138,6 +245,8 @@ async function selectConversation(id: string): Promise<void> {
   if (turn.value.active) return
   activeId.value = id
   sidebarOpen.value = false
+  selectedKbIds.value = conversations.value.find((item) => item.id === id)?.knowledge_base_ids ?? []
+  kbError.value = null
   resetTurn()
   await loadMessages(id)
 }
@@ -236,6 +345,8 @@ let pollTimer: number | undefined
 
 onMounted(() => {
   void loadConversations()
+  void loadKnowledgeBases()
+  void loadGenerationDefaults()
   pollTimer = window.setInterval(() => void pollNewMessages(), POLL_INTERVAL_MS)
 })
 
@@ -283,8 +394,46 @@ onUnmounted(() => {
           </span>
           <span v-else class="sm-chat-status">在线 · 平均 1 秒内响应</span>
         </div>
-        <ElButton size="small" text type="primary" @click="handoffVisible = true">转人工</ElButton>
+        <div class="sm-chat-tools">
+          <KnowledgeBaseSelect
+            :options="kbOptions"
+            :model-value="selectedKbIds"
+            :disabled="!activeId || busy"
+            :loading="kbLoading || kbSaving"
+            @change="onKnowledgeBasesChange"
+          />
+          <ElPopover placement="bottom-end" trigger="click" :width="460">
+            <template #reference>
+              <ElButton
+                size="small"
+                text
+                type="primary"
+                data-testid="generation-params-trigger"
+                :disabled="!activeId || !generationDefaults"
+              >
+                参数
+              </ElButton>
+            </template>
+            <!--
+              必须等「会话已选 + 默认值已就绪」再挂载面板：Element Plus 的 InputNumber 只在
+              onMounted 时写一次 aria-disabled，若此刻面板因缺少会话/默认值而被禁用，该属性会
+              永久停在 true（实际 disabled 已是 false），读屏与自动化都会误判控件不可用。
+            -->
+            <GenerationParamsPanel
+              v-if="generationDefaults && activeId"
+              :model-value="generationDraft"
+              :defaults="generationDefaults"
+              :disabled="!activeId || busy"
+              :loading="generationSaving"
+              @update:model-value="onGenerationParamsUpdate"
+              @change="onGenerationParamsChange"
+            />
+          </ElPopover>
+          <ElButton size="small" text type="primary" @click="handoffVisible = true">转人工</ElButton>
+        </div>
       </header>
+      <p v-if="kbError" class="sm-chat-kb-error" role="alert">{{ kbError }}</p>
+      <p v-if="generationError" class="sm-chat-kb-error" role="alert">{{ generationError }}</p>
 
       <div v-if="showWelcome" class="sm-welcome">
         <div class="sm-welcome-head">

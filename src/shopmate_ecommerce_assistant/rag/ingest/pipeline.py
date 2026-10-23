@@ -232,6 +232,23 @@ async def _next_attempt(session: AsyncSession, version_id: UUID) -> int:
     return int(total or 0) + 1
 
 
+def _document_metadata(metadata: dict[str, Any], *, document_id: UUID) -> dict[str, Any]:
+    """Promote loader-level metadata into per-chunk extras.
+
+    An image gets a ``image_url`` pointing at the authenticated asset endpoint: the file
+    lives under the controlled knowledge directory, so it is never served as a public
+    static file.
+    """
+    extra: dict[str, Any] = {}
+    image = metadata.get("image")
+    if isinstance(image, dict):
+        extra["image"] = {
+            **image,
+            "image_url": f"/api/v1/knowledge-images/{document_id}",
+        }
+    return extra
+
+
 def _chunk_rows(
     drafts: list[ChunkDraft],
     *,
@@ -242,8 +259,15 @@ def _chunk_rows(
     spec: SourceSpec,
     digest: str,
     embedding_meta: dict[str, Any],
+    extra_metadata: dict[str, Any] | None = None,
 ) -> tuple[list[dict[str, Any]], list[ChunkDraft], list[str]]:
-    """Build ORM-ready chunk rows plus the child drafts and their ids."""
+    """Build ORM-ready chunk rows plus the child drafts and their ids.
+
+    ``extra_metadata`` carries document-level extras every chunk of this version should
+    expose (currently the ``image`` block for screenshots), so a citation can be traced
+    back to the original picture without an extra join.
+    """
+    extra = dict(extra_metadata or {})
     ids: dict[int, UUID] = {
         draft.chunk_index: stable_uuid("chunk", str(version_id), str(draft.chunk_index))
         for draft in drafts
@@ -278,6 +302,7 @@ def _chunk_rows(
                     # vector, so a re-import can be compared against the index.
                     # Parent chunks are not embedded; ``embedded`` states that explicitly.
                     "embedding": {**embedding_meta, "embedded": draft.role == "child"},
+                    **extra,
                 },
             }
         )
@@ -414,6 +439,7 @@ async def ingest_source(
             raise EmptyDocument()
 
         embedding_meta = embedder.metadata.as_dict()
+        extra_metadata = _document_metadata(loaded.metadata, document_id=document_id)
         rows, children, child_ids = _chunk_rows(
             drafts,
             version_id=version_id,
@@ -423,6 +449,7 @@ async def ingest_source(
             spec=spec,
             digest=digest.hex(),
             embedding_meta=embedding_meta,
+            extra_metadata=extra_metadata,
         )
         if not children:
             raise EmptyDocument()
@@ -471,6 +498,7 @@ async def ingest_source(
                                 "chunk_role": "child",
                                 "is_synthetic": True,
                                 "embedding": embedding_meta,
+                                **extra_metadata,
                             },
                             ensure_ascii=False,
                         ),

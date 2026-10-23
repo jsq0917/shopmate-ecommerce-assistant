@@ -55,6 +55,8 @@ Playwright 会自动拉起 `npm run dev`（通过 webServer 配置），并把 `
 |---|---|
 | `auth.spec.ts` | 未登录重定向、错误密码提示、登录落地首页、刷新保持登录、消费者看不到客服/管理入口 |
 | `chat.spec.ts` | 会话新建、SSE 流式渲染（含「正在回复」中间态）、停止生成、消息持久化 |
+| `knowledge-bases.spec.ts` | 会话级知识库多选：只选 policy-sg 时引用只来自新加坡文档 |
+| `chat-generation.spec.ts` | 推理参数面板：温度 0↔1、max_tokens、历史轮数按会话保存、刷新不丢、恢复默认，且不影响 SSE |
 | `catalog.spec.ts` | 关键词搜索、商品卡片价格/库存/数据更新时间、详情、两件比较 |
 | `order-return.spec.ts` | 订单详情、物流时间线、退货资格检查、提交申请与「未退款」提示 |
 | `handoff.spec.ts` | 转人工表单校验、工单创建成功与工单列表 |

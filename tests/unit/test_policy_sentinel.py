@@ -77,7 +77,7 @@ class _Model:
     def __init__(self, text: str) -> None:
         self.text = text
 
-    def complete(self, *, system: str, user: str) -> str:
+    def complete(self, *, system: str, user: str, generation=None) -> str:
         return self.text
 
 

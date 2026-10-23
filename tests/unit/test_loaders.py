@@ -152,3 +152,88 @@ def test_corrupt_pdf_is_reported_as_parse_failure(tmp_path: Path) -> None:
 
     with pytest.raises(DocumentParseFailed):
         load_document(source)
+
+
+# --- images (stage 20) --------------------------------------------------------------
+
+
+def _render_screenshot(tmp_path: Path) -> Path:
+    """Render the fixture policy as a PNG, skipping when the host has no CJK font."""
+    doc = _policy_doc(file_format="png", sections=SECTIONS)
+    try:
+        return render_policy(doc, tmp_path)
+    except RuntimeError as exc:  # pragma: no cover - depends on installed fonts
+        pytest.skip(f"当前系统缺少中文字体，跳过图片渲染：{exc}")
+
+
+def test_image_is_read_through_ocr(tmp_path: Path) -> None:
+    """A screenshot yields ordinary text blocks plus its own file metadata."""
+    source = _render_screenshot(tmp_path)
+
+    loaded = load_document(source)
+
+    text = "\n".join(block.text for block in loaded.blocks)
+    # OCR keeps the wording; assert on a digit-free fragment because engines drop the
+    # spaces around numbers ("第 7 日" → "第7日") depending on the model version.
+    assert "商品需保持完好" in text
+    assert loaded.mime_type == "image/png"
+    assert loaded.page_count == 1
+    image = loaded.metadata["image"]
+    assert image["filename"] == source.name
+    assert image["width"] == 1080
+    assert image["height"] > 0
+    assert image["ocr_mean_confidence"] > 0.5
+    assert image["ocr_lines"] >= 3
+
+
+def test_image_block_uses_page_one_and_no_fake_heading(tmp_path: Path) -> None:
+    """A screenshot has no sections; the loader must not invent a heading path."""
+    source = _render_screenshot(tmp_path)
+
+    loaded = load_document(source)
+
+    assert {block.page_no for block in loaded.blocks} == {1}
+    assert all(block.heading_path == () for block in loaded.blocks)
+
+
+def test_image_without_legible_text_is_rejected(tmp_path: Path) -> None:
+    from PIL import Image
+
+    source = tmp_path / "blank.png"
+    Image.new("RGB", (600, 400), "white").save(source)
+
+    with pytest.raises(EmptyDocument):
+        load_document(source)
+
+
+def test_non_image_with_image_suffix_is_rejected(tmp_path: Path) -> None:
+    """Magic bytes, not the extension, decide: a renamed text file must not reach OCR."""
+    source = tmp_path / "fake.png"
+    source.write_bytes(b"this is not a png payload")
+
+    with pytest.raises(DocumentParseFailed):
+        load_document(source)
+
+
+def test_image_above_pixel_limit_is_rejected(tmp_path: Path) -> None:
+    from PIL import Image
+
+    from shopmate_ecommerce_assistant.rag.ingest import loaders
+
+    # 9000 × 5000 = 45 M pixels > the 40 M cap; mode "1" keeps the fixture small in memory.
+    source = tmp_path / "huge.png"
+    Image.new("1", (9000, 5000), 1).save(source)
+    assert source.stat().st_size < loaders.IMAGE_MAX_BYTES
+
+    with pytest.raises(DocumentParseFailed):
+        load_document(source)
+
+
+def test_gif_is_rejected_as_unsupported(tmp_path: Path) -> None:
+    from PIL import Image
+
+    source = tmp_path / "animation.gif"
+    Image.new("RGB", (32, 32), "white").save(source, format="GIF")
+
+    with pytest.raises(UnsupportedDocumentType):
+        load_document(source)

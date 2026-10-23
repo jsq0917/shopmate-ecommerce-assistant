@@ -1601,11 +1601,15 @@ def _summarise_policy_llm(
             "answer_total": prompt_tokens + completion_tokens,
             "judge": judge_usage,
             "cost_usd": 0.0,
-            "cost_note": "本地 Ollama 推理，无 API 计费；成本记账为 0，不代表云模型成本",
+            "cost_note": (
+                f"本脚本不计价；本轮回答模型为 {llm_settings.llm_model or '未配置'}"
+                f"（{llm_settings.llm_base_url or '未配置'}），成本按供应商账单结算，"
+                "记账 0 不代表免费"
+            ),
         },
         "latency": _latency_block([row["latency_ms"] for row in rows]),
         "judge_method": (
-            "LLM-as-judge（本地 qwen2.5:7b，temperature=0，强制 JSON 输出）；"
+            f"LLM-as-judge（{llm_settings.llm_model or '未配置'}，temperature=0，强制 JSON 输出）；"
             "不是官方 ragas 包，prompt 为本项目自建，见 scripts/eval_stage13.py"
         ),
     }
@@ -1645,20 +1649,30 @@ def main() -> int:
     parser.add_argument("--retrieval", default=str(paths.EVAL_DIR / "retrieval_cases.jsonl"))
     parser.add_argument("--parts", nargs="+", default=["retrieval", "business", "generation"])
     parser.add_argument("--limit", type=int, default=0)
-    parser.add_argument("--llm-base-url", default="http://localhost:11434/v1")
-    parser.add_argument("--llm-model", default="qwen2.5:7b")
-    parser.add_argument("--llm-api-key", default="ollama")
+    # Defaults come from the environment (.env / process env): the baseline answer model
+    # is DeepSeek (``LLM_PROFILE=deepseek``). A local Ollama server is reachable through
+    # ``LLM_PROFILE=local`` for offline smoke tests only — its numbers must never be
+    # quoted as an evaluation baseline. Explicit flags still win.
+    parser.add_argument("--llm-base-url", default="")
+    parser.add_argument("--llm-model", default="")
+    parser.add_argument("--llm-api-key", default="")
     parser.add_argument("--judge-model", default="")
     parser.add_argument("--policy-limit", type=int, default=0)
     parser.add_argument("--no-judge", action="store_true")
     parser.add_argument("--output", default="")
     args = parser.parse_args()
+    configured = get_settings()
+    if not args.llm_base_url:
+        args.llm_base_url = configured.llm_base_url
+    if not args.llm_model:
+        args.llm_model = configured.llm_model
+    if not args.llm_api_key:
+        args.llm_api_key = configured.llm_api_key
     try:
         return asyncio.run(_run(args))
     except Exception as exc:  # noqa: BLE001 - CLI boundary
         print(f"评测失败：{exc}", file=sys.stderr)
         raise
-        return 1
 
 
 if __name__ == "__main__":

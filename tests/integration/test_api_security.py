@@ -120,7 +120,7 @@ class _FailingPolicyService:
     def __init__(self, error: Exception) -> None:
         self._error = error
 
-    async def answer(self, question, scope, *, query_plan=None, generation=None):
+    async def answer(self, question, scope, *, query_plan=None, generation=None, risk_level=None):
         raise self._error
 
 
@@ -253,20 +253,24 @@ async def _fixture(*, policy=None) -> AsyncIterator[Fixture]:
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-        yield Fixture(
-            client=client,
-            settings=settings,
-            shop_id=data["shop"].id,
-            user_a=data["user_a"].id,
-            user_b=data["user_b"].id,
-            admin=data["admin"].id,
-            order_id=data["order"].id,
-            order_item_id=data["item"].id,
-            conversation_id=data["conversation"].id,
-        )
-
-    async with factory() as session:
-        await _cleanup(session, data["shop"].id)
+        try:
+            yield Fixture(
+                client=client,
+                settings=settings,
+                shop_id=data["shop"].id,
+                user_a=data["user_a"].id,
+                user_b=data["user_b"].id,
+                admin=data["admin"].id,
+                order_id=data["order"].id,
+                order_item_id=data["item"].id,
+                conversation_id=data["conversation"].id,
+            )
+        finally:
+            # Cleanup must survive a crashing test: a failed run used to leak the whole
+            # private shop (users/orders/conversations) into the shared demo database
+            # and break the seed-count assertions of whatever ran next.
+            async with factory() as session:
+                await _cleanup(session, data["shop"].id)
     await engine.dispose()
 
 

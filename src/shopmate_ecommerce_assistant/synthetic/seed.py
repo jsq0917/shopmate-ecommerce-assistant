@@ -63,6 +63,15 @@ class SeedReport:
     eval_cases: int = 0
 
 
+#: Columns that a re-seed must not overwrite on an existing row. Seeding only ever
+#: writes the ``!synthetic-account-no-login`` sentinel for ``password_hash``; the real
+#: demo credential is installed afterwards by ``scripts/demo_accounts.py``. Without
+#: this exclusion, every ``run_seed`` — including the one inside the test suite —
+#: silently reset the demo accounts back to the no-login sentinel and broke demo
+#: login until the script was re-run (found 2026-10-24).
+PRESERVE_ON_CONFLICT: dict[type[Any], frozenset[str]] = {User: frozenset({"password_hash"})}
+
+
 def _clean(model: type[Any], row: dict[str, Any]) -> dict[str, Any]:
     columns = set(model.__table__.columns.keys())
     return {key: value for key, value in row.items() if key in columns}
@@ -79,7 +88,7 @@ async def _upsert(
     cleaned = [_clean(model, row) for row in rows]
     stmt = postgresql.insert(model).values(cleaned)
     excluded = stmt.excluded
-    skip = set(conflict_columns) | {"id", "created_at"}
+    skip = set(conflict_columns) | {"id", "created_at"} | PRESERVE_ON_CONFLICT.get(model, set())
     update_columns = {
         column: getattr(excluded, column) for column in cleaned[0] if column not in skip
     }

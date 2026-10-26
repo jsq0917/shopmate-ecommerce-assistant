@@ -9,6 +9,7 @@ import pytest
 import sqlalchemy as sa
 
 from shopmate_ecommerce_assistant.core import paths
+from shopmate_ecommerce_assistant.core.security import hash_password
 from shopmate_ecommerce_assistant.db.models import Inventory, Order, Product, Shop, User
 from shopmate_ecommerce_assistant.synthetic.knowledge_corpus import (
     POLICY_DOCS,
@@ -20,6 +21,32 @@ from shopmate_ecommerce_assistant.synthetic.seed import run_seed
 pytestmark = pytest.mark.integration
 
 PHONE_PATTERN = re.compile(r"1[3-9]\d{9}")
+
+
+async def test_run_seed_preserves_an_installed_demo_password(session) -> None:
+    """A re-seed must not reset the demo credential to the no-login sentinel.
+
+    Seeding only ever writes ``!synthetic-account-no-login``; the real demo password is
+    installed afterwards by ``scripts/demo_accounts.py``. Without the
+    ``PRESERVE_ON_CONFLICT`` guard, every full test suite run re-seeded the shared demo
+    database and silently broke demo login (found 2026-10-24).
+    """
+    await run_seed(session)
+
+    installed = hash_password("ShopMate-Demo-Only-2026")
+    await session.execute(
+        sa.update(User).where(User.email_ci == "shopper01@example.invalid").values(
+            password_hash=installed
+        )
+    )
+    await session.commit()
+
+    await run_seed(session)
+
+    stored = await session.scalar(
+        sa.select(User.password_hash).where(User.email_ci == "shopper01@example.invalid")
+    )
+    assert stored == installed, "re-seed must not overwrite an installed demo password"
 
 
 async def test_seed_counts_metadata_and_idempotency(session) -> None:

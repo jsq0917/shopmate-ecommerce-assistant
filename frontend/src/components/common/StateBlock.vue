@@ -2,6 +2,10 @@
 /**
  * 统一状态块：加载 / 空 / 错误。
  * 错误使用稳定中文文案（ApiError.message），不展示 trace 或堆栈。
+ *
+ * ``stretch`` 用于「插槽内容自带滚动容器」的页面（如聊天线程）：根元素变成
+ * flex 纵向布局并吃满父级剩余高度，让子元素的 ``overflow-y: auto`` 能真正
+ * 生效。默认关闭——普通列表页保持原有的自然高度行为。
  */
 
 import { ElAlert, ElButton, ElEmpty, ElSkeleton } from 'element-plus'
@@ -14,13 +18,14 @@ defineProps<{
   empty?: boolean
   emptyText?: string
   loadingText?: string
+  stretch?: boolean
 }>()
 
 const emit = defineEmits<{ (e: 'retry'): void }>()
 </script>
 
 <template>
-  <div class="sm-state">
+  <div class="sm-state" :class="{ 'sm-state-stretch': stretch }">
     <div v-if="loading" class="sm-state-loading">
       <ElSkeleton :rows="3" animated />
       <p class="sm-muted">{{ loadingText ?? '加载中…' }}</p>
@@ -46,6 +51,17 @@ const emit = defineEmits<{ (e: 'retry'): void }>()
 </template>
 
 <style scoped>
+.sm-state {
+  /* 普通页面：自然高度，块级布局不变。 */
+}
+
+.sm-state-stretch {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .sm-state-loading {
   display: flex;
   flex-direction: column;

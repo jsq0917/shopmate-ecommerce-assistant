@@ -36,6 +36,8 @@ const error = ref<ApiError | null>(null)
 const tickets = ref<SupportTicketListItem[]>([])
 const statusFilter = ref('')
 const riskFilter = ref('')
+/** 默认只看能打开聊天记录的工单；会话已被删除的工单需显式打开才显示。 */
+const includeClosedTranscripts = ref(false)
 
 const refundLoading = ref(true)
 const refundError = ref<ApiError | null>(null)
@@ -44,6 +46,7 @@ const refundStatus = ref('requested')
 const reviewing = ref<string | null>(null)
 
 const openCount = computed(() => tickets.value.filter((item) => item.status === 'open').length)
+const deadTranscriptCount = computed(() => tickets.value.filter((item) => !item.transcript_available).length)
 const riskyCount = computed(
   () => tickets.value.filter((item) => ['high', 'critical'].includes(item.risk_level)).length,
 )
@@ -56,6 +59,7 @@ async function loadTickets(): Promise<void> {
     const data = await supportApi.tickets({
       status: statusFilter.value || undefined,
       risk_level: riskFilter.value || undefined,
+      transcript: includeClosedTranscripts.value ? 'all' : 'available',
       limit: 50,
     })
     tickets.value = data.items
@@ -193,6 +197,13 @@ onMounted(async () => {
           <ElOption value="high" label="高风险" />
           <ElOption value="critical" label="紧急" />
         </ElSelect>
+        <label class="sm-toggle">
+          <input v-model="includeClosedTranscripts" type="checkbox" @change="loadTickets" />
+          包含会话已删除的工单
+        </label>
+        <span v-if="deadTranscriptCount" class="sm-muted">
+          其中 {{ deadTranscriptCount }} 条会话已删除，只能归档
+        </span>
       </div>
 
       <StateBlock
@@ -215,6 +226,9 @@ onMounted(async () => {
               </ElTag>
               <span class="sm-ticket-reason">{{ handoffReasonLabel(row.primary_reason_code) }}</span>
               <ElTag size="small" effect="plain">{{ ticketStatusLabel(row.status) }}</ElTag>
+              <ElTag v-if="!row.transcript_available" size="small" type="info" effect="plain">
+                会话已删除
+              </ElTag>
               <span class="sm-ticket-priority">P{{ row.priority }}</span>
               <span class="sm-muted sm-ticket-wait">已等待 {{ formatWaiting(row.waiting_seconds) }}</span>
             </div>
@@ -368,6 +382,15 @@ onMounted(async () => {
 
 .sm-filter-bar {
   margin-bottom: 12px;
+}
+
+.sm-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--sm-text-secondary);
+  cursor: pointer;
 }
 
 .sm-ticket-list,

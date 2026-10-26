@@ -37,6 +37,7 @@ describe('SupportTicketsView（工单队列）', () => {
     expect(supportApi.tickets).toHaveBeenCalledWith({
       status: undefined,
       risk_level: undefined,
+      transcript: 'available',
       limit: 50,
     })
     expect(wrapper.text()).toContain('待处理')
@@ -64,6 +65,26 @@ describe('SupportTicketsView（工单队列）', () => {
     await retry.trigger('click')
     await flushPromises()
     expect(supportApi.tickets).toHaveBeenCalledTimes(2)
+  })
+
+  it('勾选后带上 transcript=all，并给会话已删除的工单打标', async () => {
+    vi.mocked(supportApi.tickets).mockResolvedValue({
+      items: [supportTicketFixture({ transcript_available: false })],
+      next_offset: null,
+    })
+    const wrapper = await mountView()
+    const toggle = wrapper.find('.sm-toggle input')
+    await toggle.setValue(true)
+    await flushPromises()
+
+    expect(supportApi.tickets).toHaveBeenLastCalledWith({
+      status: undefined,
+      risk_level: undefined,
+      transcript: 'all',
+      limit: 50,
+    })
+    expect(wrapper.text()).toContain('会话已删除')
+    expect(wrapper.text()).toContain('其中 1 条会话已删除')
   })
 
   it('点击卡片跳转工单详情', async () => {

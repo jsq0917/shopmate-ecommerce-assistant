@@ -627,6 +627,8 @@ export interface SupportTicketListItem {
   assigned_to_masked: string | null
   created_at: string
   waiting_seconds: number
+  /** false = 该工单的会话已被删除，无法打开聊天记录 */
+  transcript_available: boolean
 }
 
 export interface SupportTicketListData extends Pagination {
@@ -646,8 +648,10 @@ export interface SupportTicketDetail {
   assigned_to_masked: string | null
   created_at: string
   updated_at: string
+  waiting_seconds: number
   summary_redacted: string
   expected_response: string
+  transcript_available: boolean
 }
 
 export interface SupportConversationMessage {
@@ -694,7 +698,7 @@ export interface SupportReplyData {
 }
 
 export interface SupportTicketPatch {
-  action: 'assign' | 'resolve' | 'close'
+  action: 'assign' | 'resolve' | 'close' | 'archive'
   assignee_user_id?: Uuid | null
   resolution_summary?: string | null
   close_reason?: string | null

@@ -59,6 +59,8 @@ export interface RequestOptions {
   /** 额外请求头（如刷新令牌时的 `X-CSRF-Token`）。 */
   headers?: Record<string, string>
   signal?: AbortSignal
+  /** 超时毫秒数；`null` 关闭超时（SSE 流式请求必须传 null）。缺省 15s。 */
+  timeoutMs?: number | null
 }
 
 function buildUrl(path: string, query?: Record<string, QueryValue>): string {
@@ -120,11 +122,28 @@ async function send(options: RequestOptions & { path: string }): Promise<Respons
   } else if (hasJsonBody) {
     init.body = JSON.stringify(options.body)
   }
+  // 默认 15s 超时，避免后端 hang 住时按钮一直 loading 看起来像"没响应"；
+  // `timeoutMs: null` 关闭超时（SSE 只需等到响应头到达，计时器随后即被清除）
+  const controller = new AbortController()
+  const timeoutMs = options.timeoutMs === undefined ? 15_000 : options.timeoutMs
+  const timer = timeoutMs === null ? null : setTimeout(() => controller.abort(), timeoutMs)
+  // 调用方传入的 signal 优先；外部 abort 时也要联动取消超时
+  if (options.signal) {
+    if (options.signal.aborted) controller.abort()
+    else options.signal.addEventListener('abort', () => controller.abort(), { once: true })
+  }
+  init.signal = controller.signal
   try {
     return await fetch(buildUrl(options.path, options.query), init)
   } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') throw error
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      // 外部主动 abort 原样抛出；超时 abort 包装为网络错误
+      if (options.signal?.aborted) throw error
+      throw networkError(new Error('Request timed out'))
+    }
     throw networkError(error)
+  } finally {
+    if (timer !== null) clearTimeout(timer)
   }
 }
 

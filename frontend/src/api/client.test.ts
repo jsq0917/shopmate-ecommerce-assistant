@@ -207,12 +207,72 @@ describe('API client', () => {
     await expect(request('/products/search')).rejects.toMatchObject({ code: 'NETWORK_ERROR' })
   })
 
-  it('abort 的 AbortError 原样抛出', async () => {
+  it('外部 signal 主动 abort 的 AbortError 原样抛出', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      throw new DOMException('aborted', 'AbortError')
+    }))
+    const signal = AbortSignal.abort()
+    await expect(request('/chat/stream', { method: 'POST', signal })).rejects.toMatchObject({
+      name: 'AbortError',
+    })
+  })
+
+  it('无外部 signal 的 AbortError（超时 abort）包装为可重试网络错误', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => {
       throw new DOMException('aborted', 'AbortError')
     }))
     await expect(request('/chat/stream', { method: 'POST' })).rejects.toMatchObject({
-      name: 'AbortError',
+      code: 'NETWORK_ERROR',
+      retryable: true,
     })
+  })
+
+  it('自定义 timeoutMs 到期后中断挂起请求并抛网络错误', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(
+          (_url: string, init: RequestInit) =>
+            new Promise<Response>((_, reject) => {
+              init.signal?.addEventListener('abort', () =>
+                reject(new DOMException('aborted', 'AbortError')),
+              )
+            }),
+        ),
+      )
+      const pending = request('/products/search', { timeoutMs: 100 })
+      const assertion = expect(pending).rejects.toMatchObject({ code: 'NETWORK_ERROR' })
+      await vi.advanceTimersByTimeAsync(100)
+      await assertion
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('timeoutMs: null 不设超时，远超默认时限后仍正常返回', async () => {
+    vi.useFakeTimers()
+    try {
+      let resolveFetch!: (response: Response) => void
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(
+          (_url: string, init: RequestInit) =>
+            new Promise<Response>((resolve, reject) => {
+              resolveFetch = resolve
+              // 若实现错误地设置了超时计时器，abort 会走到这里并让本用例失败
+              init.signal?.addEventListener('abort', () =>
+                reject(new DOMException('aborted', 'AbortError')),
+              )
+            }),
+        ),
+      )
+      const pending = request('/products/search', { timeoutMs: null })
+      await vi.advanceTimersByTimeAsync(60_000)
+      resolveFetch(jsonResponse(envelope({ ok: true })))
+      await expect(pending).resolves.toEqual({ ok: true })
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

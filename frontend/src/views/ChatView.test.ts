@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 
 import ChatView from '@/views/ChatView.vue'
+import MessageBubble from '@/components/chat/MessageBubble.vue'
 import { networkError } from '@/api/errors'
 import { ApiError } from '@/api/errors'
 import {
@@ -95,6 +96,49 @@ describe('ChatView 集成', () => {
       ],
     })
     vi.mocked(generationApi.defaults).mockResolvedValue(generationDefaultsFixture())
+  })
+
+  it('发送后用户消息立即上屏（乐观显示），SSE 完成后以服务端历史为准替换', async () => {
+    type Deliver = (events: ReturnType<typeof sseEvent>[]) => void
+    // 对象容器：属性不会被 TS 控制流收窄成 null（赋值发生在 mock 回调里）。
+    const gate: { deliver: Deliver | null } = { deliver: null }
+    vi.mocked(chatApi.stream).mockImplementation(
+      (_params, consumer) =>
+        new Promise<void>((resolve) => {
+          gate.deliver = (events) => {
+            for (const event of events) consumer.onEvent(event)
+            resolve()
+          }
+        }),
+    )
+    const wrapper = await mountChat()
+    const historyCallsBefore = vi.mocked(conversationsApi.messages).mock.calls.length
+
+    await sendMessage(wrapper, '预算 300 以内的降噪耳机')
+    await flushPromises()
+
+    // SSE 仍未完成：用户消息必须已经在界面上，思考指示器可见，且未触发历史刷新。
+    expect(wrapper.text()).toContain('预算 300 以内的降噪耳机')
+    expect(wrapper.find('[data-testid="thinking-indicator"]').exists()).toBe(true)
+    expect(vi.mocked(conversationsApi.messages).mock.calls.length).toBe(historyCallsBefore)
+
+    // 流完成：loadMessages 用服务端持久化数据整体替换（本地乐观消息消失）。
+    vi.mocked(conversationsApi.messages).mockResolvedValue({
+      items: [
+        messageFixture({ id: 'u-1', role: 'user', content: '预算 300 以内的降噪耳机' }),
+        messageFixture({ id: 'a-1', role: 'assistant', content: '这款耳机支持主动降噪。' }),
+      ],
+      next_cursor: null,
+    })
+    gate.deliver?.(happyEvents())
+    await flushPromises()
+    await flushPromises()
+
+    const bubbles = wrapper.findAllComponents(MessageBubble)
+    expect(bubbles).toHaveLength(2)
+    // 同一条用户消息只出现一次（乐观消息已被服务端数据替换，而非叠加）。
+    expect(wrapper.text().match(/预算 300 以内的降噪耳机/g)).toHaveLength(1)
+    expect(wrapper.find('[data-testid="thinking-indicator"]').exists()).toBe(false)
   })
 
   it('切换知识库只发一次 PATCH，并把会话状态同步成新选择', async () => {

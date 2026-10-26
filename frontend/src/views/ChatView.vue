@@ -41,6 +41,9 @@ defineOptions({ name: 'ChatView' })
 
 const POLL_INTERVAL_MS = 8000
 
+/** 乐观用户消息的 key 前缀：流结束后由服务端历史替换，重发前先清掉。 */
+const LOCAL_KEY_PREFIX = 'local-'
+
 const { turn, send, stop, resetTurn } = useChatStream()
 
 const conversations = ref<ConversationItem[]>([])
@@ -301,6 +304,23 @@ async function onSend(text: string): Promise<void> {
   lastUserText.value = text
   const conversationId = activeId.value
 
+  // 乐观显示：发送瞬间就把用户消息渲染上屏，不等 SSE 往返。
+  // 流结束后 loadMessages 用服务端持久化的权威数据整体替换（拿到真实 message id）。
+  // 重试/断线重发前先移除上一条本地消息，避免同一条消息出现两个气泡。
+  messages.value = messages.value.filter((item) => !item.key.startsWith(LOCAL_KEY_PREFIX))
+  messages.value.push({
+    key: `${LOCAL_KEY_PREFIX}${crypto.randomUUID()}`,
+    role: 'user',
+    content: text,
+    citations: [],
+    risk: {},
+    route: null,
+    finishReason: null,
+    isComplete: true,
+    createdAt: null,
+    productCards: [],
+  })
+
   const result = await send(conversationId, text)
   // 服务端在建立流之前拒绝了重复/进行中的请求，或用户主动停止：
   // 一律以服务端持久化历史为准，避免出现“前端有、库里无”的消息。
@@ -309,6 +329,8 @@ async function onSend(text: string): Promise<void> {
     await loadMessages(conversationId)
     return
   }
+  // 断线也要刷新一次历史：用户消息可能已落库，服务端数据比乐观条目可信；
+  // 此后保留 turn 的错误气泡（带重试入口）。
   await loadMessages(conversationId)
   if (result.outcome === 'network') return
   resetTurn()
@@ -467,11 +489,12 @@ onUnmounted(() => {
         </ul>
       </div>
 
-      <StateBlock v-else :loading="messagesLoading && !busy" :error="messagesError">
+      <StateBlock v-else :loading="messagesLoading && !busy" :error="messagesError" stretch>
         <ChatThread
           v-if="activeId"
           :messages="messages"
           :turn="turn"
+          :conversation-id="activeId"
           @open-citations="onOpenCitations"
           @open-product="onOpenProduct"
           @retry="onRetry"
@@ -533,9 +556,11 @@ onUnmounted(() => {
 .sm-chat-main {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: var(--sm-surface);
+  overflow: hidden;
 }
 
 .sm-chat-toolbar {

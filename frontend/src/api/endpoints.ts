@@ -166,6 +166,8 @@ export const chatApi = {
         client_message_id: params.client_message_id,
       },
       signal: params.signal,
+      // 流式回答可持续数分钟：超时只应约束"等响应头"，这里显式关闭。
+      timeoutMs: null,
     })
     await consumeSSE(response, consumer, params.signal)
   },
@@ -253,8 +255,13 @@ export const handoffApi = {
 // ---- 客服工作台（docs/06-api.md 第 12 节） ------------------------------
 
 export const supportApi = {
-  tickets: (params: { status?: string; risk_level?: string; limit?: number } = {}) =>
-    json<SupportTicketListData>('/support/tickets', { query: params }),
+  /**
+   * 工单队列。默认 `transcript: 'available'` 只返回会话仍在的工单——会话已被删除的工单
+   * 永远打不开聊天记录，默认混进来只会让队列变成噪音；`all` 用于翻查历史。
+   */
+  tickets: (
+    params: { status?: string; risk_level?: string; limit?: number; transcript?: 'available' | 'all' } = {},
+  ) => json<SupportTicketListData>('/support/tickets', { query: params }),
 
   ticket: (ticketId: string) => json<SupportTicketDetail>(`/support/tickets/${ticketId}`),
 

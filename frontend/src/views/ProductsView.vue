@@ -27,12 +27,20 @@ const QUICK_TAGS: Array<{ label: string; q: string }> = [
   { label: '坚果', q: '坚果' },
 ]
 
+/**
+ * 两个端点的 limit 上限不同，必须各用各的：
+ * - featured：后端 `le=24`（api/catalog.py）
+ * - search：后端 `le=20`，且工具契约（docs/05-tool-contract.md §search_products）为
+ *   `limit<=20`。共用 24 曾让所有关键词搜索（含快捷标签）一律 400 VALIDATION_ERROR。
+ */
+const FEATURED_LIMIT = 24
+const SEARCH_LIMIT = 20
+
 const filters = reactive({
   q: '',
   budgetMaxYuan: '',
   inStockOnly: false,
   sort: 'relevance' as 'relevance' | 'price-asc' | 'price-desc',
-  limit: 24,
 })
 
 const loading = ref(false)
@@ -68,7 +76,7 @@ async function loadFeatured(): Promise<void> {
   searched.value = false
   activeTag.value = ''
   try {
-    result.value = await productsApi.featured({ limit: filters.limit })
+    result.value = await productsApi.featured({ limit: FEATURED_LIMIT })
   } catch (caught) {
     error.value = toApiError(caught)
     result.value = null
@@ -91,7 +99,7 @@ async function search(keyword?: string): Promise<void> {
       q,
       budget_max_cents: budgetMaxCents.value,
       in_stock_only: filters.inStockOnly,
-      limit: filters.limit,
+      limit: SEARCH_LIMIT,
     })
     searched.value = true
     selected.value = []
@@ -132,6 +140,12 @@ function toggleCompare(productId: string): void {
     return
   }
   selected.value = [...selected.value, productId]
+}
+
+function clearCompare(): void {
+  selected.value = []
+  compareData.value = null
+  compareError.value = null
 }
 
 async function runCompare(): Promise<void> {
@@ -215,7 +229,7 @@ onMounted(loadFeatured)
     <div v-if="selected.length" class="sm-compare-bar sm-card">
       <span>已选 {{ selected.length }} 件（2-4 件可比较）</span>
       <div class="sm-row">
-        <ElButton size="small" text @click="selected = []">清空</ElButton>
+        <ElButton size="small" text @click="clearCompare">清空</ElButton>
         <ElButton
           size="small"
           type="primary"
@@ -237,6 +251,10 @@ onMounted(loadFeatured)
       class="sm-block"
     />
 
+    <div v-if="compareData" class="sm-card sm-compare-wrap">
+      <ProductCompareTable :data="compareData" />
+    </div>
+
     <StateBlock
       :loading="loading && !result"
       :error="error"
@@ -257,10 +275,6 @@ onMounted(loadFeatured)
         @toggle-compare="toggleCompare"
       />
     </StateBlock>
-
-    <div v-if="compareData" class="sm-card sm-compare-wrap">
-      <ProductCompareTable :data="compareData" />
-    </div>
 
     <ElEmpty v-if="!loading && !error && !cards.length" description=" " />
 

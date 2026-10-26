@@ -8,6 +8,16 @@ import DataAsOfTag from '@/components/common/DataAsOfTag.vue'
 import type { CompareData } from '@/api/types'
 
 defineProps<{ data: CompareData }>()
+
+/** 合并商品名与规格名，避免重复（variant_title 常自带 product title 前缀）。 */
+function displayTitle(product: { title: string; variant_title: string | null }): string {
+  const vt = product.variant_title?.trim()
+  if (!vt) return product.title
+  if (vt === product.title) return product.title
+  // variant_title 以 product.title 开头（如 "速派 L 20W 数据线 · 云雾白"）则不重复拼
+  if (vt.startsWith(product.title)) return vt
+  return `${product.title} · ${vt}`
+}
 </script>
 
 <template>
@@ -22,8 +32,9 @@ defineProps<{ data: CompareData }>()
           <tr>
             <th class="sm-compare-rowhead">对比项</th>
             <th v-for="product in data.products" :key="product.product_id">
-              <span class="sm-compare-product">{{ product.title }}</span>
-              <span v-if="product.variant_title" class="sm-muted"> · {{ product.variant_title }}</span>
+              <span class="sm-compare-product">
+                {{ displayTitle(product) }}
+              </span>
             </th>
           </tr>
         </thead>

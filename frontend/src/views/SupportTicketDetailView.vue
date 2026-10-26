@@ -25,6 +25,8 @@ const loading = ref(true)
 const error = ref<ApiError | null>(null)
 const ticket = ref<SupportTicketDetail | null>(null)
 const conversation = ref<SupportConversation | null>(null)
+/** 会话取不到时的原因（例如用户已删除会话）；工单本身仍可读，不应整页报错。 */
+const transcriptError = ref<string | null>(null)
 
 const actionLoading = ref(false)
 const actionError = ref<ApiError | null>(null)
@@ -37,6 +39,8 @@ const resolveDialog = ref(false)
 const resolutionSummary = ref('')
 const closeDialog = ref(false)
 const closeReason = ref('')
+const archiveDialog = ref(false)
+const archiveReason = ref('')
 
 const assistantMessages = computed(
   () => conversation.value?.messages.filter((message) => message.role === 'assistant') ?? [],
@@ -45,17 +49,29 @@ const assistantMessages = computed(
 async function load(): Promise<void> {
   loading.value = true
   error.value = null
+  transcriptError.value = null
+  conversation.value = null
   try {
     ticket.value = await supportApi.ticket(ticketId)
-    conversation.value = await supportApi.conversation(ticket.value.conversation_id)
   } catch (caught) {
     error.value = toApiError(caught)
+    loading.value = false
+    return
+  }
+  // 会话可能已被用户删除：工单元数据仍然有效，单独吸收这个错误。
+  try {
+    conversation.value = await supportApi.conversation(ticket.value.conversation_id)
+  } catch (caught) {
+    transcriptError.value = toApiError(caught).message
   } finally {
     loading.value = false
   }
 }
 
-async function runAction(action: 'assign' | 'resolve' | 'close', extra: Record<string, unknown> = {}): Promise<void> {
+async function runAction(
+  action: 'assign' | 'resolve' | 'close' | 'archive',
+  extra: Record<string, unknown> = {},
+): Promise<void> {
   actionLoading.value = true
   actionError.value = null
   actionNotice.value = ''
@@ -114,6 +130,13 @@ async function onClose(): Promise<void> {
 }
 
 const canResolve = computed(() => resolutionSummary.value.trim().length >= 1)
+const canArchive = computed(() => archiveReason.value.trim().length >= 2)
+
+async function onArchive(): Promise<void> {
+  await runAction('archive', { close_reason: archiveReason.value.trim().slice(0, 240) })
+  archiveDialog.value = false
+  archiveReason.value = ''
+}
 
 onMounted(load)
 </script>
@@ -168,6 +191,15 @@ onMounted(load)
               >
                 关闭工单
               </ElButton>
+              <ElButton
+                v-if="!ticket.transcript_available && ticket.status !== 'closed'"
+                size="small"
+                plain
+                :loading="actionLoading"
+                @click="archiveDialog = true"
+              >
+                归档
+              </ElButton>
             </div>
           </div>
           <p v-if="ticket.summary_redacted" class="sm-ticket-summary">安全摘要：{{ ticket.summary_redacted }}</p>
@@ -179,10 +211,18 @@ onMounted(load)
 
         <div class="sm-card">
           <SupportConversationPanel v-if="conversation" :conversation="conversation" />
+          <ElAlert
+            v-else-if="transcriptError"
+            type="warning"
+            :closable="false"
+            show-icon
+            :title="transcriptError"
+            description="该工单的会话已不可访问，聊天记录、回复与打分均不可用；你仍可查看工单元数据并归档。"
+          />
           <p v-else class="sm-muted">会话加载中或不可用。</p>
         </div>
 
-        <div class="sm-card">
+        <div v-if="ticket.transcript_available" class="sm-card">
           <h3 class="sm-section-title">回复用户</h3>
           <p class="sm-muted">
             回复会写入同一会话，用户在聊天页可直接看到；内容会经过 PII 脱敏检查，不展示内部字段。
@@ -203,7 +243,7 @@ onMounted(load)
           </div>
         </div>
 
-        <div class="sm-card">
+        <div v-if="ticket.transcript_available" class="sm-card">
           <h3 class="sm-section-title">对 AI 回答打分</h3>
           <p class="sm-muted">仅可标记授权会话内的助手消息；标记进入评测样本，不直接修改知识或模型。</p>
           <QualityLabelForm
@@ -228,6 +268,26 @@ onMounted(load)
       <template #footer>
         <ElButton @click="resolveDialog = false">取消</ElButton>
         <ElButton type="primary" :loading="actionLoading" :disabled="!canResolve" @click="onResolve">确认解决</ElButton>
+      </template>
+    </ElDialog>
+
+    <ElDialog v-model="archiveDialog" title="归档工单" width="min(30rem, 94vw)">
+      <p class="sm-muted">
+        归档用于「会话已不存在、无法继续处理」的工单：工单会置为已关闭并写入审计，不会被物理删除。
+      </p>
+      <ElInput
+        v-model="archiveReason"
+        type="textarea"
+        :rows="3"
+        maxlength="240"
+        show-word-limit
+        placeholder="归档原因（必填，例如：会话已被用户删除，无法取证）"
+      />
+      <template #footer>
+        <ElButton @click="archiveDialog = false">取消</ElButton>
+        <ElButton type="primary" :loading="actionLoading" :disabled="!canArchive" @click="onArchive">
+          确认归档
+        </ElButton>
       </template>
     </ElDialog>
 

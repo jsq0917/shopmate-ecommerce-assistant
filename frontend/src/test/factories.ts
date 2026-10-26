@@ -137,6 +137,7 @@ export function supportTicketFixture(
     assigned_to_masked: null,
     created_at: '2026-03-01T09:10:00Z',
     waiting_seconds: 95,
+    transcript_available: true,
     ...overrides,
   }
 }

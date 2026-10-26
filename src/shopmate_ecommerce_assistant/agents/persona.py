@@ -117,9 +117,7 @@ def naturalize(
         if recent:
             context = f"\n最近的对话（供参考，不要复述）：{recent}"
     prompt = (
-        f"用户刚刚说：{user_text}{context}\n\n"
-        f"系统生成的答复：{cleaned}\n\n"
-        "请按要求改写这段答复。"
+        f"用户刚刚说：{user_text}{context}\n\n系统生成的答复：{cleaned}\n\n请按要求改写这段答复。"
     )
     try:
         candidate = llm.complete(system=SYSTEM_PROMPT, user=prompt, generation=generation)

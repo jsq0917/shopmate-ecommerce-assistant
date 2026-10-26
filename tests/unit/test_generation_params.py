@@ -49,9 +49,7 @@ def test_stored_overrides_are_kept_verbatim() -> None:
         {"temperature": 0.7, "top_p": 0.9, "max_tokens": 512, "history_turns": 3},
         settings=_settings(),
     )
-    assert resolved == GenerationParams(
-        temperature=0.7, top_p=0.9, max_tokens=512, history_turns=3
-    )
+    assert resolved == GenerationParams(temperature=0.7, top_p=0.9, max_tokens=512, history_turns=3)
 
 
 def test_history_turns_zero_is_a_meaningful_value() -> None:
@@ -76,9 +74,7 @@ def test_max_tokens_at_the_cap_is_kept() -> None:
 
 
 def test_out_of_range_float_override_is_ignored() -> None:
-    resolved = GenerationParams.resolve(
-        {"temperature": 1.5, "top_p": -0.1}, settings=_settings()
-    )
+    resolved = GenerationParams.resolve({"temperature": 1.5, "top_p": -0.1}, settings=_settings())
     assert resolved.temperature is None
     assert resolved.top_p is None
 

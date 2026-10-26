@@ -95,9 +95,7 @@ class KnowledgeScopeRepository:
         rejected = tuple(item for item in wanted if item not in allowed)
         return selectable, rejected
 
-    async def document_asset(
-        self, *, shop_id: UUID, document_id: UUID
-    ) -> DocumentAsset | None:
+    async def document_asset(self, *, shop_id: UUID, document_id: UUID) -> DocumentAsset | None:
         """Return the current version's stored file for an in-scope image document.
 
         Only images are served: the endpoint exists so a citation can point back at the

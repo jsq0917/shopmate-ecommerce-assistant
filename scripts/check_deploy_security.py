@@ -439,8 +439,7 @@ def main() -> int:
         print()
         passed = len(findings) - len(failures) - len(warnings)
         print(
-            f"合计 {len(findings)} 项：PASS {passed} / WARN {len(warnings)} / "
-            f"FAIL {len(failures)}"
+            f"合计 {len(findings)} 项：PASS {passed} / WARN {len(warnings)} / FAIL {len(failures)}"
         )
         if warnings:
             print("WARN 项需要人工确认，不自动视为通过。")

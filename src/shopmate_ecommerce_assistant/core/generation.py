@@ -57,9 +57,7 @@ class GenerationParams:
     history_turns: int = DEFAULT_HISTORY_TURNS
 
     @classmethod
-    def resolve(
-        cls, stored: Mapping[str, Any] | None, *, settings: Settings
-    ) -> GenerationParams:
+    def resolve(cls, stored: Mapping[str, Any] | None, *, settings: Settings) -> GenerationParams:
         """Return the effective parameters for a conversation's stored overrides.
 
         ``stored`` comes straight from JSONB, so every value is treated as untrusted:
@@ -97,9 +95,7 @@ def _as_number(value: Any) -> float | int | None:
     return value if isinstance(value, int) else number
 
 
-def _clamped_float(
-    value: Any, *, low: float, high: float, name: str
-) -> float | None:
+def _clamped_float(value: Any, *, low: float, high: float, name: str) -> float | None:
     number = _as_number(value)
     if number is None:
         return None

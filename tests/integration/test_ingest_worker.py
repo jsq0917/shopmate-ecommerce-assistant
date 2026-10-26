@@ -143,9 +143,7 @@ async def test_worker_reparses_the_uploaded_version_in_place(
             await cleanup.execute(
                 sa.delete(KnowledgeChunk).where(KnowledgeChunk.shop_id == shop.id)
             )
-            await cleanup.execute(
-                sa.delete(IngestionJob).where(IngestionJob.shop_id == shop.id)
-            )
+            await cleanup.execute(sa.delete(IngestionJob).where(IngestionJob.shop_id == shop.id))
             await cleanup.execute(
                 sa.delete(KnowledgeVersion).where(KnowledgeVersion.shop_id == shop.id)
             )

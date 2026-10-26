@@ -2597,9 +2597,7 @@ def _with_annexes(doc: PolicyDoc) -> PolicyDoc:
     )
 
 
-POLICY_DOCS: tuple[PolicyDoc, ...] = tuple(
-    _with_annexes(doc) for doc in _BASE_DOCS
-)
+POLICY_DOCS: tuple[PolicyDoc, ...] = tuple(_with_annexes(doc) for doc in _BASE_DOCS)
 
 
 FAQ_ENTRIES: tuple[tuple[str, str, str, str], ...] = (

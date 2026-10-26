@@ -406,7 +406,7 @@ class CheckoutRepository:
         if not approve and not (review_note or "").strip():
             raise ToolError(ErrorCode.VALIDATION_ERROR, "拒绝退款时必须填写说明。")
         row.status = RefundStatus.APPROVED if approve else RefundStatus.REJECTED
-        row.review_note = (review_note or None)
+        row.review_note = review_note or None
         row.reviewed_by = reviewer_id
         row.reviewed_at = datetime.now(UTC)
         await self._session.commit()

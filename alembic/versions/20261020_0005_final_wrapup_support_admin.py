@@ -53,9 +53,7 @@ def upgrade() -> None:
         sa.Column("label", sa.String(length=20), nullable=False),
         sa.Column("reason_summary", sa.String(length=240), nullable=True),
         sa.Column("labeled_by", sa.Uuid(as_uuid=True), nullable=False),
-        sa.Column(
-            "is_synthetic", sa.Boolean(), nullable=False, server_default=sa.text("true")
-        ),
+        sa.Column("is_synthetic", sa.Boolean(), nullable=False, server_default=sa.text("true")),
         *_timestamps(),
         sa.CheckConstraint(
             "label IN ('correct', 'incorrect', 'needs_knowledge')",

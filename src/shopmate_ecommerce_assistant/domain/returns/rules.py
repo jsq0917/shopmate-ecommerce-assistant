@@ -51,6 +51,7 @@ def is_category_returnable(category: str) -> bool:
     """Return ``False`` for categories the return policy excludes from self-service."""
     return category not in NON_RETURNABLE_CATEGORIES
 
+
 #: Reasons a shopper can submit without human review.
 SELF_SERVICE_REASONS: frozenset[ReturnReasonCode] = frozenset(
     {ReturnReasonCode.SIZE_OR_FIT, ReturnReasonCode.NO_LONGER_NEEDED}

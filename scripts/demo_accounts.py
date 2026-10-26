@@ -90,9 +90,7 @@ async def _run(password: str, dry_run: bool) -> list[AccountResult]:
                     )
                 ).scalar_one_or_none()
                 if user is None:
-                    results.append(
-                        AccountResult(email, expected_role, None, "missing", [])
-                    )
+                    results.append(AccountResult(email, expected_role, None, "missing", []))
                     continue
                 if not email.endswith(f"@{SYNTHETIC_DOMAIN}"):  # pragma: no cover - defensive
                     results.append(AccountResult(email, expected_role, str(user.id), "skipped", []))

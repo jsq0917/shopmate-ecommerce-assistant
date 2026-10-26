@@ -183,22 +183,30 @@ async def _ensure_order(
 async def _reset(session: AsyncSession) -> None:
     """Remove only the two demo orders created by this script."""
     order_ids = (
-        await session.execute(
-            sa.select(Order.id).where(
-                Order.shop_id == shop_id(),
-                Order.order_no.in_([DELIVERED_ORDER_NO, UNPAID_ORDER_NO]),
+        (
+            await session.execute(
+                sa.select(Order.id).where(
+                    Order.shop_id == shop_id(),
+                    Order.order_no.in_([DELIVERED_ORDER_NO, UNPAID_ORDER_NO]),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     if not order_ids:
         return
     shipment_ids = (
-        await session.execute(
-            sa.select(Shipment.id).where(
-                Shipment.shop_id == shop_id(), Shipment.order_id.in_(order_ids)
+        (
+            await session.execute(
+                sa.select(Shipment.id).where(
+                    Shipment.shop_id == shop_id(), Shipment.order_id.in_(order_ids)
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     if shipment_ids:
         await session.execute(
             sa.delete(ShipmentEvent).where(ShipmentEvent.shipment_id.in_(shipment_ids))

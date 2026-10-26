@@ -498,9 +498,7 @@ class KnowledgeAdminRepository:
         assert refreshed is not None  # the row was just updated in this transaction
         return _chunk_edit_row(refreshed, reindex_required=True)
 
-    async def soft_delete_chunk(
-        self, *, shop_id: UUID, chunk_id: UUID
-    ) -> ChunkEditRow | None:
+    async def soft_delete_chunk(self, *, shop_id: UUID, chunk_id: UUID) -> ChunkEditRow | None:
         """Stop a chunk from being retrieved without deleting its audit row."""
         chunk = await self.get_chunk(shop_id=shop_id, chunk_id=chunk_id)
         if chunk is None:
@@ -522,9 +520,7 @@ class KnowledgeAdminRepository:
         return _chunk_edit_row(row, reindex_required=True)
 
     # -- reindex ----------------------------------------------------------
-    async def create_ingestion_job(
-        self, *, shop_id: UUID, version_id: UUID
-    ) -> UUID | None:
+    async def create_ingestion_job(self, *, shop_id: UUID, version_id: UUID) -> UUID | None:
         """Queue a new ingestion attempt for ``version_id`` and mark it pending."""
         version = (
             await self._session.execute(
@@ -596,9 +592,7 @@ class KnowledgeAdminRepository:
         if row is None:
             return None
         version, document, knowledge_base = row
-        job_id = await self.latest_queued_job_id(
-            shop_id=version.shop_id, version_id=version.id
-        )
+        job_id = await self.latest_queued_job_id(shop_id=version.shop_id, version_id=version.id)
         if job_id is None:
             job_id = stable_uuid("ingestion_job", str(version.id), "1")
         return IngestTarget(

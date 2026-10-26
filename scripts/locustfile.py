@@ -79,9 +79,7 @@ class ShopMateUser(HttpUser):
         )
         challenge = self._captcha()
         body = {"email": EMAIL, "password": PASSWORD, **challenge}
-        response = self.client.post(
-            "/api/v1/auth/login", json=body, name="/api/v1/auth/login"
-        )
+        response = self.client.post("/api/v1/auth/login", json=body, name="/api/v1/auth/login")
         if response.status_code != 200:
             response.failure(f"登录失败: HTTP {response.status_code}")
             return
@@ -187,5 +185,3 @@ class ShopMateUser(HttpUser):
             response_length=events,
             exception=Exception(error) if error else None,
         )
-
-

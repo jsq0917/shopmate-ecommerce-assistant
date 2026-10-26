@@ -179,9 +179,7 @@ async def pay_order(
 ) -> Envelope[OrderDetailData]:
     """Simulated payment: moves ``created`` to ``paid`` and reserves stock."""
     repo = CheckoutRepository(session)
-    row = await repo.pay_order(
-        shop_id=context.shop_id, user_id=context.user_id, order_id=order_id
-    )
+    row = await repo.pay_order(shop_id=context.shop_id, user_id=context.user_id, order_id=order_id)
     request_id, trace_id = get_request_ids(request)
     return Envelope(data=_detail(row), request_id=request_id, trace_id=trace_id)
 
@@ -210,9 +208,7 @@ async def get_order(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> Envelope[OrderDetailData]:
     repo = CheckoutRepository(session)
-    row = await repo.get_order(
-        shop_id=context.shop_id, user_id=context.user_id, order_id=order_id
-    )
+    row = await repo.get_order(shop_id=context.shop_id, user_id=context.user_id, order_id=order_id)
     request_id, trace_id = get_request_ids(request)
     return Envelope(data=_detail(row), request_id=request_id, trace_id=trace_id)
 

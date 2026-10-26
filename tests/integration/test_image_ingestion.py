@@ -357,9 +357,7 @@ async def test_image_endpoint_serves_the_original_file() -> None:
             shop_id=shop_id, source_uri=source_uri, mime_type="image/png", suffix=".png"
         )
 
-        response = await client.get(
-            f"/api/v1/knowledge-images/{document_id}", headers=_auth(token)
-        )
+        response = await client.get(f"/api/v1/knowledge-images/{document_id}", headers=_auth(token))
 
         assert response.status_code == 200, response.text
         assert response.headers["content-type"] == "image/png"

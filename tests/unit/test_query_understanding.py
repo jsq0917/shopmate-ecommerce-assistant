@@ -67,9 +67,7 @@ def test_model_tokens_read_the_code_a_shopper_types() -> None:
         ("声岚 SL-BUDS Pro 卖多少钱？", [BUDS_AIR, BUDS_LITE], None),
     ],
 )
-def test_resolve_catalog_item(
-    text: str, items: list[dict[str, str]], expected: str | None
-) -> None:
+def test_resolve_catalog_item(text: str, items: list[dict[str, str]], expected: str | None) -> None:
     resolved = resolve_catalog_item(text, items)
     assert (resolved or {}).get("product_id") == expected
 
@@ -96,9 +94,7 @@ def test_resolve_catalog_item_accepts_extra_categories() -> None:
         ("机械键盘", [], None),
     ],
 )
-def test_best_overlap_item(
-    text: str, items: list[dict[str, str]], expected: str | None
-) -> None:
+def test_best_overlap_item(text: str, items: list[dict[str, str]], expected: str | None) -> None:
     assert (best_overlap_item(text, items) or {}).get("product_id") == expected
 
 

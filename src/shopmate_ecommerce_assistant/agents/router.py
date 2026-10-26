@@ -496,7 +496,6 @@ def _knowledge_fallback(
     return None
 
 
-
 @dataclass(frozen=True, slots=True)
 class IntentRoute:
     """The routing decision with everything the chat path needs to proceed."""

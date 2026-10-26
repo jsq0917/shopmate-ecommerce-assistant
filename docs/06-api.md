@@ -97,6 +97,7 @@ HTTP 映射：
 | GET | `/health` | 无 | 进程存活，不依赖外部服务 |
 | GET | `/ready` | 无 | 检查 PostgreSQL、Redis、Milvus/Mock OMS 可用性 |
 | GET | `/api/v1/system/meta` | 无 | 返回环境和 synthetic/mock 标识，不返回密钥或内部地址 |
+| GET | `/metrics` | `METRICS_TOKEN`（可选，2026-10-24 起） | Prometheus 文本格式指标；不进 OpenAPI |
 
 `/health` 成功：
 
@@ -137,6 +138,27 @@ HTTP 映射：
 ```
 
 阶段 11 必须使用该响应显示 Synthetic 横幅；商品卡片、订单和其他事实仍保留各自 `is_synthetic` 字段用于资源级校验。
+
+### 4.1 `GET /metrics`（可观测性端点，2026-10-24）
+
+- **格式**：Prometheus 文本 exposition（`text/plain`），由 `prometheus_client` 产出。
+- **认证**：设置 `METRICS_TOKEN` 后必须携带 `X-Metrics-Token: <token>` 或
+  `Authorization: Bearer <token>`，否则 `401`；未设置时端点开放（仅限本地开发，
+  共享/生产环境由 `compose.prod.yaml` 强制要求该变量）。不使用业务 JWT——
+  Prometheus 抓取器不带会话凭证。
+- **指标族**（定义见 `src/shopmate_ecommerce_assistant/observability/metrics.py`）：
+
+| 指标 | 类型 | 标签 | 埋点位置 |
+|---|---|---|---|
+| `shopmate_chat_turns_total` | Counter | `intent`, `finish_reason` | 聊天轮完成/出错（`agents/chat_service.py`） |
+| `shopmate_chat_latency_seconds` | Histogram | `intent` | 聊天轮端到端延迟 |
+| `shopmate_llm_tokens_total` | Counter | `model`, `kind`（prompt/completion） | 政策回答模型调用（`rag/policy_qa.py`） |
+| `shopmate_llm_latency_seconds` | Histogram | `model` | 模型往返延迟 |
+| `shopmate_retrieval_latency_seconds` | Histogram | `mode` | 混合检索延迟 |
+| `shopmate_handoff_total` | Counter | `reason_code` | 新建转人工工单（`tools/handoff_tools.py`，幂等重放不计数） |
+| `shopmate_refusal_total` | Counter | `reason` | 证据门槛/模型拒答 |
+
+验证：`curl -s -H "Authorization: Bearer $METRICS_TOKEN" http://localhost:8000/metrics | head`。
 
 ## 5. 认证 API
 
@@ -819,9 +841,16 @@ support 查看会话必须由授权工单提供业务理由；admin 默认不浏
   "user_reference_masked": "user-****01",
   "assigned_to_masked": null,
   "created_at": "2026-10-18T12:00:00Z",
-  "waiting_seconds": 120
+  "waiting_seconds": 120,
+  "transcript_available": true
 }
 ```
+
+**`transcript` 查询参数（阶段 20 修复）**：`available`（默认）只返回会话仍存在（未软删）的工单；
+`all` 额外带出会话已被删除的工单，这些行的 `transcript_available` 为 `false`。
+原因：评测脚本会软删它自己创建的会话（`scripts/eval_stage13.py::_cleanup_conversations`），
+历史上这些会话留下的工单一直停在 `open`，客服点进去只能看到「未找到该会话」；
+默认过滤让队列保持可处理，`all` 保留可追溯性。非法取值返回 `400 VALIDATION_ERROR`。
 
 `PATCH /api/v1/support/tickets/{id}` 请求：
 
@@ -834,7 +863,7 @@ support 查看会话必须由授权工单提供业务理由；admin 默认不浏
 }
 ```
 
-`assignee_user_id` 为可选 UUID；缺省或 `null` 表示当前客服自接管。`resolution_summary` 仅 `resolve` 时必填，`close_reason` 仅 `close` 时可选；与 action 不匹配的字段必须为 null 或省略。
+`assignee_user_id` 为可选 UUID；缺省或 `null` 表示当前客服自接管。`resolution_summary` 仅 `resolve` 时必填，`close_reason` 仅 `close` 时可选、`archive` 时必填；与 action 不匹配的字段必须为 null 或省略。
 
 合法状态转换固定为：
 
@@ -843,8 +872,16 @@ support 查看会话必须由授权工单提供业务理由；admin 默认不浏
 | `assign` | `open/assigned` | `assigned` | assignee 必须是同店 support/admin |
 | `resolve` | `assigned` | `resolved` | `resolution_summary` 1-500 字符 |
 | `close` | `resolved` | `closed` | `close_reason` 可选安全摘要 |
+| `archive` | `open/assigned/resolved` | `closed` | `close_reason` **必填**（阶段 20）；不得带 `resolution_summary` |
+
+`archive` 用于「会话已不存在、无法继续处理」的工单（例如评测清理后的残留）：
+与 `close` 一样是终止动作并写审计，不做物理删除，也不放宽其他转换。
 
 响应返回 `ticket_id`、`status`、`assigned_to_masked`、`updated_at` 和审计 `request_id`。非法转换返回 `409 INVALID_STATE`。
+
+`GET /api/v1/support/conversations/{id}`：授权工单不存在时 `404`（`未找到与该会话关联且可访问的人工工单。`）；
+工单存在但会话已被软删时同样 `404`，但 message 明确为 `该会话已被用户删除，无法查看聊天记录；工单元数据仍可查看或归档。`，
+便于工作台区分「不能看」与「已删除」两种情形。
 
 `GET /api/v1/support/conversations/{id}` 返回：
 

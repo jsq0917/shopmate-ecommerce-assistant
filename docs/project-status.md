@@ -1940,3 +1940,160 @@ uv run python scripts/eval_retrieval.py --output data/eval/results/retrieval-ima
 
 未做：`scripts/verify_stage13.py` 未按 143 条重跑（§3.3 的 140 条口径原样保留，见 eval-report §3.8 的口径说明）；
 前端 E2E 仅跑了 `knowledge-bases` 与 `chat-generation` 两条，其余 16 条未复跑。
+
+---
+
+## 27. 修复轮：2026-10-24（阶段 21 WIP 质量整改，未提交 git）
+
+背景：对未提交的阶段 21 WIP（observability、FAQ 缓存接入、工单归档、前端超时）做了全量测试与
+对照 `AGENTS.md` 的静态审查，发现 1 个前端测试失败、2 个 FAQ 缓存回放 bug、循环导入未修、
+指标零埋点、`/metrics` 无鉴权、eval 归档审计归属错误等问题。本轮全部整改（无业务规则放宽）。
+
+### 27.1 修复清单
+
+| 编号 | 问题 | 修复 |
+|---|---|---|
+| F-1 | 前端 `client.test.ts` 「AbortError 原样抛出」失败（WIP 引入 15s 超时后契约未同步） | 测试改为新契约（外部 signal abort 原样抛、无 signal 的 abort 包装为 NETWORK_ERROR），并新增 `timeoutMs` 选项；SSE `/chat/stream` 显式 `timeoutMs: null`（流式回答不被 15s 首字节超时误杀）。共 4 条新用例 |
+| F-2 | FAQ 缓存命中后引用 `snippet` 恒为空（写入键 `snippet`、回放读 `excerpt`） | 回放改读 `snippet`（兼容 `excerpt`）；新增 `tests/unit/test_policy_cache_gates.py` |
+| F-3 | **（测试新发现）** 缓存回放构造 `Citation` 缺必填 `score`/`dense_similarity` → 每次缓存命中 TypeError 炸掉整轮对话 | 回放补齐 `score`/`dense_similarity` 及阶段 20 的 `image_*` 字段；回归测试断言回放引用与首轮逐字段一致 |
+| F-4 | 循环导入：`import rag.policy_qa` 在新进程中 ImportError（output_guard ↔ policy_qa，备忘录记载「历史遗留，未修」） | 护栏函数（`sentinel_of`/`used_labels`/`citation_label_issues`/`citation_issues`/`commitment_issues`）抽到新模块 `rag/answer_guards.py`；policy_qa re-export 保持兼容；`tests/unit/test_module_imports.py` 子进程级回归锁 |
+| F-5 | Prometheus 指标零调用（`/metrics` 永远全零）+ `docs/08` 仍写「无指标端点」 | `chat_turns`/`chat_latency`（chat_service）、`llm_tokens`/`llm_latency`/`retrieval_latency`/`refusal_total`（policy_qa）、`handoff_total`（handoff_tools，覆盖聊天与 API 两条创建路径，幂等重放不计数）全部接线；docs/06 §4.1、docs/08 §12 同步 |
+| F-6 | `/metrics` 无鉴权且 API 端口发布到 0.0.0.0 | 新增 `METRICS_TOKEN`（Settings 字段）；设置后要求 `X-Metrics-Token` 或 `Authorization: Bearer`（`hmac.compare_digest` 比较），否则 401；`compose.prod.yaml` 强制必填，`compose.yaml` 默认空（本地开放），`.env.example`/`.env.prod.example` 补占位；`tests/unit/test_metrics_endpoint.py` |
+| F-7 | eval `_cleanup_conversations` 归档工单时 `actor_user_id` 用循环泄漏的 shopper 变量（审计谎称消费者归档了工单） | 新增 `_support_actor()` 选同店 support 角色作 actor（与 `archive_orphan_tickets.py` 同规则） |
+| F-8 | FAQ 缓存写入硬编码 `risk_level="low"` | `answer()` 新增 `risk_level` 参数，chat_service 传 `route.risk.level.value`；非 low 或未传（eval/脚本）一律不读不写缓存（fail-closed，对齐阶段 8 `FaqService.remember` 口径）；4 条新测试 |
+| F-9 | 多知识库缓存键只取第一个 KB，不同多选组合可共享键 | `_cache_kb_id()`：多选时用排序后逗号拼接的全部 KB id；顺序无关、选择敏感；测试覆盖 |
+| F-10 | （整改过程发现）6 处测试替身 `answer()` 不接受新增的 `risk_level` 参数 → TypeError 波及 14 条聊天/集成用例 | 六处假 policy 服务签名统一补 `risk_level=None` |
+| F-11 | 安全测试夹具清理代码位于 `yield` 之后：测试崩溃即跳过清理，向共享演示库泄漏 4 个「阶段12 安全测试店铺」（含用户/订单/会话），破坏 seed 计数断言 | `_fixture` 改 `try/finally` 兜底清理；本次泄漏的 4 店铺（12 用户/4 会话/4 消息/4 订单/4 明细/4 物流）已按外键顺序 SQL 清除，`shops` 恢复为 1 |
+| F-12 | metrics 端点测试断言计数器恰为 `1.0`：套件串跑共享进程注册表时计数已 >1，必失败 | 改用专属探针标签 + 正则断言序列存在，顺序无关 |
+
+**审查结论更正**：初审报告第 8 项（「chunk 编辑后缓存不失效」）经复核不成立——WIP 已在
+`api/admin.py` 的 `patch_chunk` 与软删除端点调用 `_invalidate_faq_cache`（全店失效），
+叠加阶段 7 的 PG 权威复核，不存在陈旧窗口。该项无需改动。
+
+### 27.2 其他处理
+
+- `uv run ruff format .`：WIP 遗留的 29 个未格式化文件统一格式化（`ruff format --check .`
+  门禁恢复通过，345 files formatted）。
+- 三份二进制政策文档（docx/pptx，字节数不变内容已变）**未动**，成因待所有者确认（疑似
+  seed/OCR 工具重写 zip 元数据）；与 `verify_stage13` 的 140→143 指纹悬案一并在 §0.5 追踪。
+- 运行中容器与工作树脱节问题：见 §27.4，镜像重建后消除。
+
+### 27.3 本轮门禁（2026-10-24 实测）
+
+```text
+uv run ruff check .                  -> All checks passed!
+uv run ruff format --check .         -> 345 files already formatted
+uv run pytest -q                     -> 816 passed, 2 skipped（新增 9 条：缓存门控 5 +
+                                        metrics 2 + 导入回归 2；较 26.4 的 804 净增 12，
+                                        其余为 F-8/F-9 拆分后并入的用例）
+cd frontend && npm run typecheck     -> 0 errors
+cd frontend && npx vitest --run      -> 17 files / 155 passed（新增 4 条超时契约用例）
+cd frontend && npm run build         -> built in 8.82s
+```
+
+### 27.4 镜像重建（消除 §0.6 的部署脱节）
+
+2026-10-24 实测确认旧镜像（`e90831d`，构建于 10-23 16:54）不含 observability/FAQ 缓存/异步
+LLM 改动（`/metrics` 404、容器内无 `observability/` 目录），但含 support 工单 WIP——同一批
+WIP 半部署状态。按 §0.6 约定执行 `docker compose build api && docker compose up -d api`
+（授权来自所有者对修复方案的确认）。
+
+重建后实测（2026-10-24）：
+
+```text
+docker compose build api               -> Image shopmate-api:0.1.0 Built
+docker compose up -d api               -> Started；25 秒后 healthy
+容器内 /app/src/.../                   -> observability/ 目录存在，main.py 含 make_metrics_router
+GET :18000/health                      -> 200
+GET :18000/ready                       -> 200
+GET :18000/metrics                     -> 200；7 个指标族（chat_turns / chat_latency /
+                                          llm_tokens / llm_latency / retrieval_latency /
+                                          handoff_total / refusal_total）全部暴露
+docker compose config（dev/prod）      -> 均通过
+```
+
+### 27.5 补充修复（2026-10-24 下午）：演示账号登录失效
+
+现象：登录页一键填充消费者账号后报「邮箱或者密码不正确」。
+
+根因（证据链）：前端填充 `ShopMate-Demo-Only-2026`（`LoginView.vue`），该密码由
+`scripts/demo_accounts.py` 以 Argon2 哈希写入三个演示账号；但 `synthetic/seed.py` 的通用
+`_upsert` 在 `ON CONFLICT DO UPDATE` 时覆盖包括 `password_hash` 在内的全部列——
+**每次运行全量测试套件**（`test_seed_data.py` 会在共享演示库上执行 `run_seed`）都会把
+三个演示账号悄悄重置回 `!synthetic-account-no-login` 哨兵值。实测 DB 中三账号
+`updated_at=2026-10-24 03:18Z`，正是当天全量 pytest 的运行时刻。
+
+修复：
+
+| 项 | 内容 |
+|---|---|
+| 根治 | `seed.py` 新增 `PRESERVE_ON_CONFLICT = {User: {"password_hash"}}`：冲突更新时跳过该列；新用户仍写哨兵值，`demo_accounts.py` 的职责不变 |
+| 恢复 | 重跑 `uv run python scripts/demo_accounts.py --json`，三账号 `password-set` |
+| 验证 | `GET /auth/captcha` + `POST /auth/login` 实测 `shopper01` 登录 **200** 并返回用户档案 |
+| 回归 | `test_seed_data.py` 新增 `test_run_seed_preserves_an_installed_demo_password`；套件 8/8 通过后复核 DB：三账号哈希仍为 `$argon2id$…`（本次测试又跑了两次 `run_seed`，哈希未被动） |
+
+部署说明：`seed.py` 只被 CLI 与测试引用，运行中的 api 不 import 它，本次无需重建镜像
+（下次按 §0.6 约定重建时自然带上）。
+
+### 27.6 聊天界面修复（2026-10-24 下午）：滚动失效与消息延迟显示
+
+用户报告两个问题，根因与修复：
+
+| 问题 | 根因 | 修复 |
+|---|---|---|
+| 消息区无法滚动（含流式期间） | `ChatThread` 被 `StateBlock` 包裹，其根元素 `.sm-state` 是普通 div（非 flex 容器）：`.sm-thread` 的 `flex:1; min-height:0; overflow-y:auto` 全部失效（高度恒等于内容高度，永不产生滚动条），溢出内容被 `.sm-chat-main` 的 `overflow:hidden` 裁掉 | `StateBlock` 新增 `stretch` prop（默认关闭，其他页面零影响）：根元素变 flex column + flex:1 + min-height:0；ChatView 启用 `stretch` |
+| 用户消息要等 AI 回复后才显示 | `ChatView.onSend` 从未乐观插入用户消息，SSE 流结束后才 `loadMessages` 拉回 | 发送瞬间以 `local-` 前缀 key 乐观 push 用户消息；流结束后 `loadMessages` 以服务端数据整体替换（真实 message id）；重试/断线重发前先移除旧 local 消息防重复 |
+
+滚动策略（stick-to-bottom）与等待状态：
+
+- **贴底跟随**：距底 <80px 时新内容自动滚底；用户上翻后停止跟随，手动回底后恢复。
+- **强制滚底仅两处**：切换会话（新增 `conversationId` prop watch）与新发送的用户消息。第一轮浏览器实测发现「每轮回答结束 `loadMessages` 替换数组被误判为会话切换而强制滚底、打断翻历史的用户」——已改为 `conversationId` 显式判定，同会话刷新不再打扰。
+- **思考指示器**：流已建立但尚无任何产出（无文本/工具/卡片/引用）时显示三点动画占位，替代原来的空气泡；有产出或错误时切换为正常气泡/错误气泡。
+
+改动文件：`StateBlock.vue`、`ChatView.vue`、`ChatThread.vue`、`ChatThread.test.ts`（新增）、`ChatView.test.ts`。
+
+验证：
+
+```text
+cd frontend && npx vitest --run      -> 18 files / 164 passed（新增 ChatThread 8 条 +
+                                        ChatView 乐观显示 1 条）
+npm run typecheck                   -> 0 errors
+npm run build                       -> built in 6.12s
+```
+
+浏览器黑盒实测（dev server :5199 → API :18000，真实 DeepSeek 流式回答）：
+
+| 场景 | 结果 | 证据 |
+|---|---|---|
+| 发送瞬间用户消息上屏 + 思考指示器 | 通过（修复前后各验一次） | DOM 断言 `userMsg:1, thinking:1` + 截图 |
+| 回复完成后乐观消息被服务端数据替换、无重复 | 通过 | `userCount:1` + 完整引用回答 + 截图 |
+| 消息区可滚动、上翻停留 | 通过（滚动容器 `overflowing:true`，1952px>438px；滚轮上翻 scrollTop 1513→0，视口显示历史消息） | 截图 |
+| 流式期间上翻不被拽回 | 首轮实测暴露真实缺陷（回答结束被 loadMessages 拽回底部，1719≈max）；修复后该行为由单测锁定（贴底跟随/上翻不抢/回底恢复/会话切换强制/同会话刷新不强制 共 5 条）。修复后的浏览器复验因 IAB 滚动命令通道整体超时（点击/求值正常、仅 cuaScroll/domCuaScroll 挂起，环境问题与页面无关）未能完成，如实记录 | 修复前截图 + 单测 8/8 |
+
+浏览器验证期间的环境事件：Docker Desktop 守护进程一度停止（所有容器下线），经所有者「请继续」指令后启动 Docker Desktop 程序（未改任何设置）并 `docker compose up -d` 恢复全部 7 个容器 healthy；演示登录口令经 `scripts/demo_accounts.py` 重新生效。
+
+### 27.7 商品中心快捷标签一律报「请求参数不合法」（2026-10-24 傍晚）
+
+现象：商品中心「挑一件合适的」快捷标签（降噪耳机、机械键盘等）全部点击报
+VALIDATION_ERROR「请求参数不合法」。
+
+根因（实测复现）：`ProductsView.vue` 用同一个 `filters.limit = 24` 同时喂两个端点，但
+后端约束不同——`GET /products/featured` 是 `le=24`（首页精选恰好合法），`GET /products/search`
+是 `le=20`（对齐工具契约 §9.1 `limit<=20`）。于是首页正常、任何关键词搜索（含全部快捷标签）
+一律 422→400。curl 实证：`search?limit=24 -> 400 VALIDATION_ERROR`，`limit=20 -> 200`（6 件）。
+
+修复：拆分常量 `FEATURED_LIMIT=24` / `SEARCH_LIMIT=20`，各自对齐所在端点契约，注释写明来源；
+`filters.limit` 字段移除（未绑定 UI）。
+
+回归：新增 `frontend/src/views/ProductsView.test.ts`（3 条：featured 用 24；快捷标签搜索
+`limit<=20` 且渲染结果无错误态；输入框搜索同样遵守契约）。
+
+验证：
+
+```text
+cd frontend && npx vitest --run   -> 19 files / 167 passed
+npm run typecheck                -> 0 errors
+npm run build                    -> built in 7.80s
+浏览器实测（:5199 真实 API）：点「降噪耳机」-> 激活态 + 6 件结果、无错误提示；
+点「机械键盘」-> 激活态 + 4 件结果、无错误提示（截图存证）
+```

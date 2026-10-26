@@ -58,6 +58,7 @@ from shopmate_ecommerce_assistant.core.security import AccessContext, permission
 from shopmate_ecommerce_assistant.db.models import Order, User
 from shopmate_ecommerce_assistant.db.models.enums import UserRole
 from shopmate_ecommerce_assistant.db.repositories.conversations import ConversationRepository
+from shopmate_ecommerce_assistant.db.repositories.support import SupportRepository
 from shopmate_ecommerce_assistant.db.session import create_engine, create_session_factory
 from shopmate_ecommerce_assistant.rag.embeddings import build_embedding_provider
 from shopmate_ecommerce_assistant.rag.errors import RetrievalError
@@ -1537,9 +1538,32 @@ def _summarise_generation(rows: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+async def _support_actor(session: Any, shop_id: UUID) -> UUID | None:
+    """Pick the shop's earliest-created support agent as the archive actor.
+
+    Archiving a ticket is a support-side action. Attributing it to the shopper whose
+    conversation was cleaned up would falsify the audit trail, and a shopper id also
+    happens to leak from the previous loop — neither is acceptable, so the actor is
+    resolved explicitly here (same rule as ``scripts/archive_orphan_tickets.py``).
+    """
+    result = await session.execute(
+        sa.select(User.id)
+        .where(User.shop_id == shop_id, User.role == UserRole.SUPPORT)
+        .order_by(User.created_at, User.id)
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
 async def _cleanup_conversations(session: Any, created: list[tuple[UUID, UUID, UUID]]) -> None:
-    """Soft-delete only the conversations this run created (demo sidebar stays clean)."""
+    """Soft-delete only the conversations this run created (demo sidebar stays clean).
+
+    Any handoff ticket those conversations raised is archived in the same pass. Without
+    this, every evaluation run leaves behind ``open`` tickets whose transcript can never
+    be opened, and the support workbench slowly fills up with rows no agent can act on.
+    """
     repository = ConversationRepository(session)
+    support = SupportRepository(session)
     for shop_id, user_id, conversation_id in created:
         try:
             await repository.soft_delete(
@@ -1547,6 +1571,25 @@ async def _cleanup_conversations(session: Any, created: list[tuple[UUID, UUID, U
             )
         except Exception:  # pragma: no cover - cleanup must never fail the run
             await session.rollback()
+    for shop_id in {shop_id for shop_id, _, _ in created}:
+        actor = await _support_actor(session, shop_id)
+        if actor is None:  # pragma: no cover - seeded shops always have a support agent
+            continue
+        for _, _, conversation_id in [row for row in created if row[0] == shop_id]:
+            try:
+                ticket = await support.get_ticket_for_conversation(
+                    shop_id=shop_id, conversation_id=conversation_id
+                )
+                if ticket is not None and str(ticket.status) != "closed":
+                    await support.transition(
+                        shop_id=shop_id,
+                        ticket_id=ticket.id,
+                        actor_user_id=actor,
+                        action="archive",
+                        close_reason="评测会话已清理，工单自动归档",
+                    )
+            except Exception:  # pragma: no cover - cleanup must never fail the run
+                await session.rollback()
 
 
 def _summarise_policy_llm(

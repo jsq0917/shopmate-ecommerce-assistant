@@ -591,6 +591,9 @@ class SupportTicketItem(BaseModel):
     assigned_to_masked: str | None
     created_at: datetime
     waiting_seconds: int
+    #: False when the conversation behind the ticket no longer exists (soft-deleted),
+    #: so no transcript can be opened from the workbench.
+    transcript_available: bool = True
 
 
 class SupportTicketListData(BaseModel):
@@ -614,12 +617,13 @@ class SupportTicketDetail(BaseModel):
     waiting_seconds: int
     summary_redacted: str
     expected_response: str
+    transcript_available: bool = True
 
 
 class SupportTicketPatchRequest(_Strict):
-    """``assign`` / ``resolve`` / ``close`` with action-matched optional fields."""
+    """``assign`` / ``resolve`` / ``close`` / ``archive`` with action-matched fields."""
 
-    action: Literal["assign", "resolve", "close"]
+    action: Literal["assign", "resolve", "close", "archive"]
     assignee_user_id: UUID | None = None
     resolution_summary: str | None = Field(default=None, max_length=500)
     close_reason: str | None = Field(default=None, max_length=240)
@@ -645,6 +649,15 @@ class SupportTicketPatchRequest(_Strict):
                 raise ValueError("close 不允许携带 resolution_summary")
             if self.close_reason is not None:
                 self.close_reason = self.close_reason.strip() or None
+            return self
+        # archive: closing a ticket whose transcript is gone must stay explainable, so the
+        # reason is mandatory rather than optional.
+        if self.resolution_summary is not None:
+            raise ValueError("archive 不允许携带 resolution_summary")
+        reason = (self.close_reason or "").strip()
+        if not reason:
+            raise ValueError("archive 必须提供 close_reason")
+        self.close_reason = reason
         return self
 
 

@@ -81,6 +81,8 @@ CONTRACT_FIELDS = {
     "assigned_to_masked",
     "created_at",
     "waiting_seconds",
+    # stage-20 fix: the workbench must be able to tell that a ticket's transcript is gone
+    "transcript_available",
 }
 
 
@@ -384,6 +386,63 @@ async def test_queue_returns_exactly_the_contract_fields(fx: Fixture) -> None:
     assert "support-shopper" not in item["user_reference_masked"]
 
 
+async def test_queue_hides_tickets_whose_transcript_is_gone(fx: Fixture) -> None:
+    """默认队列只保留能取证的行；会话软删后仍可用 transcript=all 翻出来并标注。"""
+    headers = _auth(fx.token(fx.support))
+
+    before = await fx.client.get("/api/v1/support/tickets", headers=headers)
+    assert len(before.json()["data"]["items"]) == 1
+    assert before.json()["data"]["items"][0]["transcript_available"] is True
+
+    engine = create_engine(fx.settings)
+    factory = create_session_factory(engine)
+    async with factory() as session:
+        await session.execute(
+            sa.update(Conversation)
+            .where(Conversation.id == fx.conversation_id)
+            .values(deleted_at=datetime.now(UTC))
+        )
+        await session.commit()
+    await engine.dispose()
+
+    default_view = await fx.client.get("/api/v1/support/tickets", headers=headers)
+    assert default_view.json()["data"]["items"] == []
+
+    everything = await fx.client.get(
+        "/api/v1/support/tickets", params={"transcript": "all"}, headers=headers
+    )
+    items = everything.json()["data"]["items"]
+    assert len(items) == 1
+    assert items[0]["transcript_available"] is False
+
+    bad = await fx.client.get(
+        "/api/v1/support/tickets", params={"transcript": "nonsense"}, headers=headers
+    )
+    assert bad.status_code == 400
+    assert bad.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+async def test_deleted_conversation_says_why_it_is_unavailable(fx: Fixture) -> None:
+    """取证失败要说明原因，不能对所有情况都回同一句「未找到该会话」。"""
+    headers = _auth(fx.token(fx.support))
+    engine = create_engine(fx.settings)
+    factory = create_session_factory(engine)
+    async with factory() as session:
+        await session.execute(
+            sa.update(Conversation)
+            .where(Conversation.id == fx.conversation_id)
+            .values(deleted_at=datetime.now(UTC))
+        )
+        await session.commit()
+    await engine.dispose()
+
+    response = await fx.client.get(
+        f"/api/v1/support/conversations/{fx.conversation_id}", headers=headers
+    )
+    assert response.status_code == 404
+    assert "已被用户删除" in response.json()["error"]["message"]
+
+
 async def test_consumer_admin_and_anonymous_are_rejected(fx: Fixture) -> None:
     """§12: shoppers have no ticket permission and admin does not get it by default."""
     shopper = await fx.client.get(
@@ -426,6 +485,51 @@ async def test_ticket_detail_matches_contract(fx: Fixture) -> None:
 
 
 # ------------------------------------------------------------------- 状态机与审计
+
+
+async def test_archive_closes_a_ticket_without_a_transcript(fx: Fixture) -> None:
+    """archive：open/assigned/resolved 可直接归档，原因必填，并留下审计。"""
+    headers = _auth(fx.token(fx.support))
+    url = f"/api/v1/support/tickets/{fx.ticket_id}"
+
+    without_reason = await fx.client.patch(url, json={"action": "archive"}, headers=headers)
+    assert without_reason.status_code == 400
+    assert without_reason.json()["error"]["code"] == "VALIDATION_ERROR"
+
+    with_summary = await fx.client.patch(
+        url, json={"action": "archive", "resolution_summary": "不支持"}, headers=headers
+    )
+    assert with_summary.status_code == 400
+
+    archived = await fx.client.patch(
+        url, json={"action": "archive", "close_reason": "会话已被用户删除"}, headers=headers
+    )
+    assert archived.status_code == 200, archived.text
+    assert archived.json()["data"]["status"] == "closed"
+
+    again = await fx.client.patch(
+        url, json={"action": "archive", "close_reason": "再来一次"}, headers=headers
+    )
+    assert again.status_code == 409
+
+    engine = create_engine(fx.settings)
+    factory = create_session_factory(engine)
+    async with factory() as session:
+        actions = (
+            await session.execute(
+                sa.select(AuditEvent.action).where(
+                    AuditEvent.shop_id == fx.shop_id, AuditEvent.resource_id == fx.ticket_id
+                )
+            )
+        ).scalars()
+        assert "support.ticket.archive" in set(actions)
+        reason = (
+            await session.execute(
+                sa.select(HandoffTicket.close_reason).where(HandoffTicket.id == fx.ticket_id)
+            )
+        ).scalar_one()
+        assert reason == "会话已被用户删除"
+    await engine.dispose()
 
 
 async def test_state_machine_and_audit(fx: Fixture) -> None:
@@ -515,9 +619,7 @@ async def test_conversation_requires_authorising_ticket_and_masks_pii(fx: Fixtur
     assert data["messages"][1]["risk"]["rule_codes"] == ["COMPLAINT"]
     assert data["tool_calls"][0]["tool_name"] == "get_order_status"
 
-    unrelated = await fx.client.get(
-        f"/api/v1/support/conversations/{uuid4()}", headers=headers
-    )
+    unrelated = await fx.client.get(f"/api/v1/support/conversations/{uuid4()}", headers=headers)
     assert unrelated.status_code == 404
 
 
@@ -619,9 +721,7 @@ async def test_upload_creates_pending_version_and_queued_job(fx: Fixture) -> Non
     factory = create_session_factory(engine)
     async with factory() as session:
         job_status = await session.scalar(
-            sa.select(IngestionJob.status).where(
-                IngestionJob.id == UUID(data["ingestion_job_id"])
-            )
+            sa.select(IngestionJob.status).where(IngestionJob.id == UUID(data["ingestion_job_id"]))
         )
     await engine.dispose()
     assert str(job_status) == "queued", "no worker in CI, so the job must stay queued"
@@ -700,7 +800,5 @@ async def test_admin_writes_require_admin_role(fx: Fixture) -> None:
         headers=_auth(fx.token(fx.shopper, UserRole.SHOPPER)),
     )
     assert shopper.status_code == 403
-    support = await fx.client.get(
-        "/api/v1/admin/documents", headers=_auth(fx.token(fx.support))
-    )
+    support = await fx.client.get("/api/v1/admin/documents", headers=_auth(fx.token(fx.support)))
     assert support.status_code == 403

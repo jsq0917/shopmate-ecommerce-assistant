@@ -67,9 +67,7 @@ TicketWriter = Annotated[AccessContext, Depends(require_permission("support:tick
 ConversationReader = Annotated[
     AccessContext, Depends(require_permission("support:conversation:read"))
 ]
-LabelWriter = Annotated[
-    AccessContext, Depends(require_permission("support:quality_label:write"))
-]
+LabelWriter = Annotated[AccessContext, Depends(require_permission("support:quality_label:write"))]
 
 _TICKET_NOT_FOUND = "未找到可由当前账号访问的人工工单。"
 
@@ -88,6 +86,7 @@ def _item(row: SupportTicketRow) -> SupportTicketItem:
         assigned_to_masked=row.assigned_to_masked,
         created_at=row.created_at,
         waiting_seconds=row.waiting_seconds,
+        transcript_available=row.transcript_available,
     )
 
 
@@ -126,15 +125,22 @@ async def list_tickets(
     session: Annotated[AsyncSession, Depends(get_session)],
     ticket_status: Annotated[str | None, Query(alias="status")] = None,
     risk_level: Annotated[str | None, Query()] = None,
+    transcript: Annotated[str, Query(pattern="^(available|all)$")] = "available",
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> Envelope[SupportTicketListData]:
-    """Return the risk/age ordered ticket queue for the caller's shop."""
+    """Return the risk/age ordered ticket queue for the caller's shop.
+
+    ``transcript="available"`` (default) keeps the queue actionable: a ticket whose
+    conversation was removed (the evaluation harness soft-deletes the sessions it creates)
+    can never be opened, so it is only listed when ``transcript="all"`` is asked for.
+    """
     repo = SupportRepository(session)
     rows = await repo.list_tickets(
         shop_id=context.shop_id,
         status=ticket_status,
         risk_level=risk_level,
+        transcript=transcript,
         limit=limit,
         offset=offset,
     )
@@ -178,6 +184,7 @@ async def get_ticket(
             waiting_seconds=row.waiting_seconds,
             summary_redacted=row.summary_redacted,
             expected_response=row.expected_response,
+            transcript_available=row.transcript_available,
         ),
         request_id=request_id,
         trace_id=trace_id,
@@ -213,9 +220,7 @@ async def patch_ticket(
             f"工单当前状态为 {existing.status}，不能执行该操作。",
         ) from exc
     except UnknownAssignee as exc:
-        raise ToolError(
-            ErrorCode.FORBIDDEN, "指定客服不在当前店铺或没有客服权限。"
-        ) from exc
+        raise ToolError(ErrorCode.FORBIDDEN, "指定客服不在当前店铺或没有客服权限。") from exc
 
     request_id, trace_id = get_request_ids(request)
     await _audit(
@@ -260,9 +265,7 @@ async def get_conversation(
         shop_id=context.shop_id, conversation_id=conversation_id
     )
     if ticket is None:
-        raise ToolError(
-            ErrorCode.CONVERSATION_NOT_FOUND, "未找到与该会话关联且可访问的人工工单。"
-        )
+        raise ToolError(ErrorCode.CONVERSATION_NOT_FOUND, "未找到与该会话关联且可访问的人工工单。")
     row = await repo.get_conversation(
         shop_id=context.shop_id,
         conversation_id=conversation_id,
@@ -270,6 +273,14 @@ async def get_conversation(
         message_limit=message_limit,
     )
     if row is None:
+        state = await repo.conversation_state(
+            shop_id=context.shop_id, conversation_id=conversation_id
+        )
+        if state == "deleted":
+            raise ToolError(
+                ErrorCode.CONVERSATION_NOT_FOUND,
+                "该会话已被用户删除，无法查看聊天记录；工单元数据仍可查看或归档。",
+            )
         raise ToolError(ErrorCode.CONVERSATION_NOT_FOUND, "未找到该会话。")
     request_id, trace_id = get_request_ids(request)
     return Envelope(
@@ -455,9 +466,7 @@ async def list_refunds(
 ) -> Envelope[RefundListData]:
     """Return refund applications waiting for a human decision (shop-wide)."""
     repo = CheckoutRepository(session)
-    rows = await repo.list_shop_refunds(
-        shop_id=context.shop_id, status=refund_status, limit=limit
-    )
+    rows = await repo.list_shop_refunds(shop_id=context.shop_id, status=refund_status, limit=limit)
     request_id, trace_id = get_request_ids(request)
     return Envelope(
         data=RefundListData(items=[_refund_item(row) for row in rows]),

@@ -35,10 +35,19 @@ from shopmate_ecommerce_assistant.db.repositories.handoff_read import EXPECTED_R
 from shopmate_ecommerce_assistant.safety.pii import mask_pii
 
 #: ``action`` -> (allowed current statuses, target status).
+#:
+#: ``archive`` exists because a ticket can outlive its transcript: the stage-13 evaluation
+#: harness soft-deletes the conversations it creates, and any ticket those runs raised used
+#: to stay ``open`` forever, flooding the workbench with rows an agent could never open.
+#: Archiving is a terminal, audited move (never a hard delete) and requires a reason.
 TRANSITIONS: dict[str, tuple[frozenset[HandoffStatus], HandoffStatus]] = {
     "assign": (frozenset({HandoffStatus.OPEN, HandoffStatus.ASSIGNED}), HandoffStatus.ASSIGNED),
     "resolve": (frozenset({HandoffStatus.ASSIGNED}), HandoffStatus.RESOLVED),
     "close": (frozenset({HandoffStatus.RESOLVED}), HandoffStatus.CLOSED),
+    "archive": (
+        frozenset({HandoffStatus.OPEN, HandoffStatus.ASSIGNED, HandoffStatus.RESOLVED}),
+        HandoffStatus.CLOSED,
+    ),
 }
 
 ELEVATED_ROLES = (UserRole.SUPPORT, UserRole.ADMIN)
@@ -90,6 +99,9 @@ class SupportTicketRow:
     waiting_seconds: int
     summary_redacted: str
     expected_response: str = EXPECTED_RESPONSE
+    #: False when the conversation behind the ticket is gone (soft-deleted): the ticket
+    #: still exists and stays auditable, but no transcript can be produced for it.
+    transcript_available: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -136,6 +148,7 @@ def _ticket_row(
     owner_masked: str | None,
     assignee_masked: str | None,
     now: datetime,
+    transcript_available: bool = True,
 ) -> SupportTicketRow:
     reason_codes = (
         list(row.risk_rule_codes_jsonb) if isinstance(row.risk_rule_codes_jsonb, list) else []
@@ -156,6 +169,7 @@ def _ticket_row(
         updated_at=row.updated_at,
         waiting_seconds=_waiting_seconds(row.created_at, now),
         summary_redacted=row.summary_redacted,
+        transcript_available=transcript_available,
     )
 
 
@@ -195,10 +209,19 @@ class SupportRepository:
         shop_id: UUID,
         status: str | None = None,
         risk_level: str | None = None,
+        transcript: str = "available",
         limit: int = 20,
         offset: int = 0,
     ) -> tuple[SupportTicketRow, ...]:
-        """Return the ticket queue: highest risk first, then longest waiting first."""
+        """Return the ticket queue: highest risk first, then longest waiting first.
+
+        ``transcript="available"`` (default) hides tickets whose conversation is gone:
+        those rows are real and auditable, but an agent can never open them, so showing
+        them by default turns the queue into noise. ``transcript="all"`` brings them back
+        flagged with ``transcript_available=False``.
+        """
+        if transcript not in ("available", "all"):
+            raise ValueError(f"unknown transcript filter: {transcript!r}")
         owner = sa.orm.aliased(User)
         assignee = sa.orm.aliased(User)
         severity = sa.case(
@@ -207,8 +230,19 @@ class SupportRepository:
             (HandoffTicket.risk_level == "medium", 2),
             else_=3,
         )
+        live_transcript = sa.and_(
+            Conversation.shop_id == HandoffTicket.shop_id,
+            Conversation.id == HandoffTicket.conversation_id,
+            Conversation.deleted_at.is_(None),
+        )
         stmt = (
-            sa.select(HandoffTicket, owner.display_name_masked, assignee.display_name_masked)
+            sa.select(
+                HandoffTicket,
+                owner.display_name_masked,
+                assignee.display_name_masked,
+                Conversation.id.is_not(None).label("transcript_available"),
+            )
+            .outerjoin(Conversation, live_transcript)
             .outerjoin(
                 owner,
                 sa.and_(owner.shop_id == HandoffTicket.shop_id, owner.id == HandoffTicket.user_id),
@@ -229,12 +263,37 @@ class SupportRepository:
             stmt = stmt.where(HandoffTicket.status == HandoffStatus(status))
         if risk_level is not None:
             stmt = stmt.where(HandoffTicket.risk_level == risk_level)
+        if transcript == "available":
+            stmt = stmt.where(Conversation.id.is_not(None))
         now = datetime.now(UTC)
         rows = (await self._session.execute(stmt)).all()
         return tuple(
-            _ticket_row(ticket, owner_masked=owner_name, assignee_masked=assignee_name, now=now)
-            for ticket, owner_name, assignee_name in rows
+            _ticket_row(
+                ticket,
+                owner_masked=owner_name,
+                assignee_masked=assignee_name,
+                now=now,
+                transcript_available=bool(available),
+            )
+            for ticket, owner_name, assignee_name, available in rows
         )
+
+    async def conversation_state(self, *, shop_id: UUID, conversation_id: UUID) -> str:
+        """Return ``"live"`` / ``"deleted"`` / ``"missing"`` for a conversation.
+
+        Used to tell an agent *why* a transcript is unavailable instead of answering every
+        case with the same "not found".
+        """
+        row = (
+            await self._session.execute(
+                sa.select(Conversation.deleted_at).where(
+                    Conversation.shop_id == shop_id, Conversation.id == conversation_id
+                )
+            )
+        ).first()
+        if row is None:
+            return "missing"
+        return "deleted" if row[0] is not None else "live"
 
     async def get_ticket(self, *, shop_id: UUID, ticket_id: UUID) -> SupportTicketRow | None:
         owner = sa.orm.aliased(User)
@@ -259,7 +318,14 @@ class SupportRepository:
             return None
         ticket, owner_name, assignee_name = row
         return _ticket_row(
-            ticket, owner_masked=owner_name, assignee_masked=assignee_name, now=datetime.now(UTC)
+            ticket,
+            owner_masked=owner_name,
+            assignee_masked=assignee_name,
+            now=datetime.now(UTC),
+            transcript_available=await self.conversation_state(
+                shop_id=shop_id, conversation_id=ticket.conversation_id
+            )
+            == "live",
         )
 
     # -- state machine ----------------------------------------------------
@@ -308,6 +374,12 @@ class SupportRepository:
         elif action == "resolve":
             ticket.resolution_summary = resolution_summary
             ticket.resolved_at = datetime.now(UTC)
+        elif action == "archive":
+            reason = (close_reason or "").strip()
+            if not reason:
+                raise InvalidTicketTransition("archive requires a close_reason")
+            ticket.close_reason = reason
+            ticket.resolved_at = ticket.resolved_at or datetime.now(UTC)
         else:
             ticket.close_reason = close_reason
 

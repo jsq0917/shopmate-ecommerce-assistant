@@ -18,17 +18,31 @@ rendering, so a passage cannot close ``<evidence>`` or forge a new tag.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
-import re
-from collections.abc import Sequence
+from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import Any, Literal, Protocol
 
 import httpx
 
 from shopmate_ecommerce_assistant.core.config import Settings
 from shopmate_ecommerce_assistant.core.generation import GenerationParams
+from shopmate_ecommerce_assistant.observability.metrics import (
+    llm_latency_seconds,
+    llm_tokens,
+    refusal_total,
+    retrieval_latency_seconds,
+)
+from shopmate_ecommerce_assistant.rag.answer_guards import (
+    citation_issues,
+    citation_label_issues,
+    commitment_issues,
+    sentinel_of,
+    used_labels,
+)
 from shopmate_ecommerce_assistant.rag.citations import Citation
 from shopmate_ecommerce_assistant.rag.query_rewrite import QueryPlan
 from shopmate_ecommerce_assistant.rag.retrieval import (
@@ -80,7 +94,13 @@ SYSTEM_PROMPT = """你是 ShopMate 电商客服的知识库问答助手。
 
 
 class AnswerModel(Protocol):
-    """Minimal text-completion contract (OpenAI-compatible or fake in tests)."""
+    """Minimal text-completion contract (OpenAI-compatible or fake in tests).
+
+    Production callers go through :meth:`acomplete` so the event loop is never blocked on
+    a synchronous HTTP round-trip. Test doubles only need to implement the synchronous
+    :meth:`complete`; the service falls back to ``asyncio.to_thread`` for them, which keeps
+    the existing unit tests working without an async HTTP mock.
+    """
 
     name: str
 
@@ -91,12 +111,23 @@ class AnswerModel(Protocol):
         user: str,
         generation: GenerationParams | None = None,
     ) -> str:
-        """Return the model's raw text answer.
+        """Return the model's raw text answer (synchronous).
 
         ``generation`` carries the conversation's stage-19 overrides; ``None`` (the default)
         keeps the environment-configured behaviour, which is what every pre-stage-19 caller
         and test double uses.
         """
+
+    async def acomplete(
+        self,
+        *,
+        system: str,
+        user: str,
+        generation: GenerationParams | None = None,
+    ) -> str:
+        """Async variant of :meth:`complete`. Defaults to running :meth:`complete` in a
+        worker thread so synchronous test doubles keep working without modification."""
+        ...
 
 
 class AnswerModelError(Exception):
@@ -117,7 +148,7 @@ class OpenAICompatibleAnswerModel:
     baseline, because a 7B model's refusals say nothing about the production model.
     """
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, *, http_client: httpx.AsyncClient | None = None) -> None:
         self.name = settings.llm_model
         self._base_url = settings.llm_base_url.rstrip("/")
         self._api_key = settings.llm_api_key
@@ -126,6 +157,10 @@ class OpenAICompatibleAnswerModel:
         self._temperature = settings.llm_temperature
         #: ``0`` means "do not send the parameter and keep the provider default".
         self._max_tokens = settings.llm_max_tokens
+        #: An externally-managed async client (preferred for the async chat path). When
+        #: provided, :meth:`acomplete` reuses it so the app shares one connection pool;
+        #: :meth:`complete` still opens a short-lived sync client for scripts/tests.
+        self._http_client = http_client
         #: ``usage`` dict of the most recent call (prompt/completion tokens), or ``None``.
         #: Read-only telemetry for evaluation and cost accounting; never affects the answer.
         self.last_usage: dict[str, Any] | None = None
@@ -189,11 +224,73 @@ class OpenAICompatibleAnswerModel:
             raise AnswerModelError("ANSWER_MODEL_BAD_RESPONSE", "回答模型返回内容格式异常")
         return content.strip()
 
+    async def acomplete(
+        self,
+        *,
+        system: str,
+        user: str,
+        generation: GenerationParams | None = None,
+    ) -> str:
+        """Async variant of :meth:`complete`, reusing the injected async client.
 
-def build_answer_model(settings: Settings) -> AnswerModel | None:
+        Falls back to a short-lived ``httpx.AsyncClient`` when no shared client was injected
+        (e.g. scripts, tests). Never blocks the event loop.
+        """
+        temperature = self._temperature
+        top_p: float | None = None
+        max_tokens = self._max_tokens
+        if generation is not None:
+            if generation.temperature is not None:
+                temperature = generation.temperature
+            if generation.top_p is not None:
+                top_p = generation.top_p
+            if generation.max_tokens is not None:
+                max_tokens = generation.max_tokens
+        payload: dict[str, Any] = {
+            "model": self._model,
+            "temperature": temperature,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+        }
+        if top_p is not None:
+            payload["top_p"] = top_p
+        if max_tokens:
+            payload["max_tokens"] = max_tokens
+        headers = {"Authorization": f"Bearer {self._api_key}"}
+        url = f"{self._base_url}/chat/completions"
+        try:
+            if self._http_client is not None:
+                response = await self._http_client.post(
+                    url, json=payload, headers=headers, timeout=self._timeout
+                )
+            else:
+                async with httpx.AsyncClient(timeout=self._timeout) as client:
+                    response = await client.post(url, json=payload, headers=headers)
+            response.raise_for_status()
+            data = response.json()
+        except httpx.HTTPError as exc:
+            raise AnswerModelError("ANSWER_MODEL_UNAVAILABLE", "回答模型调用失败") from exc
+        except ValueError as exc:
+            raise AnswerModelError("ANSWER_MODEL_BAD_RESPONSE", "回答模型返回非 JSON") from exc
+        usage = data.get("usage")
+        self.last_usage = usage if isinstance(usage, dict) else None
+        choices = data.get("choices") or []
+        if not choices:
+            raise AnswerModelError("ANSWER_MODEL_BAD_RESPONSE", "回答模型未返回候选")
+        content = (choices[0].get("message") or {}).get("content") or ""
+        if not isinstance(content, str):
+            raise AnswerModelError("ANSWER_MODEL_BAD_RESPONSE", "回答模型返回内容格式异常")
+        return content.strip()
+
+
+def build_answer_model(
+    settings: Settings, *, http_client: httpx.AsyncClient | None = None
+) -> AnswerModel | None:
     """Return the configured answer model, or ``None`` when LLM access is not configured."""
     if settings.llm_base_url.strip() and settings.llm_model.strip():
-        return OpenAICompatibleAnswerModel(settings)
+        return OpenAICompatibleAnswerModel(settings, http_client=http_client)
     return None
 
 
@@ -221,82 +318,9 @@ class PolicyAnswer:
         }
 
 
-_LABEL = re.compile(r"\[(c\d+)\]")
-_SENTENCE_SPLIT = re.compile(r"(?<=[。！？；\n])")
-_SENTENCE_ENDINGS = "。！？；\n"
-
-#: The two sentinels the prompt asks the model to emit, plus everything that may legally
-#: surround them: citation labels, whitespace and sentence-final punctuation.
-_SENTINEL = re.compile(r"\[\s*c\d+\s*\]", re.IGNORECASE)
-_SENTINEL_TRIM = " \t\r\n\u3000。．.！!？?；;：:，,、\"'“”‘’（）()【】[]"
-
-
-def sentinel_of(text: str) -> str | None:
-    """Return ``"NO_EVIDENCE"`` / ``"CONFLICT"`` when ``text`` *is* that sentinel.
-
-    Stage 13 found a fail-open: the model emitted ``NO_EVIDENCE [c1][c2]…`` instead of a
-    bare sentinel, so an exact-equality check missed it, the citation guard accepted the
-    labels, and the sentinel string itself was shown to the user as the answer
-    (``eval-058`` / ``eval-061``).
-
-    The match therefore normalises first — strip citation labels, surrounding whitespace
-    and trailing sentence punctuation, then compare case-insensitively — so any sentinel
-    that reaches this point is routed to the refusal / handoff branch instead of the
-    answer body. A real answer that merely *contains* the words is untouched.
-    """
-    core = _SENTINEL.sub("", text).strip().rstrip(_SENTINEL_TRIM).strip()
-    upper = core.upper()
-    if upper == "NO_EVIDENCE":
-        return "NO_EVIDENCE"
-    if upper == "CONFLICT":
-        return "CONFLICT"
-    return None
-
-
-#: Only transitional / action-guidance sentences may appear without a ``[cN]`` label.
-#: Everything else is treated as a policy claim, so a claim phrased without any of the
-#: old keyword hints ("退货需保持商品完好。") can no longer slip through.
-_TRANSITIONAL_OPENERS = (
-    "如需",
-    "如果需要",
-    "建议",
-    "你可以",
-    "您可以",
-    "请联系",
-    "如有疑问",
-    "以上",
-)
-
 #: Delimiters that must not survive into the prompt: a snippet containing them could
 #: otherwise close ``<evidence>`` or open a fake ``<system>`` block.
 _DELIMITER_ESCAPES = str.maketrans({"&": "&amp;", "<": "&lt;", ">": "&gt;"})
-
-#: Minimal output guard (stage 7 scope): the model must never assert that money has
-#: already moved or been approved. A bare "赔付" is deliberately *not* matched — the
-#: corpus itself discusses 赔付 rules, so only completed/approved phrasings are flagged.
-_COMMITMENT_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
-    (
-        "refund_completed",
-        re.compile(r"(?:已|已经|现已)(?:完成)?(?:为你|为您|给你|给您)?退款|退款成功"),
-    ),
-    (
-        "refund_approved",
-        re.compile(
-            r"退款(?:已|已经)(?:批准|通过)|"
-            r"已(?:经)?(?:批准|通过)(?:了)?(?:你的|您的)?(?:退款|退货|赔付|申请)"
-        ),
-    ),
-    (
-        "compensation_decided",
-        re.compile(r"已(?:经)?(?:为你|为您|给你|给您)?(?:赔付|补偿|打款)"),
-    ),
-    ("free_order", re.compile(r"免单")),
-    (
-        "coupon_issued",
-        re.compile(r"(?:优惠券|代金券)(?:已|已经)发放|已(?:经)?发放(?:优惠券|代金券)"),
-    ),
-)
-_NEGATION_BEFORE = re.compile(r"(?:不|未|没有|无法|不能|不予|不会|不得|不可)[^。！？；\n]{0,6}$")
 
 
 def _escape_evidence(text: str) -> str:
@@ -322,77 +346,22 @@ def build_policy_prompt(question: str, citations: list[Citation]) -> str:
     )
 
 
-def used_labels(text: str) -> list[str]:
-    """Return citation labels referenced by the answer, preserving order."""
-    seen: list[str] = []
-    for label in _LABEL.findall(text):
-        if label not in seen:
-            seen.append(label)
-    return seen
+async def _invoke_model(
+    model: AnswerModel,
+    *,
+    system: str,
+    user: str,
+    generation: GenerationParams | None,
+) -> str:
+    """Call the model without blocking the event loop.
 
-
-def _is_transitional(sentence: str) -> bool:
-    """Return True for sentences that carry no policy claim of their own."""
-    core = sentence.strip().rstrip(_SENTENCE_ENDINGS).strip()
-    if not core:
-        return True
-    if core.endswith(("：", ":")):
-        return True
-    return core.startswith(_TRANSITIONAL_OPENERS)
-
-
-def citation_label_issues(text: str, available_labels: Sequence[str]) -> list[str]:
-    """Deterministically check that every policy claim is backed by a provided label.
-
-    Label-based so the same rules can re-validate a *cached* answer without rebuilding
-    ``Citation`` objects, and so the output guard shares one implementation with stage 7.
+    Prefers ``acomplete`` when the model implements it (production path); otherwise runs
+    the synchronous ``complete`` in a worker thread so legacy test doubles keep working.
     """
-    issues: list[str] = []
-    # A sentinel carries no answer, so its labels (if any) are irrelevant: checking them
-    # first would report ``unknown_citation`` on ``CONFLICT [c1][c2]`` and hide the fact
-    # that the model refused. Normalise once, before anything else looks at labels.
-    if sentinel_of(text) is not None:
-        return issues
-    available = set(available_labels)
-    labels = used_labels(text)
-    unknown = [label for label in labels if label not in available]
-    if unknown:
-        issues.append(f"unknown_citation:{','.join(unknown)}")
-    if not labels:
-        issues.append("missing_citation")
-        return issues
-    for sentence in _SENTENCE_SPLIT.split(text):
-        stripped = sentence.strip()
-        if not stripped or _LABEL.search(stripped):
-            continue
-        if _is_transitional(stripped):
-            continue
-        issues.append("uncited_claim")
-        break
-    return issues
-
-
-def citation_issues(text: str, citations: list[Citation]) -> list[str]:
-    """Deterministically check that every policy claim is backed by a provided citation."""
-    return citation_label_issues(text, [citation.label for citation in citations])
-
-
-def commitment_issues(text: str) -> list[str]:
-    """Return unauthorised money-commitment findings in a model draft.
-
-    This is the minimal output guard for stage 7. It only looks for *asserted* outcomes
-    ("已退款", "退款已批准", "免单"), never for policy descriptions of a refund process.
-    """
-    findings: list[str] = []
-    for code, pattern in _COMMITMENT_RULES:
-        for match in pattern.finditer(text):
-            prefix = text[max(0, match.start() - 8) : match.start()]
-            if _NEGATION_BEFORE.search(prefix):
-                continue
-            issue = f"unauthorized_commitment:{code}"
-            if issue not in findings:
-                findings.append(issue)
-    return findings
+    acomplete = getattr(model, "acomplete", None)
+    if acomplete is not None:
+        return await acomplete(system=system, user=user, generation=generation)
+    return await asyncio.to_thread(model.complete, system=system, user=user, generation=generation)
 
 
 class PolicyQAService:
@@ -404,10 +373,16 @@ class PolicyQAService:
         retriever: DocumentRetriever,
         answer_model: AnswerModel | None,
         settings: Settings,
+        faq_cache: Any = None,
+        clock: Callable[[], datetime] | None = None,
     ) -> None:
         self._retriever = retriever
         self._answer_model = answer_model
         self._settings = settings
+        #: Optional :class:`FaqAnswerCache`; when set, answered policy turns are served
+        #: from Redis on repeat questions instead of calling the LLM again.
+        self._faq_cache = faq_cache
+        self._clock = clock or (lambda: datetime.now(UTC))
 
     async def answer(
         self,
@@ -416,6 +391,7 @@ class PolicyQAService:
         *,
         query_plan: QueryPlan | None = None,
         generation: GenerationParams | None = None,
+        risk_level: str | None = None,
     ) -> PolicyAnswer:
         """Retrieve, gate, then compose an answer (or refuse/hand off).
 
@@ -428,13 +404,22 @@ class PolicyQAService:
         ``generation`` carries the conversation's stage-19 parameter overrides (temperature
         / top_p / max_tokens) and is forwarded verbatim to the answer model; ``None`` keeps
         the environment defaults.
+
+        ``risk_level`` is the routed turn's risk (``low``/``medium``/``high``). Stage-8
+        cacheability says only low-risk turns may use the FAQ cache, so a non-low risk —
+        or a caller that cannot speak for the risk (eval harness, scripts) — gets the
+        uncached path. Fail-closed, like ``FaqService.remember``.
         """
         retrieval_query = (
             query_plan.primary_query.strip()
             if query_plan and query_plan.primary_query
             else question
         )
+        retrieval_started = self._clock()
         retrieval = await self._retriever.retrieve(retrieval_query, scope)
+        retrieval_latency_seconds.labels(retrieval.mode.value).observe(
+            (self._clock() - retrieval_started).total_seconds()
+        )
         audit = dict(retrieval.audit)
         if query_plan is not None:
             plan_audit = query_plan.audit()
@@ -455,6 +440,7 @@ class PolicyQAService:
 
         if not retrieval.evidence_sufficient or not retrieval.citations:
             audit["decision"] = "refused_no_evidence"
+            refusal_total.labels("no_evidence").inc()
             return PolicyAnswer(
                 status="refused",
                 answer_text=REFUSAL_TEXT,
@@ -472,21 +458,48 @@ class PolicyQAService:
                 "未配置回答模型（LLM_BASE_URL / LLM_MODEL），无法生成政策回答",
             )
 
+        # -- FAQ high-confidence cache (read) --------------------------------
+        # Build a cache scope from the retrieved citations: any version change in the
+        # corpus invalidates the cached answer automatically. Only a low-risk turn may
+        # read or write the cache (stage-8 cacheability, fail-closed).
+        cacheable = self._faq_cache is not None and risk_level == "low"
+        if self._faq_cache is not None and not cacheable:
+            audit["faq_cache"] = {"hit": False, "reason": "risk_not_cacheable"}
+        cached = await self._try_cache_get(question, scope, retrieval, audit) if cacheable else None
+        if cached is not None:
+            return cached
+
         prompt = build_policy_prompt(question, list(retrieval.citations))
+        model_name = getattr(self._answer_model, "name", "unknown")
+        llm_started = self._clock()
         try:
-            draft = self._answer_model.complete(
-                system=SYSTEM_PROMPT, user=prompt, generation=generation
+            draft = await _invoke_model(
+                self._answer_model, system=SYSTEM_PROMPT, user=prompt, generation=generation
             )
         except AnswerModelError as exc:
             audit["decision"] = "error"
             audit["error"] = {"code": exc.code, "message": exc.message}
             raise
+        llm_latency_seconds.labels(model_name).observe(
+            (self._clock() - llm_started).total_seconds()
+        )
         audit["answer_digest"] = _digest(draft)
         audit["answer_chars"] = len(draft)
+        usage = getattr(self._answer_model, "last_usage", None)
+        if isinstance(usage, dict):
+            audit["llm_usage"] = usage
+            for kind, field_name in (
+                ("prompt", "prompt_tokens"),
+                ("completion", "completion_tokens"),
+            ):
+                count = usage.get(field_name)
+                if isinstance(count, int | float):
+                    llm_tokens.labels(model_name, kind).inc(int(count))
 
         sentinel = sentinel_of(draft)
         if sentinel == "NO_EVIDENCE":
             audit["decision"] = "refused_model"
+            refusal_total.labels("model_no_evidence").inc()
             return PolicyAnswer(
                 status="refused",
                 answer_text=REFUSAL_TEXT,
@@ -545,7 +558,7 @@ class PolicyQAService:
                 "retrieval_mode": retrieval.mode.value,
             },
         )
-        return PolicyAnswer(
+        answer = PolicyAnswer(
             status="answered",
             answer_text=draft,
             citations=used,
@@ -553,6 +566,136 @@ class PolicyQAService:
             used_labels=tuple(labels),
             audit=audit,
         )
+        await self._try_cache_put(question, scope, answer, risk_level=risk_level)
+        return answer
+
+    # -- FAQ cache helpers ------------------------------------------------
+    def _corpus_version(self, retrieval: RetrievalResult) -> str:
+        """Stable version fingerprint: sorted joined version strings of cited chunks."""
+        versions = sorted({c.version for c in retrieval.citations if c.version})
+        return hashlib.sha256("|".join(versions).encode()).hexdigest()[:16]
+
+    @staticmethod
+    def _cache_kb_id(scope: RetrievalScope) -> str | None:
+        """Cache-key KB dimension.
+
+        A single KB keeps its id. A multi-KB scope (stage 18) uses the sorted,
+        comma-joined ids so two different selections — e.g. ``{A,B}`` vs ``{A,C}`` — can
+        never share a cache key, even when their retrievals happen to cite the same
+        version set.
+        """
+        if scope.knowledge_base_id:
+            return scope.knowledge_base_id
+        if scope.knowledge_base_ids:
+            return ",".join(sorted(scope.knowledge_base_ids))
+        return None
+
+    async def _try_cache_get(
+        self,
+        question: str,
+        scope: RetrievalScope,
+        retrieval: RetrievalResult,
+        audit: dict[str, Any],
+    ) -> PolicyAnswer | None:
+        """Return a cached answer on a hit, else None. Never raises."""
+        if self._faq_cache is None:
+            return None
+        from shopmate_ecommerce_assistant.rag.faq import FaqCacheScope
+
+        cache_scope = FaqCacheScope(
+            shop_id=scope.shop_id,
+            region=scope.region or "CN",
+            locale=scope.locale or "zh-CN",
+            knowledge_version=self._corpus_version(retrieval),
+            knowledge_base_id=self._cache_kb_id(scope),
+        )
+        try:
+            lookup = await self._faq_cache.get(question, cache_scope)
+        except Exception:
+            logger.warning("FAQ cache read raised; serving uncached")
+            return None
+        audit["faq_cache"] = {"hit": lookup.hit, "reason": lookup.reason}
+        if not lookup.hit or lookup.answer is None:
+            return None
+        cached = lookup.answer
+        logger.info("FAQ cache hit for question digest", extra={"reason": lookup.reason})
+        return PolicyAnswer(
+            status="answered",
+            answer_text=cached.answer,
+            citations=tuple(
+                Citation(
+                    citation_id=str(c.get("citation_id", "")),
+                    label=c.get("label", ""),
+                    document_id=str(c.get("document_id", "")),
+                    version_id=str(c.get("version_id", "")),
+                    chunk_id=str(c.get("chunk_id", "")),
+                    title=c.get("title", ""),
+                    heading=c.get("heading"),
+                    page_no=c.get("page_no"),
+                    version=c.get("version", ""),
+                    effective_from=c.get("effective_from"),
+                    effective_to=c.get("effective_to"),
+                    # 写入侧 Citation.as_dict() 的键是 "snippet"；"excerpt" 仅兼容
+                    # 历史载荷，避免缓存命中后片段预览变空串（引用规则要求可预览）。
+                    snippet=c.get("snippet") or c.get("excerpt") or "",
+                    # ``score``/``dense_similarity`` 是必填字段：缺失会让每次缓存
+                    # 命中直接 TypeError 炸掉整轮对话（try 只包住 Redis 读取）。
+                    score=float(c.get("score") or 0.0),
+                    dense_similarity=c.get("dense_similarity"),
+                    # 阶段 20：OCR 引用要带回原图链接，否则 UI 无法回源截图。
+                    image_url=c.get("image_url"),
+                    image_filename=c.get("image_filename"),
+                    image_width=c.get("image_width"),
+                    image_height=c.get("image_height"),
+                )
+                for c in cached.citations
+            ),
+            retrieval=retrieval,
+            used_labels=cached.citation_labels,
+            audit={**audit, "decision": "answered_cached"},
+        )
+
+    async def _try_cache_put(
+        self,
+        question: str,
+        scope: RetrievalScope,
+        answer: PolicyAnswer,
+        *,
+        risk_level: str | None,
+    ) -> None:
+        """Write an answered policy turn to the cache. Never raises."""
+        if self._faq_cache is None:
+            return
+        from shopmate_ecommerce_assistant.rag.faq import CachedFaqAnswer, FaqCacheScope
+
+        cache_scope = FaqCacheScope(
+            shop_id=scope.shop_id,
+            region=scope.region or "CN",
+            locale=scope.locale or "zh-CN",
+            knowledge_version=self._corpus_version(answer.retrieval),
+            knowledge_base_id=self._cache_kb_id(scope),
+        )
+        cached = CachedFaqAnswer(
+            question=question,
+            answer=answer.answer_text,
+            citation_labels=answer.used_labels,
+            citations=tuple(c.as_dict() for c in answer.citations),
+            knowledge_version=cache_scope.knowledge_version,
+            intent="policy_faq",
+            created_at=self._clock().isoformat(),
+        )
+        try:
+            write = await self._faq_cache.put(
+                question,
+                cache_scope,
+                cached,
+                intent="policy_faq",
+                risk_level=risk_level or "",
+                evidence_sufficient=True,
+            )
+            logger.info("FAQ cache write", extra={"stored": write.stored, "reason": write.reason})
+        except Exception:
+            logger.warning("FAQ cache write raised; answer still served")
 
 
 def _digest(text: str) -> str:
@@ -573,6 +716,7 @@ __all__ = [
     "build_answer_model",
     "build_policy_prompt",
     "citation_issues",
+    "citation_label_issues",
     "commitment_issues",
     "sentinel_of",
     "used_labels",

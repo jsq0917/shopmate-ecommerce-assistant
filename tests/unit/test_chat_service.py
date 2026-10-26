@@ -64,7 +64,7 @@ class FailingPolicy:
     def __init__(self, exc: Exception) -> None:
         self._exc = exc
 
-    async def answer(self, question, scope, *, query_plan=None, generation=None):
+    async def answer(self, question, scope, *, query_plan=None, generation=None, risk_level=None):
         raise self._exc
 
 
@@ -117,7 +117,7 @@ class FixedPolicy:
         self._citations = citations
         self.generations: list[object] = []
 
-    async def answer(self, question, scope, *, query_plan=None, generation=None):
+    async def answer(self, question, scope, *, query_plan=None, generation=None, risk_level=None):
         self.generations.append(generation)
         return SimpleNamespace(
             status=self._status, answer_text=self._answer_text, citations=self._citations
@@ -190,7 +190,6 @@ async def test_policy_answer_status_drives_the_reported_finish_reason(
     outcome = await service._run(route, "七天无理由退货的政策是什么？", _tool_context())
 
     assert outcome.finish_reason == expected
-
 
 
 async def test_product_discovery_success_emits_tool_status_and_cards(settings: Settings) -> None:
@@ -623,9 +622,7 @@ _TITLES: dict[str, str] = {item["product_id"]: item["title"] for item in _CATALO
 
 def _compare_payload(ids: list[str]) -> dict[str, Any]:
     return {
-        "products": [
-            {"product_id": pid, "title": _TITLES[pid], "variant_id": None} for pid in ids
-        ],
+        "products": [{"product_id": pid, "title": _TITLES[pid], "variant_id": None} for pid in ids],
         "rows": [
             {
                 "key": "price",

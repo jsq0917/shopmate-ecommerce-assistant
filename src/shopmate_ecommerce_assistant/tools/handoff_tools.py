@@ -31,6 +31,7 @@ from shopmate_ecommerce_assistant.domain.idempotency import (
     IdempotencyStore,
 )
 from shopmate_ecommerce_assistant.domain.orders.ports import OrderReader
+from shopmate_ecommerce_assistant.observability.metrics import handoff_total
 from shopmate_ecommerce_assistant.safety.pii import mask_pii
 from shopmate_ecommerce_assistant.safety.risk import RiskLevel
 from shopmate_ecommerce_assistant.tools.audit import summarize_result
@@ -162,6 +163,9 @@ class HandoffTools:
             # let the unique index keep duplicate creation impossible on retry.
             await self._release(scope)
             raise
+        # Only freshly created tickets count (idempotent replays return above), so the
+        # metric measures real escalations from every path — chat turns and the API.
+        handoff_total.labels(params.reason_code).inc()
         return ToolOutcome(result, audit=False)
 
     async def _submit(

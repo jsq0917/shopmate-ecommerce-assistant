@@ -1,9 +1,10 @@
 """Output guard: PII, prompt leakage, uncited policy claims and money promises.
 
 The guard is the last deterministic checkpoint before text reaches a user. It reuses the
-stage-7 citation and commitment rules (``rag.policy_qa``) instead of keeping a second,
-diverging copy, and adds the checks that stage 7 deliberately left out: PII redaction,
-system-prompt leakage, unsafe HTML/links and unverified real-time facts.
+stage-7 citation and commitment rules (``rag.answer_guards``, re-exported by
+``rag.policy_qa``) instead of keeping a second, diverging copy, and adds the checks that
+stage 7 deliberately left out: PII redaction, system-prompt leakage, unsafe HTML/links
+and unverified real-time facts.
 
 Fail-closed by design: ``structured_facts_verified`` defaults to ``False``, so forgetting
 to pass it blocks a price/stock/logistics claim rather than letting it through.
@@ -16,8 +17,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
+from shopmate_ecommerce_assistant.rag.answer_guards import citation_label_issues, commitment_issues
 from shopmate_ecommerce_assistant.rag.citations import Citation
-from shopmate_ecommerce_assistant.rag.policy_qa import citation_label_issues, commitment_issues
 from shopmate_ecommerce_assistant.safety.pii import mask_pii, pii_kinds
 from shopmate_ecommerce_assistant.safety.risk import RiskLevel
 

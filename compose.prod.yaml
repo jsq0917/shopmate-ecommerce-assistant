@@ -239,6 +239,8 @@ services:
       LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-0}
       # Safety ceiling for the chat page's per-conversation max-output override.
       LLM_MAX_TOKENS_CAP: ${LLM_MAX_TOKENS_CAP:-4096}
+      # /metrics must never be open in production; scrapers carry this token.
+      METRICS_TOKEN: ${METRICS_TOKEN:?set METRICS_TOKEN in .env.prod}
       # 只读根文件系统下，torch / huggingface 的缓存必须落到 tmpfs。
       HOME: /tmp
       XDG_CACHE_HOME: /tmp/cache

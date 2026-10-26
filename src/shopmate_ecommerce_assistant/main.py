@@ -41,6 +41,7 @@ from shopmate_ecommerce_assistant.api.middleware import RequestIDMiddleware
 from shopmate_ecommerce_assistant.core.config import Settings, get_settings
 from shopmate_ecommerce_assistant.core.rate_limit import RedisRateLimiter
 from shopmate_ecommerce_assistant.db.session import create_engine, create_session_factory
+from shopmate_ecommerce_assistant.observability.metrics import make_router as make_metrics_router
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +70,9 @@ _OPENAPI_TAGS = [
 
 def _build_policy_factory(
     settings: Settings,
+    *,
+    http_client: httpx.AsyncClient | None = None,
+    redis: Redis | None = None,
 ) -> tuple[Callable[[Any], Any], Any, Any] | None:
     """Wire the stage-7 retriever into a per-request ``PolicyQAService`` factory.
 
@@ -78,6 +82,9 @@ def _build_policy_factory(
     lazy and network-free (the Milvus client connects on first search and the model loads on
     first embed), so a missing weight or an enabled-but-unregistered reranker is caught here
     and degrades the chat path to its fixed "知识库暂不可用" answer instead of crashing.
+
+    ``http_client`` is the shared async HTTP client from the lifespan; it lets the answer
+    model reuse one connection pool instead of opening a new sync client per request.
 
     Returns:
         ``(build_policy, milvus_store, embedder)`` or ``None`` when wiring failed. The
@@ -95,7 +102,7 @@ def _build_policy_factory(
         provider = get_bge_m3_provider(settings)
         store = build_store(settings)
         reranker = build_reranker(settings)
-        answer_model = build_answer_model(settings)
+        answer_model = build_answer_model(settings, http_client=http_client)
     except Exception:
         logger.exception("RAG wiring failed; policy answers will report unavailable")
         return None
@@ -108,7 +115,20 @@ def _build_policy_factory(
             authorizer=session_authorizer(session),
             reranker=reranker,
         )
-        return PolicyQAService(retriever=retriever, answer_model=answer_model, settings=settings)
+        faq_cache = None
+        if redis is not None:
+            from shopmate_ecommerce_assistant.rag.faq import (
+                FaqAnswerCache,
+                RedisCacheBackend,
+            )
+
+            faq_cache = FaqAnswerCache(RedisCacheBackend(redis), settings=settings)
+        return PolicyQAService(
+            retriever=retriever,
+            answer_model=answer_model,
+            settings=settings,
+            faq_cache=faq_cache,
+        )
 
     return build, store, provider
 
@@ -249,7 +269,7 @@ def create_app(
         # fixed "知识库暂不可用" message instead of guessing.
         app.state.policy = None
         app.state.policy_store = None
-        wiring = _build_policy_factory(resolved_settings)
+        wiring = _build_policy_factory(resolved_settings, http_client=http_client, redis=redis)
         app.state.ingestion_runner = None
         if wiring is not None:
             app.state.policy_factory, app.state.policy_store, embedder = wiring
@@ -312,6 +332,7 @@ def create_app(
         )
 
     app.include_router(health_router)
+    app.include_router(make_metrics_router())
     app.include_router(system.router)
     app.include_router(auth.router)
     app.include_router(conversations.router)

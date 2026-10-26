@@ -134,6 +134,11 @@ class Settings(BaseSettings):
     #: clamps stale rows to it. ``LLM_MAX_TOKENS`` (the operator default) is unaffected.
     llm_max_tokens_cap: int = Field(default=4096, ge=256, le=8192)
 
+    #: Bearer token required by ``GET /metrics``. Empty keeps the endpoint open, which is
+    #: intended for local development only — in that mode the API port must not be exposed
+    #: beyond loopback. Set ``METRICS_TOKEN`` in every shared/production environment.
+    metrics_token: str = ""
+
     @model_validator(mode="after")
     def _fill_llm_profile(self) -> "Settings":
         """Fill provider defaults from ``LLM_PROFILE`` without overriding explicit values."""

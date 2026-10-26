@@ -136,6 +136,9 @@ services:
       LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-0}
       # Safety ceiling for the chat page's per-conversation max-output override.
       LLM_MAX_TOKENS_CAP: ${LLM_MAX_TOKENS_CAP:-4096}
+      # Open in local dev by default (keep API_PORT on loopback when sharing the host);
+      # set METRICS_TOKEN in .env to lock /metrics down.
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
     volumes:
       - ./models:/models:ro
     ports:

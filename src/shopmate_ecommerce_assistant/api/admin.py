@@ -135,9 +135,7 @@ async def _read_limited(upload: UploadFile, *, limit: int, suffix: str) -> bytes
         try:
             payload.decode("utf-8-sig")
         except UnicodeDecodeError as exc:
-            raise ToolError(
-                ErrorCode.UNSUPPORTED_FILE_TYPE, "文本文件不是 UTF-8 编码。"
-            ) from exc
+            raise ToolError(ErrorCode.UNSUPPORTED_FILE_TYPE, "文本文件不是 UTF-8 编码。") from exc
     return payload
 
 
@@ -192,7 +190,6 @@ async def _invalidate_faq_cache(request: Request, shop_id: UUID) -> None:
         await FaqAnswerCache(RedisCacheBackend(redis)).invalidate_shop(str(shop_id))
     except Exception:
         logger.warning("FAQ cache invalidation failed after chunk edit")
-
 
 
 @router.get("/knowledge-bases", response_model=Envelope[KnowledgeBaseListData])
@@ -448,9 +445,7 @@ async def upload_document(
 ) -> Envelope[UploadDocumentData]:
     """Validate an upload, store it under the controlled directory and queue a version."""
     repo = KnowledgeAdminRepository(session)
-    knowledge_base = await repo.get_knowledge_base(
-        shop_id=context.shop_id, kb_id=knowledge_base_id
-    )
+    knowledge_base = await repo.get_knowledge_base(shop_id=context.shop_id, kb_id=knowledge_base_id)
     if knowledge_base is None:
         raise ToolError(ErrorCode.VALIDATION_ERROR, "知识库不存在或不属于当前店铺。")
     if doc_type not in {item.value for item in KnowledgeDocType}:
@@ -659,7 +654,8 @@ async def reindex_document(
     )
 
 
-def _doc_item(row) -> DocumentListItem:    return DocumentListItem(
+def _doc_item(row) -> DocumentListItem:
+    return DocumentListItem(
         document_id=row.document_id,
         title=row.title,
         doc_type=row.doc_type,

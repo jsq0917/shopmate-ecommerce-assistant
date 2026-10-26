@@ -53,7 +53,7 @@ class _ScopedPolicy:
         self.scopes: list[object] = []
         self.generations: list[object] = []
 
-    async def answer(self, question, scope, *, query_plan=None, generation=None):
+    async def answer(self, question, scope, *, query_plan=None, generation=None, risk_level=None):
         self.scopes.append(scope)
         self.generations.append(generation)
         return SimpleNamespace(

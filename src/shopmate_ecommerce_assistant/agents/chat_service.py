@@ -67,6 +67,11 @@ from shopmate_ecommerce_assistant.db.repositories.conversations import (
     MessageRepository,
 )
 from shopmate_ecommerce_assistant.db.repositories.orders import OrderRepository
+from shopmate_ecommerce_assistant.observability.metrics import (
+    chat_latency_seconds,
+    chat_turns,
+    refusal_total,
+)
 from shopmate_ecommerce_assistant.rag.policy_qa import AnswerModelError, PolicyQAService
 from shopmate_ecommerce_assistant.rag.query_rewrite import plan_query
 from shopmate_ecommerce_assistant.rag.retrieval import RetrievalError, RetrievalScope
@@ -113,20 +118,46 @@ class ChatOutcome:
     answer_text: str
     pre_events: list[StreamEvent] = field(default_factory=list)
     citations: list[dict[str, Any]] = field(default_factory=list)
-    #: ``[cN]`` labels the answer text may reference. Kept next to the citation payloads
-    #: because the output guard validates labels, not citation ids.
     citation_labels: list[str] = field(default_factory=list)
     structured_facts_verified: bool = False
     risk: dict[str, Any] = field(default_factory=dict)
     #: 商品卡片，既要随 SSE 发出，也要随助手消息落库。
     product_cards: list[dict[str, Any]] = field(default_factory=list)
     finish_reason: str = "stop"
+    #: LLM token usage (prompt/completion) when the turn called an LLM; else None.
+    usage: dict[str, Any] | None = None
+    #: End-to-end latency for the turn, in milliseconds, when measurable.
+    latency_ms: float | None = None
 
 
 def _chunk_text(text: str, size: int = DELTA_CHUNK_CHARS) -> list[str]:
     if not text:
         return [""]
     return [text[index : index + size] for index in range(0, len(text), size)]
+
+
+def _resolve_followup_query(text: str, history: list[str] | None) -> str:
+    """Fold the previous user turn's catalog words into a short follow-up query.
+
+    A short follow-up ("那有没有便宜点的") carries no product words of its own; the
+    previous topic is folded in so the search still has a subject. ``history`` already
+    contains the current turn, so the previous topic is the most recent *different*
+    user message. Prefer catalog words over the whole sentence to protect the token budget.
+    """
+    if not history or len(text.strip()) >= 12:
+        return text
+    previous = next(
+        (
+            turn.strip()
+            for turn in reversed(history)
+            if turn.strip() and turn.strip() != text.strip()
+        ),
+        "",
+    )
+    if not previous:
+        return text
+    topic = category_terms(previous)
+    return f"{' '.join(topic)} {text}" if topic else f"{previous} {text}"
 
 
 class ChatService:
@@ -216,6 +247,7 @@ class ChatService:
         keeps the pre-stage-19 behaviour (fixed 10 history turns, environment LLM defaults).
         """
         guard = guard_input(message, settings=self._settings)
+        started_at = self._clock()
         history_turns = (
             generation.history_turns if generation is not None else DEFAULT_HISTORY_TURNS
         )
@@ -274,6 +306,7 @@ class ChatService:
         except ToolError as exc:
             # The error text is persisted once as an incomplete assistant snapshot so the
             # history can show "未完成" after a reconnect (contract 7.9 / 7.10).
+            chat_turns.labels(route.intent.value, "error").inc()
             message_id = await self._persist_assistant(
                 ctx,
                 conversation_id,
@@ -327,12 +360,17 @@ class ChatService:
         for index, chunk in enumerate(_chunk_text(final_text)):
             yield delta_event({"message_id": str(message_id), "index": index, "text": chunk})
 
+        elapsed_ms = (self._clock() - started_at).total_seconds() * 1000.0
+        chat_turns.labels(route.intent.value, finish_reason).inc()
+        chat_latency_seconds.labels(route.intent.value).observe(elapsed_ms / 1000.0)
+        if finish_reason == "refusal":
+            refusal_total.labels("evidence_gate").inc()
         yield done_event(
             {
                 "message_id": str(message_id),
                 "finish_reason": finish_reason,
-                "usage": None,
-                "latency_ms": None,
+                "usage": outcome.usage,
+                "latency_ms": round(elapsed_ms, 1),
                 "persisted": True,
                 "message_is_complete": finish_reason != "cancelled",
             }
@@ -423,25 +461,7 @@ class ChatService:
         purchase: bool = False,
     ) -> ChatOutcome:
         events: list[StreamEvent] = []
-        # A short follow-up ("那有没有便宜点的") carries no product words of its own; fold the
-        # previous user turn in so the search still has a topic.
-        query = text
-        if history and len(text.strip()) < 12:
-            # ``history`` already contains this turn, so the previous topic is the most
-            # recent *different* user message.
-            previous = next(
-                (
-                    turn.strip()
-                    for turn in reversed(history)
-                    if turn.strip() and turn.strip() != text.strip()
-                ),
-                "",
-            )
-            if previous:
-                # Prefer the previous turn's catalog words over its whole sentence: a long
-                # sentence would eat the 20-token budget and drop the actual product term.
-                topic = category_terms(previous)
-                query = f"{' '.join(topic)} {text}" if topic else f"{previous} {text}"
+        query = _resolve_followup_query(text, history)
         payload = SearchProductsInput(
             query=expand_query(query),
             budget_max_cents=extract_budget_cents(text),
@@ -493,19 +513,7 @@ class ChatService:
         degrades to the stage-8 card list instead of inventing a product.
         """
         events: list[StreamEvent] = []
-        query = text
-        if history and len(text.strip()) < 12:
-            previous = next(
-                (
-                    turn.strip()
-                    for turn in reversed(history)
-                    if turn.strip() and turn.strip() != text.strip()
-                ),
-                "",
-            )
-            if previous:
-                topic = category_terms(previous)
-                query = f"{' '.join(topic)} {text}" if topic else f"{previous} {text}"
+        query = _resolve_followup_query(text, history)
 
         search = await self._invoke(
             "search_products",
@@ -901,7 +909,11 @@ class ChatService:
         plan = plan_query(text, settings=self._settings, intent=route.intent.value)
         try:
             answer = await self._policy.answer(
-                text, scope, query_plan=plan, generation=generation
+                text,
+                scope,
+                query_plan=plan,
+                generation=generation,
+                risk_level=route.risk.level.value,
             )
         except (AnswerModelError, RetrievalError):
             return ChatOutcome(
@@ -918,6 +930,8 @@ class ChatService:
             citations.append(payload)
             labels.append(citation.label)
             events.append(citation_event(payload))
+        audit = getattr(answer, "audit", {}) or {}
+        usage = audit.get("llm_usage") if isinstance(audit, dict) else None
         return ChatOutcome(
             answer_text=answer.answer_text,
             pre_events=events,
@@ -925,15 +939,7 @@ class ChatService:
             citation_labels=labels,
             structured_facts_verified=False,
             risk=route.risk.as_dict(),
-            # ``PolicyAnswer.status`` is the only truthful source for how the turn ended.
-            # Without this, a refusal streamed ``done.finish_reason="stop"`` and was stored
-            # with ``finish_reason="stop"``, so the client never showed the 已拒答 badge
-            # (MessageBubble.vue checks ``finish_reason === 'refusal'``). The stage-13
-            # business metric does not read this field — it evaluates policy turns on the
-            # evidence gate directly (scripts/eval_stage13.py, ``policy_retrieval``) — so
-            # this is a truthfulness fix for the API/UI, not a measurement change.
-            # ``getattr`` keeps duck-typed test doubles (policy services injected by the
-            # integration suite) working: an object without ``status`` degrades to "stop".
+            usage=usage if isinstance(usage, dict) else None,
             finish_reason=_FINISH_REASON_BY_STATUS.get(getattr(answer, "status", ""), "stop"),
         )
 

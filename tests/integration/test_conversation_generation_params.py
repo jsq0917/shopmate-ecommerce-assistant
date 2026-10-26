@@ -51,7 +51,7 @@ class _ScopedPolicy:
         self.scopes: list[object] = []
         self.generations: list[object] = []
 
-    async def answer(self, question, scope, *, query_plan=None, generation=None):
+    async def answer(self, question, scope, *, query_plan=None, generation=None, risk_level=None):
         self.scopes.append(scope)
         self.generations.append(generation)
         return SimpleNamespace(
@@ -164,9 +164,7 @@ async def test_patch_persists_merges_and_clears_overrides() -> None:
         assert first.json()["data"]["generation_params"]["history_turns"] == 4
 
         # Merge: an omitted field keeps its stored value.
-        merged = await _patch_params(
-            client, token, conversation_id, {"max_tokens": 1024}
-        )
+        merged = await _patch_params(client, token, conversation_id, {"max_tokens": 1024})
         params = merged.json()["data"]["generation_params"]
         assert params["temperature"] == 0.7
         assert params["history_turns"] == 4

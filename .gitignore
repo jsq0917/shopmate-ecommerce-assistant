@@ -37,8 +37,11 @@ Thumbs.db
 # Local model weights (BGE-M3 ~2.3GB): never committed, never baked into images
 models/
 
-# Agent scratch space (one-off recovery scripts); project memory under .workbuddy/memory is tracked
-.workbuddy/tmp/
+# Agent scratch space + local working memory: not committed (paths, scratch notes, one-off scripts)
+.workbuddy/
+
+# Local edit backups (e.g. retrieval_cases.jsonl.bak-58)
+*.bak-*
 
 # Runtime uploads written by POST /api/v1/admin/documents (content lives in PostgreSQL/Milvus)
 data/knowledge/uploads/

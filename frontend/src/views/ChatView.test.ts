@@ -1,12 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { createPinia, setActivePinia, type Pinia } from 'pinia'
 
 import ChatView from '@/views/ChatView.vue'
 import MessageBubble from '@/components/chat/MessageBubble.vue'
+import { useAuthStore } from '@/stores/auth'
 import { networkError } from '@/api/errors'
 import { ApiError } from '@/api/errors'
 import {
   CONVERSATION_ID,
+  CONVERSATION_ID_2,
   KB_CN,
   KB_SG,
   MESSAGE_ID,
@@ -57,9 +60,9 @@ function happyEvents() {
   ]
 }
 
-async function mountChat() {
+async function mountChat(pinia: Pinia = createPinia()) {
   const wrapper = mount(ChatView, {
-    global: { stubs: { ElPopover: ElPopoverStub } },
+    global: { plugins: [pinia], stubs: { ElPopover: ElPopoverStub } },
   })
   await flushPromises()
   await flushPromises()
@@ -401,5 +404,48 @@ describe('ChatView 集成', () => {
     await flushPromises()
     expect((wrapper.find('textarea').element as HTMLTextAreaElement).disabled).toBe(true)
     expect(wrapper.text()).toContain('停止')
+  })
+
+  it('切换账号后清空上一账号的会话与消息，并重新加载新账号数据', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const auth = useAuthStore()
+    auth.user = {
+      user_id: '11111111-1111-4111-8111-111111111111',
+      email: 'a@example.invalid',
+      display_name_masked: 'a***',
+      role: 'shopper',
+      shop_id: 'shop-1',
+      is_synthetic: true,
+    }
+
+    vi.mocked(conversationsApi.list).mockResolvedValue({
+      items: [conversationFixture({ title: 'A 账号的会话' })],
+      next_cursor: null,
+    })
+    const wrapper = await mountChat(pinia)
+    expect(wrapper.text()).toContain('A 账号的会话')
+    expect(wrapper.text()).toContain('有没有降噪耳机')
+
+    // 同一 SPA 会话里换成另一个账号：列表与历史都必须换成 B 的数据。
+    vi.mocked(conversationsApi.list).mockResolvedValue({
+      items: [conversationFixture({ id: CONVERSATION_ID_2, title: 'B 账号的会话' })],
+      next_cursor: null,
+    })
+    vi.mocked(conversationsApi.messages).mockResolvedValue({
+      items: [messageFixture({ id: 'm-b', role: 'user', content: 'B 账号的订单到哪了' })],
+      next_cursor: null,
+    })
+
+    auth.user = { ...auth.user!, user_id: '99999999-9999-4999-8999-999999999999', email: 'b@example.invalid' }
+    await flushPromises()
+    await flushPromises()
+    await flushPromises()
+
+    expect(vi.mocked(conversationsApi.list).mock.calls.length).toBeGreaterThanOrEqual(2)
+    expect(wrapper.text()).toContain('B 账号的会话')
+    expect(wrapper.text()).toContain('B 账号的订单到哪了')
+    expect(wrapper.text()).not.toContain('A 账号的会话')
+    expect(wrapper.text()).not.toContain('有没有降噪耳机')
   })
 })

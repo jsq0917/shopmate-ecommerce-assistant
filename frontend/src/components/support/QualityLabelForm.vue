@@ -13,7 +13,16 @@ import { toApiError } from '@/api/errors'
 import type { ApiError } from '@/api/errors'
 import { qualityLabel } from '@/utils/format'
 
-const props = defineProps<{ assistantMessageId: string }>()
+const props = withDefaults(
+  defineProps<{
+    assistantMessageId: string
+    /** 工单未接管时为 true：表单整体不可用（后端同样拒绝写入）。 */
+    disabled?: boolean
+  }>(),
+  // 布尔 prop 不写默认值时，Vue 会把「未传入」当作 false —— 这里必须显式声明，
+  // 否则一旦父组件忘传就会把可用的表单锁上。
+  { disabled: false },
+)
 
 const emit = defineEmits<{ (e: 'labeled'): void }>()
 
@@ -25,6 +34,7 @@ const success = ref(false)
 
 const canSubmit = computed(
   () =>
+    !props.disabled &&
     !submitting.value &&
     (label.value === 'correct' || reason.value.trim().length > 0),
 );
@@ -54,7 +64,7 @@ async function submit(): Promise<void> {
   <div class="sm-quality">
     <h4 class="sm-section-title">回答质量标记</h4>
     <div class="sm-quality-row">
-      <ElSelect v-model="label" style="width: 10rem">
+      <ElSelect v-model="label" style="width: 10rem" :disabled="disabled">
         <ElOption
           v-for="option in ['correct', 'incorrect', 'needs_knowledge']"
           :key="option"
@@ -67,6 +77,7 @@ async function submit(): Promise<void> {
         placeholder="标记原因摘要（incorrect / needs_knowledge 必填）"
         maxlength="200"
         style="max-width: 20rem"
+        :disabled="disabled"
       />
       <ElButton size="small" type="primary" :loading="submitting" :disabled="!canSubmit" @click="submit">
         提交标记

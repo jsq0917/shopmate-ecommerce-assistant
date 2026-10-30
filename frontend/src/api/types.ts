@@ -652,6 +652,14 @@ export interface SupportTicketDetail {
   summary_redacted: string
   expected_response: string
   transcript_available: boolean
+  /**
+   * 当前登录客服是否就是本工单的接管人；未接管或由他人接管时为 false。
+   *
+   * 后端可能不返回该字段（旧版本实例 / 滚动发布期间），所以标为可选：调用方必须
+   * 处理 `undefined`（见 `views/SupportTicketDetailView.vue` 的 `assignedToMe`），
+   * 不能直接按 false 处理，否则会把「自己刚接管」误判成「别人接管」。
+   */
+  assigned_to_me?: boolean
 }
 
 export interface SupportConversationMessage {

@@ -386,6 +386,54 @@ async def test_queue_returns_exactly_the_contract_fields(fx: Fixture) -> None:
     assert "support-shopper" not in item["user_reference_masked"]
 
 
+async def test_queue_puts_unresolved_tickets_before_closed_ones(fx: Fixture) -> None:
+    """新转人工的工单必须出现在第一页。
+
+    回归：队列原先只按「风险 → 等待时长」排序，历史 ``closed`` 工单创建得更早，
+    140 条已关闭工单把刚转人工的 ``open`` 工单挤到第 143 位，而工作台一次只取 50 条，
+    于是消费者点了「转人工」、客服在队列里看不到。
+    """
+    headers = _auth(fx.token(fx.support))
+    ticket_url = f"/api/v1/support/tickets/{fx.ticket_id}"
+
+    # 老工单归档成 closed（created_at 仍然更早）
+    archived = await fx.client.patch(
+        ticket_url, json={"action": "archive", "close_reason": "历史工单"}, headers=headers
+    )
+    assert archived.status_code == 200, archived.text
+
+    engine = create_engine(fx.settings)
+    factory = create_session_factory(engine)
+    now = datetime.now(UTC)
+    async with factory() as session:
+        fresh = HandoffTicket(
+            id=uuid4(),
+            shop_id=fx.shop_id,
+            conversation_id=fx.conversation_id,
+            user_id=fx.shopper,
+            risk_level=RiskLevel.LOW,
+            primary_reason_code="USER_REQUESTS_HUMAN",
+            risk_rule_codes_jsonb=["USER_REQUESTS_HUMAN"],
+            summary_redacted="刚转人工（合成）",
+            status=HandoffStatus.OPEN,
+            priority=3,
+            created_at=now,
+            updated_at=now,
+        )
+        session.add(fresh)
+        await session.commit()
+        fresh_id = fresh.id
+    await engine.dispose()
+
+    response = await fx.client.get("/api/v1/support/tickets", headers=headers)
+    assert response.status_code == 200, response.text
+    items = response.json()["data"]["items"]
+    assert [item["ticket_id"] for item in items][:1] == [str(fresh_id)]
+    # 未结优先压过低风险：哪怕它 risk_level 更低，也排在 closed 高风险的工单之前
+    assert items[0]["status"] == "open"
+    assert items[-1]["status"] == "closed"
+
+
 async def test_queue_hides_tickets_whose_transcript_is_gone(fx: Fixture) -> None:
     """默认队列只保留能取证的行；会话软删后仍可用 transcript=all 翻出来并标注。"""
     headers = _auth(fx.token(fx.support))
@@ -479,9 +527,17 @@ async def test_ticket_detail_matches_contract(fx: Fixture) -> None:
     )
     assert response.status_code == 200, response.text
     data = response.json()["data"]
-    assert set(data) == CONTRACT_FIELDS | {"updated_at", "summary_redacted", "expected_response"}
+    # `assigned_to_me` 是详情独有的派生布尔（列表不带），用于工作台在未接管时锁住写操作；
+    # 它只回答「是不是我接的」，不暴露 assigned_to 原始 id。
+    assert set(data) == CONTRACT_FIELDS | {
+        "updated_at",
+        "summary_redacted",
+        "expected_response",
+        "assigned_to_me",
+    }
     assert data["summary_redacted"] == "用户投诉并要求赔偿（合成）"
     assert data["expected_response"]
+    assert data["assigned_to_me"] is False
 
 
 # ------------------------------------------------------------------- 状态机与审计
@@ -601,6 +657,97 @@ async def test_cross_shop_assignee_is_forbidden(fx: Fixture) -> None:
     )
     assert response.status_code == 403, response.text
     assert response.json()["error"]["code"] == "FORBIDDEN"
+
+
+async def test_reply_requires_takeover(fx: Fixture) -> None:
+    """未接管的工单不能回复用户。
+
+    历史缺口：``reply`` 只看 ``support:ticket:write`` 和工单归属，任何客服账号都能绕过
+    「接管」直接往消费者的会话里写消息。现在未接管 → ``409``，接管后 → ``201``。
+    """
+    headers = _auth(fx.token(fx.support))
+    ticket_url = f"/api/v1/support/tickets/{fx.ticket_id}"
+    reply_url = f"{ticket_url}/reply"
+
+    detail = await fx.client.get(ticket_url, headers=headers)
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["data"]["status"] == "open"
+    assert detail.json()["data"]["assigned_to_me"] is False
+
+    blocked = await fx.client.post(reply_url, json={"content": "您好，已收到。"}, headers=headers)
+    assert blocked.status_code == 409, blocked.text
+    assert blocked.json()["error"]["code"] == "INVALID_STATE"
+    assert "接管" in blocked.json()["error"]["message"]
+
+    # 被拒的回复不能留下任何痕迹
+    engine = create_engine(fx.settings)
+    factory = create_session_factory(engine)
+    async with factory() as session:
+        written = await session.scalar(
+            sa.select(sa.func.count())
+            .select_from(Message)
+            .where(
+                Message.conversation_id == fx.conversation_id,
+                Message.route == "support_agent",
+            )
+        )
+    await engine.dispose()
+    assert written == 0
+
+    assigned = await fx.client.patch(ticket_url, json={"action": "assign"}, headers=headers)
+    assert assigned.status_code == 200, assigned.text
+
+    detail = await fx.client.get(ticket_url, headers=headers)
+    assert detail.json()["data"]["assigned_to_me"] is True
+
+    ok = await fx.client.post(
+        reply_url, json={"content": "您好，已收到，正在核实。"}, headers=headers
+    )
+    assert ok.status_code == 201, ok.text
+    assert ok.json()["data"]["conversation_id"] == str(fx.conversation_id)
+
+
+async def test_reply_and_resolve_blocked_when_another_agent_holds_the_ticket(
+    fx: Fixture,
+) -> None:
+    """工单已被别人接管时，既不能回复也不能解决；接管回自己后恢复。"""
+    headers = _auth(fx.token(fx.support))
+    ticket_url = f"/api/v1/support/tickets/{fx.ticket_id}"
+
+    assigned = await fx.client.patch(
+        ticket_url,
+        json={"action": "assign", "assignee_user_id": str(fx.admin)},
+        headers=headers,
+    )
+    assert assigned.status_code == 200, assigned.text
+
+    detail = await fx.client.get(ticket_url, headers=headers)
+    assert detail.json()["data"]["status"] == "assigned"
+    assert detail.json()["data"]["assigned_to_me"] is False
+
+    reply = await fx.client.post(
+        f"{ticket_url}/reply", json={"content": "我来回复。"}, headers=headers
+    )
+    assert reply.status_code == 409, reply.text
+    assert reply.json()["error"]["code"] == "INVALID_STATE"
+    assert "其他客服" in reply.json()["error"]["message"]
+
+    resolve = await fx.client.patch(
+        ticket_url, json={"action": "resolve", "resolution_summary": "我来处理"}, headers=headers
+    )
+    assert resolve.status_code == 409, resolve.text
+    assert resolve.json()["error"]["code"] == "INVALID_STATE"
+
+    # 接管回自己（assign 允许从 assigned 转 assigned），两条路径同时解锁
+    taken = await fx.client.patch(ticket_url, json={"action": "assign"}, headers=headers)
+    assert taken.status_code == 200, taken.text
+    detail = await fx.client.get(ticket_url, headers=headers)
+    assert detail.json()["data"]["assigned_to_me"] is True
+
+    ok = await fx.client.post(
+        f"{ticket_url}/reply", json={"content": "已接手处理。"}, headers=headers
+    )
+    assert ok.status_code == 201, ok.text
 
 
 # --------------------------------------------------------------------- 会话取证

@@ -97,7 +97,7 @@ async function copyContent(): Promise<void> {
     :class="message.role === 'user' ? 'sm-message-user' : 'sm-message-assistant'"
   >
     <span v-if="message.role === 'assistant'" class="sm-avatar sm-avatar-ai" aria-hidden="true">SM</span>
-    <div class="sm-bubble-wrap">
+    <div class="sm-bubble-wrap" :class="{ 'sm-bubble-wrap-wide': message.productCards?.length }">
       <div class="sm-bubble" :class="{ 'sm-bubble-agent': isAgent }">
         <template v-if="message.role === 'user'">
           <p class="sm-bubble-text">{{ message.content }}</p>
@@ -137,6 +137,7 @@ async function copyContent(): Promise<void> {
           <ProductCardList
             v-if="message.productCards?.length"
             :cards="message.productCards"
+            revalidate
             @detail="emit('open-product', $event)"
           />
 
@@ -210,6 +211,14 @@ async function copyContent(): Promise<void> {
   display: flex;
   flex-direction: column;
   gap: 3px;
+}
+
+/*
+ * 带商品卡的气泡：气泡宽度由内容决定（flex 收缩），商品网格在不定宽容器里只会排成单列，
+ * 右侧留出大片空白。这里给一个确定宽度，让 auto-fill 网格正常铺开成多列。
+ */
+.sm-bubble-wrap-wide {
+  width: min(760px, 82%);
 }
 
 .sm-message-user .sm-bubble-wrap {

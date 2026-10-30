@@ -618,6 +618,9 @@ class SupportTicketDetail(BaseModel):
     summary_redacted: str
     expected_response: str
     transcript_available: bool = True
+    #: True when the caller is the agent currently holding the ticket. The workbench uses it
+    #: to lock reply/resolve/close before the takeover, matching the server-side guard.
+    assigned_to_me: bool = False
 
 
 class SupportTicketPatchRequest(_Strict):

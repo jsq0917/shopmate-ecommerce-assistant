@@ -817,7 +817,7 @@ support 查看会话必须由授权工单提供业务理由；admin 默认不浏
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/api/v1/support/tickets` | 风险/等待时间排序的工单队列 |
+| GET | `/api/v1/support/tickets` | 未结优先、风险/等待时间排序的工单队列 |
 | GET | `/api/v1/support/tickets/{id}` | 工单、会话/退货安全摘要、引用、工具摘要和风险 |
 | PATCH | `/api/v1/support/tickets/{id}` | 接管、解决、关闭；状态转换审计 |
 | POST | `/api/v1/support/tickets/{id}/reply` | **阶段 17**：人工回复，写回工单关联会话（`201`） |
@@ -852,6 +852,11 @@ support 查看会话必须由授权工单提供业务理由；admin 默认不浏
 历史上这些会话留下的工单一直停在 `open`，客服点进去只能看到「未找到该会话」；
 默认过滤让队列保持可处理，`all` 保留可追溯性。非法取值返回 `400 VALIDATION_ERROR`。
 
+**队列排序**：`open/assigned/resolved` 全部排在 `closed` 之前，同组内再按风险（critical → high →
+medium → 其他）与创建时间升序（等得久的在前）。原因：只按「风险 + 等待时长」排序时，历史已关闭
+工单创建得更早、会永久占据第一页，而工作台一次只取 `limit` 行（前端 50），消费者刚点的「转人工」
+就排到几百条之后、界面里看不到。已关闭工单不需要客服处理，未结的才需要。
+
 `PATCH /api/v1/support/tickets/{id}` 请求：
 
 ```json
@@ -870,8 +875,8 @@ support 查看会话必须由授权工单提供业务理由；admin 默认不浏
 | action | 允许原状态 | 新状态 | 额外要求 |
 |---|---|---|---|
 | `assign` | `open/assigned` | `assigned` | assignee 必须是同店 support/admin |
-| `resolve` | `assigned` | `resolved` | `resolution_summary` 1-500 字符 |
-| `close` | `resolved` | `closed` | `close_reason` 可选安全摘要 |
+| `resolve` | `assigned` | `resolved` | `resolution_summary` 1-500 字符；**必须是当前接管人** |
+| `close` | `resolved` | `closed` | `close_reason` 可选安全摘要；**必须是当前接管人** |
 | `archive` | `open/assigned/resolved` | `closed` | `close_reason` **必填**（阶段 20）；不得带 `resolution_summary` |
 
 `archive` 用于「会话已不存在、无法继续处理」的工单（例如评测清理后的残留）：
@@ -945,8 +950,16 @@ Content-Type: application/json
 ```
 
 - 需要 `support:ticket:write`，工单必须属于当前店铺；只读角色 → `403 FORBIDDEN`。
+- **必须先接管**：`status` 必须是 `assigned` 且 `assigned_to` 就是调用者，否则 `409 INVALID_STATE`。
+  未接管 → `工单尚未接管，不能回复用户；请先点击「接管」。`；已被他人接管 →
+  `该工单已由其他客服接管，不能回复用户；如需回复请先接管。`；`resolved`／`closed` → 同样 `409`。
+  读会话（`GET /support/conversations/{id}`）不受此限：客服需要先看内容才能判断是否接管。
 - `content` 1–2000 字符；服务端以 `role=assistant` + 人工标记追加消息，不经过模型、不改写内容。
 - 返回 `201`：`message_id`、`conversation_id`、`created_at`。
+- 工单详情额外返回 `assigned_to_me`（`bool`），供工作台在未接管时把回复/打分/解决/关闭置为不可用。
+  该字段是派生值：滚动发布或镜像未重建时旧实例不会返回它，客户端**不能把它缺失直接当成 `false`**
+  （否则自己刚接管的工单会被判成「别人接管的」，接管按钮不消失、回复框永久禁用）；缺失时应回退到
+  「本次接管调用是否成功」这类本地事实。
 
 **退款审核**——队列 + 审批，审批只改状态与审计，**不触发任何真实打款**：
 

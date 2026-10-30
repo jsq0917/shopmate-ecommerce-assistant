@@ -53,6 +53,16 @@ watch(
   { deep: true },
 )
 
+/** `add` 的结果：调用方据此决定提示文案（是否被库存/上限截断）。 */
+export interface CartAddResult {
+  /** 加购后该规格在购物车中的数量；0 表示未能加入（无可售库存）。 */
+  quantity: number
+  /** 本次实际增加的数量；0 表示已达上限，数量未变。 */
+  added: number
+  /** 是否因可售库存或单品上限被截断。 */
+  capped: boolean
+}
+
 export function useCart() {
   const items = computed(() => state.items)
   const count = computed(() => state.items.reduce((sum, item) => sum + item.quantity, 0))
@@ -61,18 +71,35 @@ export function useCart() {
   )
   const isEmpty = computed(() => state.items.length === 0)
 
-  function add(item: Omit<CartItem, 'quantity'>, quantity = 1): void {
+  /**
+   * 加入购物车（幂等累积，不产生任何服务端写入）。
+   *
+   * 已存在的规格会用本次传入的快照覆盖价格/库存/标题：加购时若刚做过库存复核，
+   * 购物车展示的就是最新事实，而不是第一次加购时的旧快照。
+   * 结算仍以后端重新计价为准，所以这里的价格只是展示值。
+   */
+  function add(item: Omit<CartItem, 'quantity'>, quantity = 1): CartAddResult {
     const limit = item.availableQty === null ? MAX_QUANTITY : Math.max(0, item.availableQty)
-    if (limit <= 0) return
+    if (limit <= 0) return { quantity: 0, added: 0, capped: true }
+    const wanted = Math.max(1, Math.floor(quantity))
     const existing = state.items.find((row) => row.variantId === item.variantId)
     if (existing) {
-      existing.quantity = Math.min(existing.quantity + quantity, limit, MAX_QUANTITY)
-      return
+      const before = existing.quantity
+      Object.assign(existing, {
+        productId: item.productId,
+        title: item.title,
+        category: item.category,
+        priceCents: item.priceCents,
+        currency: item.currency,
+        availableQty: item.availableQty,
+        quantity: Math.min(before + wanted, limit, MAX_QUANTITY),
+      })
+      const added = existing.quantity - before
+      return { quantity: existing.quantity, added, capped: added < wanted }
     }
-    state.items.push({
-      ...item,
-      quantity: Math.min(Math.max(1, quantity), limit, MAX_QUANTITY),
-    })
+    const initial = Math.min(wanted, limit, MAX_QUANTITY)
+    state.items.push({ ...item, quantity: initial })
+    return { quantity: initial, added: initial, capped: initial < wanted }
   }
 
   function setQuantity(variantId: string, quantity: number): void {

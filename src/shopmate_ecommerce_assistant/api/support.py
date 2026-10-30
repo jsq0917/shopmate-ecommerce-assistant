@@ -56,7 +56,10 @@ from shopmate_ecommerce_assistant.db.repositories.support import (
     InvalidTicketTransition,
     SupportRepository,
     SupportTicketRow,
+    TicketNotTakenOver,
     UnknownAssignee,
+    ensure_reply_allowed,
+    ensure_ticket_owned,
 )
 from shopmate_ecommerce_assistant.domain.audit.models import AuditEventRecord
 
@@ -185,6 +188,7 @@ async def get_ticket(
             summary_redacted=row.summary_redacted,
             expected_response=row.expected_response,
             transcript_available=row.transcript_available,
+            assigned_to_me=row.assigned_to is not None and row.assigned_to == context.user_id,
         ),
         request_id=request_id,
         trace_id=trace_id,
@@ -204,6 +208,15 @@ async def patch_ticket(
     existing = await repo.get_ticket(shop_id=context.shop_id, ticket_id=ticket_id)
     if existing is None:
         raise ToolError(ErrorCode.CONVERSATION_NOT_FOUND, _TICKET_NOT_FOUND)
+    # Only the agent holding the ticket may resolve or close it: ``assign`` is how a ticket
+    # changes hands, so it must stay open to every writer, while ``resolve``/``close`` are
+    # work on a case the caller is supposed to own. ``archive`` stays open to all writers
+    # because it is the orphan-cleanup path for tickets whose transcript is gone.
+    if body.action in ("resolve", "close"):
+        try:
+            ensure_ticket_owned(existing, agent_user_id=context.user_id, action="执行该操作")
+        except TicketNotTakenOver as exc:
+            raise ToolError(ErrorCode.INVALID_STATE, str(exc)) from exc
     try:
         row = await repo.transition(
             shop_id=context.shop_id,
@@ -394,11 +407,19 @@ async def reply_to_ticket(
     render it as "人工客服" rather than as an AI answer. The conversation owner is looked up
     from the conversation row (never from the body) and the message keeps the owner's
     ``user_id`` so the shopper's transcript query still finds it.
+
+    Writing into the shopper's conversation requires the caller to have **taken the ticket
+    over** (``status=assigned`` and ``assigned_to=caller``): reading a transcript is what
+    an agent does to decide whether to take it, replying is work that presupposes ownership.
     """
     repo = SupportRepository(session)
     ticket = await repo.get_ticket(shop_id=context.shop_id, ticket_id=ticket_id)
     if ticket is None:
         raise ToolError(ErrorCode.CONVERSATION_NOT_FOUND, _TICKET_NOT_FOUND)
+    try:
+        ensure_reply_allowed(ticket, agent_user_id=context.user_id)
+    except TicketNotTakenOver as exc:
+        raise ToolError(ErrorCode.INVALID_STATE, str(exc)) from exc
     owner_id = (
         await session.execute(
             sa.select(Conversation.user_id).where(

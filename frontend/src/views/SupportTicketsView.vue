@@ -4,11 +4,24 @@
  *
  * 两个列表都只返回当前店铺的数据（后端校验），前端筛选不构成安全边界。
  * 退款审批是人工动作：通过/拒绝都必须留下说明，拒绝时说明必填。
+ *
+ * 工单驳回同样是人工动作，且**不删除任何数据**：复用状态机的 archive 迁移
+ * （open/assigned/resolved → closed，close_reason 必填、写审计），
+ * 工单与聊天记录都留在库里，用户侧仍能看到关闭原因。
  */
 
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElButton, ElMessage, ElMessageBox, ElOption, ElSelect, ElTag } from 'element-plus'
+import {
+  ElAlert,
+  ElButton,
+  ElCheckbox,
+  ElMessage,
+  ElMessageBox,
+  ElOption,
+  ElSelect,
+  ElTag,
+} from 'element-plus'
 
 import StateBlock from '@/components/common/StateBlock.vue'
 import { supportApi } from '@/api/endpoints'
@@ -45,12 +58,55 @@ const refunds = ref<RefundItem[]>([])
 const refundStatus = ref('requested')
 const reviewing = ref<string | null>(null)
 
-const openCount = computed(() => tickets.value.filter((item) => item.status === 'open').length)
 const deadTranscriptCount = computed(() => tickets.value.filter((item) => !item.transcript_available).length)
-const riskyCount = computed(
-  () => tickets.value.filter((item) => ['high', 'critical'].includes(item.risk_level)).length,
-)
 const pendingRefunds = computed(() => refunds.value.filter((item) => item.status === 'requested'))
+
+/** 可驳回状态：已解决 / 已关闭的工单不参与驳回（前者应走「关闭」，后者已终结）。 */
+const REJECTABLE_STATUS = ['open', 'assigned'] as const
+
+function isRejectable(row: SupportTicketListItem): boolean {
+  return (REJECTABLE_STATUS as readonly string[]).includes(row.status)
+}
+
+/** 勾选的工单 id。只存 id，列表刷新后由 pruneSelection 剔除已不可驳回的行。 */
+const selectedIds = ref<string[]>([])
+const rejecting = ref(false)
+/** 批量驳回的失败明细：不用 toast 吞掉，留在页面上可查。 */
+const rejectFailures = ref<Array<{ ticketId: string; message: string }>>([])
+
+const rejectableTickets = computed(() => tickets.value.filter(isRejectable))
+const rejectableCount = computed(() => rejectableTickets.value.length)
+const allSelected = computed(
+  () => rejectableCount.value > 0 && selectedIds.value.length === rejectableCount.value,
+)
+const partlySelected = computed(() => selectedIds.value.length > 0 && !allSelected.value)
+
+function setSelected(ticketId: string, checked: unknown): void {
+  const target = tickets.value.find((row) => row.ticket_id === ticketId)
+  if (!target || !isRejectable(target)) return
+  const next = new Set(selectedIds.value)
+  if (checked) next.add(ticketId)
+  else next.delete(ticketId)
+  selectedIds.value = [...next]
+}
+
+function toggleSelectAll(checked: unknown): void {
+  selectedIds.value = checked ? rejectableTickets.value.map((row) => row.ticket_id) : []
+}
+
+function onSelectAllChange(checked: unknown): void {
+  toggleSelectAll(Boolean(checked))
+}
+
+function onRowChange(ticketId: string, checked: unknown): void {
+  setSelected(ticketId, Boolean(checked))
+}
+
+/** 列表刷新后，把已不在「可驳回」集合里的 id 从选中项里去掉，避免批量操作打到旧数据。 */
+function pruneSelection(): void {
+  const allowed = new Set(rejectableTickets.value.map((row) => row.ticket_id))
+  selectedIds.value = selectedIds.value.filter((id) => allowed.has(id))
+}
 
 async function loadTickets(): Promise<void> {
   loading.value = true
@@ -63,6 +119,7 @@ async function loadTickets(): Promise<void> {
       limit: 50,
     })
     tickets.value = data.items
+    pruneSelection()
   } catch (caught) {
     error.value = toApiError(caught)
     tickets.value = []
@@ -92,6 +149,81 @@ function riskType(level: string): 'danger' | 'warning' | 'info' {
   if (level === 'critical' || level === 'high') return 'danger'
   if (level === 'medium') return 'warning'
   return 'info'
+}
+
+/**
+ * 批量驳回：一次确认 + 一次填写原因，然后对每条工单各自调用 PATCH。
+ *
+ * 之所以逐条调用而不是新造批量接口：后端每次迁移都会写一条审计（谁、从什么状态到什么状态、
+ * 有没有原因），逐条调用才能保证「哪几条成功、哪几条失败」可以逐条追溯；部分失败也不会
+ * 让整批回滚成一个说不清的结果。选中的工单最多就是当前页的 50 条。
+ */
+async function rejectSelected(): Promise<void> {
+  if (rejecting.value) return
+  const targets = tickets.value.filter(
+    (row) => selectedIds.value.includes(row.ticket_id) && isRejectable(row),
+  )
+  if (!targets.length) {
+    ElMessage.warning('请先选择要驳回的工单')
+    return
+  }
+
+  const deadCount = targets.filter((row) => !row.transcript_available).length
+  const deadNote = deadCount ? `，其中 ${deadCount} 条的会话已被用户删除（只关闭工单，不影响会话）` : ''
+  let reason = ''
+  try {
+    const result = await ElMessageBox.prompt(
+      `将驳回并关闭选中的 ${targets.length} 条工单${deadNote}。驳回原因会写入工单记录与审计日志；关闭后不可撤销，工单数据不会被删除。`,
+      `批量驳回 ${targets.length} 条工单`,
+      {
+        confirmButtonText: '确认驳回',
+        cancelButtonText: '取消',
+        inputType: 'textarea',
+        inputPlaceholder: '例如：重复提交 / 信息不足无法受理 / 非本店售后范围',
+        inputValidator: (value: string) =>
+          (value && value.trim().length >= 2) || '请填写至少 2 个字的驳回原因',
+      },
+    )
+    reason = String(result.value ?? '').trim()
+  } catch {
+    // 用户取消：什么都不做，保留当前选择。
+    return
+  }
+  if (!reason) return
+
+  rejecting.value = true
+  rejectFailures.value = []
+  try {
+    const results = await Promise.allSettled(
+      targets.map((row) =>
+        supportApi.patchTicket(row.ticket_id, {
+          action: 'archive',
+          // 后端 close_reason ≤ 240 字符，前缀固定 5 字，留足裁剪余量。
+          close_reason: `批量驳回：${reason}`.slice(0, 240),
+        }),
+      ),
+    )
+    const failures = results.flatMap((result, index) =>
+      result.status === 'rejected'
+        ? [{ ticketId: targets[index].ticket_id, message: toApiError(result.reason).message }]
+        : [],
+    )
+    rejectFailures.value = failures
+    const succeeded = targets.length - failures.length
+
+    if (!failures.length) {
+      ElMessage.success(`已驳回 ${succeeded} 条工单`)
+    } else if (succeeded) {
+      ElMessage.warning(`已驳回 ${succeeded} 条，${failures.length} 条失败，失败明细见列表上方`)
+    } else {
+      ElMessage.error(`驳回失败：${failures[0].message}`)
+    }
+
+    selectedIds.value = []
+    await loadTickets()
+  } finally {
+    rejecting.value = false
+  }
 }
 
 async function review(row: RefundItem, approve: boolean): Promise<void> {
@@ -147,15 +279,9 @@ onMounted(async () => {
       <ElButton @click="loadTickets(); loadRefunds()">刷新</ElButton>
     </div>
 
+    <!-- 只保留退款待办计数：「待处理工单」「高风险工单」两张统计卡已下线（数据不受影响，
+         仍可通过下方状态/风险筛选查看），避免同一份队列在顶部和列表里重复曝光。 -->
     <div class="sm-stats">
-      <div class="sm-stat">
-        <span class="sm-stat-label">待处理工单</span>
-        <strong>{{ openCount }}</strong>
-      </div>
-      <div class="sm-stat">
-        <span class="sm-stat-label">高风险工单</span>
-        <strong class="sm-stat-danger">{{ riskyCount }}</strong>
-      </div>
       <div class="sm-stat">
         <span class="sm-stat-label">待审核退款</span>
         <strong>{{ pendingRefunds.length }}</strong>
@@ -206,6 +332,44 @@ onMounted(async () => {
         </span>
       </div>
 
+      <div v-if="rejectableCount" class="sm-bulk-bar">
+        <ElCheckbox
+          :model-value="allSelected"
+          :indeterminate="partlySelected"
+          :disabled="rejecting"
+          @change="onSelectAllChange"
+        >
+          全选可驳回（{{ rejectableCount }}）
+        </ElCheckbox>
+        <span class="sm-muted">已选 {{ selectedIds.length }} 条</span>
+        <ElButton
+          size="small"
+          type="danger"
+          plain
+          :disabled="!selectedIds.length || rejecting"
+          :loading="rejecting"
+          @click="rejectSelected"
+        >
+          批量驳回
+        </ElButton>
+        <span class="sm-muted sm-bulk-hint">驳回 = 关闭工单并记录原因，不删除工单与聊天记录</span>
+      </div>
+
+      <ElAlert
+        v-if="rejectFailures.length"
+        class="sm-block"
+        type="warning"
+        :closable="false"
+        show-icon
+        title="部分工单驳回失败，可重试或逐条处理"
+      >
+        <ul class="sm-failure-list">
+          <li v-for="item in rejectFailures" :key="item.ticketId">
+            <span class="sm-mono">{{ item.ticketId }}</span>：{{ item.message }}
+          </li>
+        </ul>
+      </ElAlert>
+
       <StateBlock
         :loading="loading && !tickets.length"
         :error="error"
@@ -221,6 +385,15 @@ onMounted(async () => {
             @click="router.push(`/support/tickets/${row.ticket_id}`)"
           >
             <div class="sm-ticket-top">
+              <!-- 勾选只负责选中，不触发卡片跳转；已解决/已关闭不可驳回，勾选框置灰 -->
+              <ElCheckbox
+                class="sm-ticket-check"
+                :model-value="selectedIds.includes(row.ticket_id)"
+                :disabled="!isRejectable(row) || rejecting"
+                :title="isRejectable(row) ? '选择此工单用于批量驳回' : '已解决 / 已关闭的工单不能驳回'"
+                @click.stop
+                @change="onRowChange(row.ticket_id, $event)"
+              />
               <ElTag size="small" :type="riskType(row.risk_level)" effect="light">
                 {{ riskLevelLabel(row.risk_level) }}风险
               </ElTag>
@@ -315,13 +488,15 @@ onMounted(async () => {
 
 <style scoped>
 .sm-stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 16px;
 }
 
 .sm-stat {
+  flex: 1 1 180px;
+  max-width: 260px;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -342,8 +517,38 @@ onMounted(async () => {
   font-variant-numeric: tabular-nums;
 }
 
-.sm-stat-danger {
-  color: var(--sm-danger);
+/* ---- 批量驳回 ------------------------------------------------------- */
+
+.sm-bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  border: 1px solid var(--sm-border);
+  border-radius: var(--sm-radius);
+  background: var(--sm-surface);
+  box-shadow: var(--sm-shadow-xs);
+}
+
+.sm-bulk-hint {
+  margin-left: auto;
+  font-size: 12px;
+}
+
+.sm-ticket-check {
+  margin-right: 2px;
+}
+
+.sm-failure-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+}
+
+.sm-block {
+  margin-bottom: 10px;
 }
 
 .sm-tabs {
@@ -475,8 +680,12 @@ onMounted(async () => {
 }
 
 @media (max-width: 768px) {
-  .sm-stats {
-    grid-template-columns: 1fr;
+  .sm-stat {
+    max-width: none;
+  }
+
+  .sm-bulk-hint {
+    margin-left: 0;
   }
 }
 </style>

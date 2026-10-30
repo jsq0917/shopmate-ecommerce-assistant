@@ -61,6 +61,39 @@ class UnknownAssignee(Exception):
     """The requested assignee does not exist in this shop or cannot handle tickets."""
 
 
+class TicketNotTakenOver(Exception):
+    """The caller never claimed this ticket, so it has no right to write into the case."""
+
+
+def ensure_reply_allowed(ticket: SupportTicketRow, *, agent_user_id: UUID) -> None:
+    """Raise unless ``agent_user_id`` may append a human reply to this ticket.
+
+    Reading a transcript is deliberately *not* gated: an agent has to read the case before
+    deciding whether to take it. Writing into the shopper's conversation is gated, because
+    an unclaimed ticket would otherwise let any account holding ``support:ticket:write``
+    answer the shopper without going through the ``接管`` handshake.
+    """
+    status = str(ticket.status)
+    if status == HandoffStatus.OPEN.value:
+        raise TicketNotTakenOver("工单尚未接管，不能回复用户；请先点击「接管」。")
+    if status == HandoffStatus.RESOLVED.value:
+        raise TicketNotTakenOver("工单已标记解决，不能再回复用户。")
+    if status == HandoffStatus.CLOSED.value:
+        raise TicketNotTakenOver("工单已关闭，不能再回复用户。")
+    if ticket.assigned_to != agent_user_id:
+        raise TicketNotTakenOver("该工单已由其他客服接管，不能回复用户；如需回复请先接管。")
+
+
+def ensure_ticket_owned(
+    ticket: SupportTicketRow, *, agent_user_id: UUID, action: str
+) -> None:
+    """Raise unless ``agent_user_id`` is the agent currently holding this ticket."""
+    if ticket.assigned_to is None:
+        raise TicketNotTakenOver(f"工单尚未接管，不能{action}；请先点击「接管」。")
+    if ticket.assigned_to != agent_user_id:
+        raise TicketNotTakenOver(f"该工单已由其他客服接管，不能{action}；如需继续处理请先接管。")
+
+
 def queue_for(risk_level: str) -> str:
     """Return the stable queue name for a risk level (contract §12)."""
     return "priority_support" if risk_level in ("high", "critical") else "standard_support"
@@ -102,6 +135,9 @@ class SupportTicketRow:
     #: False when the conversation behind the ticket is gone (soft-deleted): the ticket
     #: still exists and stays auditable, but no transcript can be produced for it.
     transcript_available: bool = True
+    #: Raw assignee id. Never serialised (responses only carry ``assigned_to_masked``) but
+    #: needed to decide whether the caller is the agent who actually took the ticket over.
+    assigned_to: UUID | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -170,6 +206,7 @@ def _ticket_row(
         waiting_seconds=_waiting_seconds(row.created_at, now),
         summary_redacted=row.summary_redacted,
         transcript_available=transcript_available,
+        assigned_to=row.assigned_to,
     )
 
 
@@ -213,7 +250,12 @@ class SupportRepository:
         limit: int = 20,
         offset: int = 0,
     ) -> tuple[SupportTicketRow, ...]:
-        """Return the ticket queue: highest risk first, then longest waiting first.
+        """Return the ticket queue: unresolved first, then highest risk, then longest waiting.
+
+        ``closed`` tickets are pushed behind every live one. Sorting purely by risk/age put
+        four-day-old closed tickets at the top of the first page, so a ticket the shopper
+        had just escalated never appeared in the workbench (the page only loads ``limit``
+        rows): a closed ticket needs no agent, an open one does.
 
         ``transcript="available"`` (default) hides tickets whose conversation is gone:
         those rows are real and auditable, but an agent can never open them, so showing
@@ -224,6 +266,8 @@ class SupportRepository:
             raise ValueError(f"unknown transcript filter: {transcript!r}")
         owner = sa.orm.aliased(User)
         assignee = sa.orm.aliased(User)
+        # 0 for anything an agent can still work on (open/assigned/resolved), 1 for closed.
+        unresolved = sa.case((HandoffTicket.status == HandoffStatus.CLOSED, 1), else_=0)
         severity = sa.case(
             (HandoffTicket.risk_level == "critical", 0),
             (HandoffTicket.risk_level == "high", 1),
@@ -255,7 +299,7 @@ class SupportRepository:
                 ),
             )
             .where(HandoffTicket.shop_id == shop_id)
-            .order_by(severity, HandoffTicket.created_at, HandoffTicket.id)
+            .order_by(unresolved, severity, HandoffTicket.created_at, HandoffTicket.id)
             .offset(offset)
             .limit(limit)
         )

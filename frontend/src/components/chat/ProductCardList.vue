@@ -1,24 +1,39 @@
 <script setup lang="ts">
 /**
  * 商品卡片网格。价格/库存/as_of 全部来自工具事实，不推断、不补写。
- * 卡片可直接加购（使用当前展示的规格快照），也可打开详情换规格。
+ * 卡片可直接加购：默认用卡片上的规格快照；聊天场景（revalidate）会先向商品详情接口复核
+ * 一次库存与价格，复核到售罄就拒绝加入。也可打开详情换规格。
  */
 
-import { ElButton, ElCheckbox, ElTag } from 'element-plus'
+import { onBeforeUnmount, reactive } from 'vue'
+import { ElButton, ElCheckbox, ElMessage, ElTag } from 'element-plus'
 
 import DataAsOfTag from '@/components/common/DataAsOfTag.vue'
 import ProductThumb from '@/components/common/ProductThumb.vue'
+import { productsApi } from '@/api/endpoints'
 import { useCart } from '@/composables/useCart'
 import { attributeValueText, formatMoney, stockStatusLabel } from '@/utils/format'
 import type { ProductCardBase } from '@/api/types'
 
-defineProps<{
-  cards: ProductCardBase[]
-  selectable?: boolean
-  selectedIds?: string[]
-  /** 卡片右上角是否显示「可加购」入口。 */
-  buyable?: boolean
-}>()
+/**
+ * `buyable` 必须显式给默认值：仅声明 `buyable?: boolean` 时 Vue 会把「未传」的布尔 prop
+ * 强制转成 false，按钮就会恒定 disabled（这正是之前「加购」点不动的根因）。
+ */
+const props = withDefaults(
+  defineProps<{
+    cards: ProductCardBase[]
+    selectable?: boolean
+    selectedIds?: string[]
+    /** 卡片右上角是否显示「可加购」入口。 */
+    buyable?: boolean
+    /**
+     * 加购前是否用商品详情接口复核库存。
+     * 聊天里的卡片是历史快照（可能几分钟前），需要复核；商品中心列表本身就是刚查到的，不必再打一次。
+     */
+    revalidate?: boolean
+  }>(),
+  { buyable: true, selectable: false, selectedIds: () => [], revalidate: false },
+)
 
 const emit = defineEmits<{
   (e: 'detail', card: ProductCardBase): void
@@ -26,6 +41,13 @@ const emit = defineEmits<{
 }>()
 
 const cart = useCart()
+
+/** 正在复核/写入的规格：既用于按钮 loading，也是重复点击的闸门（同一规格只允许一个在途请求）。 */
+const pendingVariants = reactive(new Set<string>())
+/** 刚加购成功的规格：按钮短暂显示「已加入」，给出即时反馈。 */
+const addedVariants = reactive(new Set<string>())
+const flashTimers = new Map<string, number>()
+const FLASH_MS = 1400
 
 /** 搜索卡片带 category；SSE 商品卡不带，退回空字符串使用默认封面。 */
 function cardCategory(card: ProductCardBase): string {
@@ -39,17 +61,102 @@ function stockClass(status: string): string {
   return 'sm-stock-unknown'
 }
 
-function addToCart(card: ProductCardBase): void {
-  if (card.stock_status === 'out_of_stock') return
-  cart.add({
-    variantId: card.variant_id,
-    productId: card.product_id,
-    title: card.title,
-    category: cardCategory(card),
-    priceCents: card.price_cents,
-    currency: card.currency,
-    availableQty: card.available_qty,
-  })
+function isPending(card: ProductCardBase): boolean {
+  return pendingVariants.has(card.variant_id)
+}
+
+function buttonLabel(card: ProductCardBase): string {
+  if (isPending(card)) return '加购中'
+  if (addedVariants.has(card.variant_id)) return '已加入'
+  return '加购'
+}
+
+function flashAdded(variantId: string): void {
+  addedVariants.add(variantId)
+  const existing = flashTimers.get(variantId)
+  if (existing) window.clearTimeout(existing)
+  flashTimers.set(
+    variantId,
+    window.setTimeout(() => {
+      addedVariants.delete(variantId)
+      flashTimers.delete(variantId)
+    }, FLASH_MS),
+  )
+}
+
+onBeforeUnmount(() => {
+  for (const timer of flashTimers.values()) window.clearTimeout(timer)
+  flashTimers.clear()
+})
+
+/**
+ * 加购：卡片快照 → （可选）服务端库存复核 → 写入本地购物车 → 反馈。
+ *
+ * 库存/价格只能来自结构化数据（业务铁律 1）：复核到售罄就拒绝加入，
+ * 复核接口不可用时退回卡片快照并在提示里说明「结算会重新校验」，不阻断用户。
+ */
+async function addToCart(card: ProductCardBase): Promise<void> {
+  if (!props.buyable) return
+  if (card.stock_status === 'out_of_stock') {
+    ElMessage.warning('该规格暂时无货，换个规格看看')
+    return
+  }
+  if (pendingVariants.has(card.variant_id)) return
+  pendingVariants.add(card.variant_id)
+
+  try {
+    let priceCents = card.price_cents
+    let currency = card.currency
+    let availableQty = card.available_qty
+    let revalidated = true
+
+    if (props.revalidate) {
+      try {
+        const detail = await productsApi.detail(card.product_id)
+        const variant = detail.product.variants.find((row) => row.id === card.variant_id)
+        if (!variant) {
+          ElMessage.warning('该规格已下架，打开「详情」换个规格看看')
+          return
+        }
+        if (variant.stock_status === 'out_of_stock' || (variant.available_qty ?? 1) <= 0) {
+          ElMessage.warning('该规格刚刚售罄，换个规格或稍后再试')
+          return
+        }
+        priceCents = variant.price_cents
+        currency = variant.currency
+        availableQty = variant.available_qty
+      } catch {
+        revalidated = false
+      }
+    }
+
+    const result = cart.add({
+      variantId: card.variant_id,
+      productId: card.product_id,
+      title: card.title,
+      category: cardCategory(card),
+      priceCents,
+      currency,
+      availableQty,
+    })
+
+    if (result.quantity === 0) {
+      ElMessage.warning('该规格暂无可售库存，未能加入购物车')
+      return
+    }
+    flashAdded(card.variant_id)
+    if (!revalidated) {
+      ElMessage.warning('库存校验失败，已按卡片显示的信息加入，结算时会重新校验')
+    } else if (result.added === 0) {
+      ElMessage.warning(`该规格最多可买 ${result.quantity} 件，购物车数量未再增加`)
+    } else if (result.capped) {
+      ElMessage.success(`已加入购物车（受可售库存限制，当前共 ${result.quantity} 件）`)
+    } else {
+      ElMessage.success(`已加入购物车（共 ${result.quantity} 件）`)
+    }
+  } finally {
+    pendingVariants.delete(card.variant_id)
+  }
 }
 </script>
 
@@ -105,10 +212,11 @@ function addToCart(card: ProductCardBase): void {
             <ElButton
               size="small"
               type="primary"
-              :disabled="card.stock_status === 'out_of_stock' || buyable === false"
+              :loading="isPending(card)"
+              :disabled="card.stock_status === 'out_of_stock' || !buyable"
               @click="addToCart(card)"
             >
-              加购
+              {{ buttonLabel(card) }}
             </ElButton>
           </div>
         </footer>

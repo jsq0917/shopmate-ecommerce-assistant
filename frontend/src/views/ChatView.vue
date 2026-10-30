@@ -35,6 +35,7 @@ import type {
   ProductCardData,
 } from '@/api/types'
 import { useChatStream } from '@/composables/useChatStream'
+import { useAuthStore } from '@/stores/auth'
 import { routeLabel } from '@/utils/format'
 
 defineOptions({ name: 'ChatView' })
@@ -45,6 +46,8 @@ const POLL_INTERVAL_MS = 8000
 const LOCAL_KEY_PREFIX = 'local-'
 
 const { turn, send, stop, resetTurn } = useChatStream()
+
+const auth = useAuthStore()
 
 const conversations = ref<ConversationItem[]>([])
 const activeId = ref<string | null>(null)
@@ -165,6 +168,57 @@ watch(
 )
 const activeTitle = computed(() => activeConversation.value?.title ?? '智能客服')
 const showWelcome = computed(() => !messages.value.length && !busy.value)
+
+/**
+ * 换账号时把本页所有账号相关的内存状态清空并重新拉取。
+ *
+ * AppShell 已经用 user_id 作为 keep-alive 缓存键，正常路径下会拿到全新的组件实例；
+ * 这里再兜一层：只要身份变了（例如将来去掉缓存键、或令牌刷新换成了另一个人的会话），
+ * 也不能让上一个账号的会话列表、消息、引用和流式状态留在界面上。
+ */
+function resetForAccountSwitch(): void {
+  stop()
+  resetTurn()
+  conversations.value = []
+  messages.value = []
+  activeId.value = null
+  lastUserText.value = ''
+  listError.value = null
+  messagesError.value = null
+  drawerCitations.value = []
+  citationDrawerVisible.value = false
+  detailVisible.value = false
+  detailProductId.value = null
+  handoffVisible.value = false
+  selectedKbIds.value = []
+  generationDraft.value = {}
+  kbError.value = null
+  generationError.value = null
+  void loadConversations()
+  void loadKnowledgeBases()
+}
+
+/** 当前界面上的数据属于哪个账号：用它判断「是不是换了人」，而不是依赖 watch 的上一次值。 */
+let loadedAccountId: string | null = auth.user?.user_id ?? null
+
+watch(
+  () => auth.user?.user_id ?? null,
+  (current) => {
+    if (current === loadedAccountId) return
+    loadedAccountId = current
+    if (!current) {
+      // 已登出：页面马上会被缓存淘汰/替换，这里只做内存清理，不再发请求。
+      stop()
+      resetTurn()
+      conversations.value = []
+      messages.value = []
+      activeId.value = null
+      lastUserText.value = ''
+      return
+    }
+    resetForAccountSwitch()
+  },
+)
 
 const SUGGESTIONS: Array<{ icon: string; title: string; text: string }> = [
   {
@@ -374,6 +428,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (pollTimer) window.clearInterval(pollTimer)
+  // 实例被淘汰（换账号 / 缓存移除）时断开在途 SSE，避免把上一个账号的回答写进当前界面。
+  stop()
 })
 </script>
 

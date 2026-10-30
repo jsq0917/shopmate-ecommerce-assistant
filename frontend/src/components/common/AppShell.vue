@@ -54,6 +54,9 @@ const navItems = computed(() => {
 
 const isAuthPage = computed(() => route.name === 'login')
 
+/** keep-alive 的缓存键：只有同一账号才复用同一个页面实例。 */
+const accountKey = computed(() => auth.user?.user_id ?? 'anonymous')
+
 const displayName = computed(() => auth.user?.display_name_masked ?? auth.user?.email ?? '未登录')
 const avatarText = computed(() => displayName.value.trim().slice(0, 1) || 'S')
 
@@ -68,6 +71,9 @@ async function onLogout(): Promise<void> {
     return
   }
   await auth.logout()
+  // 购物车是浏览器级本地状态（localStorage），登出后必须清空，否则下一个登录的账号
+  // 会看到上一个人加购的商品。
+  cart.clear()
   await router.push({ name: 'login' })
 }
 </script>
@@ -138,8 +144,13 @@ async function onLogout(): Promise<void> {
 
     <main class="sm-shell-main">
       <router-view v-slot="{ Component }">
-        <keep-alive include="ChatView">
-          <component :is="Component" />
+        <!--
+          账号隔离：keep-alive 只按组件名缓存，同一个 SPA 会话里换账号会复用上一个账号的
+          ChatView 实例（onMounted 不再执行），会话列表与消息就停留在旧账号上。
+          把当前 user_id 拼进缓存键，换人即换实例；max=1 保证旧实例被淘汰释放。
+        -->
+        <keep-alive include="ChatView" :max="1">
+          <component :is="Component" :key="accountKey" />
         </keep-alive>
       </router-view>
     </main>
